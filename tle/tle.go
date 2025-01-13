@@ -2,6 +2,8 @@ package tle
 
 import (
 	"bufio"
+	"fmt"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -54,59 +56,119 @@ type TLE struct {
 }
 
 func ReadTLELine1(line string) (TLELine1, error) {
-	// Example: 1 25544U 98067A   08264.51782528 -.00002182  00000-0 -11606-4 0  2927
-
-	//parse the line
-	//split the line into its components
-
-	components := strings.Fields(line)
-	TleLine1 := TLELine1{}
-	TleLine1.LineString = line
-	TleLine1.LineNumber = components[0]
-	TleLine1.SataliteID = components[1][0:5]
-	TleLine1.Classification = components[1][5:6]
-	TleLine1.LaunchYear = components[2][0:2]
-	TleLine1.LaunchNumber = components[2][2:5]
-	TleLine1.LaunchPiece = components[2][5:len(components[2])]
-	TleLine1.EpochYear = components[3][0:2]
-	TleLine1.EpochDay = components[3][2:14]
-	TleLine1.FirstDerivative = components[4][0:1] + "e" + components[4][1:8]
-	if components[5][0:1] == "-" {
-		TleLine1.SecondDerivative = components[5][0:1] + "e" + components[5][1:8]
-	} else {
-		TleLine1.SecondDerivative = "0." + components[5][0:len(components[5])]
+	if len(line) < 69 {
+		return TLELine1{}, fmt.Errorf("line 1 too short: %d chars", len(line))
 	}
-	TleLine1.Bstar = components[6][0:1] + "e" + components[6][1:8]
-	TleLine1.EphemerisType = components[7][0:1]
-	TleLine1.ElementSetNumber = components[8][0:4]
-	TleLine1.Checksum = components[8][4:len(components[8])]
-	return TleLine1, nil
-	//convert the components to their respective types
 
-	//return the parsed line
+	tleLine1 := TLELine1{
+		LineString: line,
+	}
+
+	// Fixed-width field parsing based on TLE format specification
+	fields := map[string][2]int{
+		"LineNumber":       {0, 1},
+		"SatelliteID":      {2, 7},
+		"Classification":   {7, 8},
+		"LaunchYear":       {9, 11},
+		"LaunchNumber":     {11, 14},
+		"LaunchPiece":      {14, 17},
+		"EpochYear":        {18, 20},
+		"EpochDay":         {20, 32},
+		"FirstDerivative":  {33, 43},
+		"SecondDerivative": {44, 52},
+		"Bstar":            {53, 61},
+		"EphemerisType":    {62, 63},
+		"ElementSetNumber": {64, 68},
+		"Checksum":         {68, 69},
+	}
+
+	var err error
+	for field, pos := range fields {
+		value := strings.TrimSpace(line[pos[0]:pos[1]])
+		switch field {
+		case "SatelliteID":
+			tleLine1.SataliteID = value
+		case "Classification":
+			tleLine1.Classification = value
+		case "LaunchYear":
+			tleLine1.LaunchYear = value
+		case "LaunchNumber":
+			tleLine1.LaunchNumber = value
+		case "LaunchPiece":
+			tleLine1.LaunchPiece = value
+		case "EpochYear":
+			tleLine1.EpochYear = value
+		case "EpochDay":
+			tleLine1.EpochDay = value
+		case "FirstDerivative":
+			tleLine1.FirstDerivative = parseScientificNotation(value)
+		case "SecondDerivative":
+			tleLine1.SecondDerivative = parseScientificNotation(value)
+		case "Bstar":
+			tleLine1.Bstar = parseScientificNotation(value)
+		case "EphemerisType":
+			tleLine1.EphemerisType = value
+		case "ElementSetNumber":
+			tleLine1.ElementSetNumber = value
+		case "Checksum":
+			tleLine1.Checksum = value
+		}
+	}
+
+	return tleLine1, err
 }
+
 func ReadTLELine2(line string) (TLELine2, error) {
-	// Example: 2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391563537
+	if len(line) < 69 {
+		return TLELine2{}, fmt.Errorf("line 2 too short: %d chars", len(line))
+	}
 
-	//parse the line
-	//split the line into its components
-	components := strings.Fields(line)
-	TleLine2 := TLELine2{}
-	TleLine2.LineString = line
-	TleLine2.LineNumber = components[0]
-	TleLine2.SataliteID = components[1]
-	TleLine2.Inclination = components[2]
-	TleLine2.RightAscension = components[3]
-	TleLine2.Eccentricity = "0." + components[4]
-	TleLine2.ArgumentOfPerigee = components[5]
-	TleLine2.MeanAnomaly = components[6]
-	TleLine2.MeanMotion = components[7][0:11]
-	TleLine2.RevolutionNumber = components[7][11:16]
-	TleLine2.Checksum = components[7][16:17]
-	return TleLine2, nil
+	tleLine2 := TLELine2{
+		LineString: line,
+	}
 
-	//return the parsed line
+	// Fixed-width field parsing based on TLE format specification
+	fields := map[string][2]int{
+		"LineNumber":        {0, 1},
+		"SatelliteID":       {2, 7},
+		"Inclination":       {8, 16},
+		"RightAscension":    {17, 25},
+		"Eccentricity":      {26, 33},
+		"ArgumentOfPerigee": {34, 42},
+		"MeanAnomaly":       {43, 51},
+		"MeanMotion":        {52, 63},
+		"RevolutionNumber":  {63, 68},
+		"Checksum":          {68, 69},
+	}
+
+	var err error
+	for field, pos := range fields {
+		value := strings.TrimSpace(line[pos[0]:pos[1]])
+		switch field {
+		case "SatelliteID":
+			tleLine2.SataliteID = value
+		case "Inclination":
+			tleLine2.Inclination = value
+		case "RightAscension":
+			tleLine2.RightAscension = value
+		case "Eccentricity":
+			tleLine2.Eccentricity = "0." + value // Add leading "0." for eccentricity
+		case "ArgumentOfPerigee":
+			tleLine2.ArgumentOfPerigee = value
+		case "MeanAnomaly":
+			tleLine2.MeanAnomaly = value
+		case "MeanMotion":
+			tleLine2.MeanMotion = value
+		case "RevolutionNumber":
+			tleLine2.RevolutionNumber = value
+		case "Checksum":
+			tleLine2.Checksum = value
+		}
+	}
+
+	return tleLine2, err
 }
+
 func ReadTLEFile(filePath string) ([]TLE, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -152,17 +214,73 @@ func ReadTLEFile(filePath string) ([]TLE, error) {
 	return tles, nil
 }
 
-func (t TLE) CalculatePositionECI(time time.Time) (position satellite.Vector3, velocity satellite.Vector3) {
-	// SGP4
-	position, velocity = satellite.Propagate(t.SatallliteObject, time.Year(), int(time.Month()), time.Day(), time.Hour(), time.Minute(), time.Second())
-	return position, velocity
+func (t TLE) CalculatePositionECI(time time.Time) (position satellite.Vector3, velocity satellite.Vector3, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("calculation error: %v", r)
+		}
+	}()
+
+	position, velocity = satellite.Propagate(
+		t.SatallliteObject,
+		time.Year(),
+		int(time.Month()),
+		time.Day(),
+		time.Hour(),
+		time.Minute(),
+		time.Second(),
+	)
+	return position, velocity, nil
 }
 
-func (t TLE) CalculatePositionLLA(time time.Time) (latitude float64, longitude float64, altitude satellite.LatLong) {
-	// SGP4
-	gmst := satellite.GSTimeFromDate(time.Year(), int(time.Month()), time.Day(), time.Hour(), time.Minute(), time.Second())
-	position, _ := t.CalculatePositionECI(time)
-	latitude, longitude, altitude = satellite.ECIToLLA(position, gmst)
-	return latitude, longitude, altitude
+func (t TLE) CalculatePositionLLA(time time.Time) (latitude, longitude float64, altitude satellite.LatLong, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("calculation error: %v", r)
+		}
+	}()
 
+	position, _, err := t.CalculatePositionECI(time.UTC())
+	if err != nil {
+		return 0, 0, satellite.LatLong{}, err
+	}
+
+	gmst := satellite.GSTimeFromDate(
+		time.Year(),
+		int(time.Month()),
+		time.Day(),
+		time.Hour(),
+		time.Minute(),
+		time.Second(),
+	)
+
+	latitude, longitude, altitude = satellite.ECIToLLA(position, gmst)
+
+	// Convert latitude to degrees and normalize to [-90, 90]
+	latitude = math.Mod(latitude, 360)
+
+	// Validate results
+
+	if latitude < -90 || latitude > 90 {
+		return 0, 0, satellite.LatLong{}, fmt.Errorf("invalid latitude: %v", latitude)
+	}
+	if longitude < -180 || longitude > 180 {
+		return 0, 0, satellite.LatLong{}, fmt.Errorf("invalid longitude: %v", longitude)
+	}
+
+	return latitude, longitude, altitude, nil
+}
+
+func (t TLE) DrawOnMap(time time.Time) error {
+	latitude, longitude, _, err := t.CalculatePositionLLA(time)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	fmt.Printf("OpenStreetMap: http://www.openstreetmap.org/?mlat=%.6f&mlon=%.6f&zoom=12\n",
+		latitude, longitude)
+	fmt.Printf("Google Maps: https://www.google.com/maps/?q=%.6f,%.6f\n",
+		latitude, longitude)
+	return nil
 }
