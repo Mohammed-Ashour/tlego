@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	tle "go_tle/tle"
 )
@@ -18,5 +19,6 @@ func main() {
 	}
 	tle := tles[0]
 	fmt.Println(tle.Line1.Classification)
+	tle.DrawOnMap(time.Now().UTC())
 
 }
