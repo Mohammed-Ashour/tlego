@@ -7,9 +7,9 @@ type ElsetRec struct {
 	EpochYr       int
 	EpochTynumrev int
 	Error         int
-	OperationMode string
-	Init          string
-	Method        string
+	OperationMode rune // a character
+	Init          rune // a character
+	Method        rune // a character
 
 	// Orbital parameters
 	A           float64

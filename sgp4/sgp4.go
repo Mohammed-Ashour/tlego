@@ -18,9 +18,9 @@ func dpper(e3, ee2, peo, pgho, pho, pinco, plo, se2, se3, sgh2,
 	sgh3, sgh4, sh2, sh3, si2, si3, sl2, sl3, sl4, t,
 	xgh2, xgh3, xgh4, xh2, xh3, xi2, xi3, xl2, xl3, xl4,
 	zmol, zmos float64,
-	init string,
+	init rune,
 	rec *ElsetRec,
-	opsmode string) {
+	opsmode rune) {
 
 	// Constants
 	const (
@@ -33,7 +33,7 @@ func dpper(e3, ee2, peo, pgho, pho, pinco, plo, se2, se3, sgh2,
 	// Calculate time varying periodics
 	zm := zmos + zns*t
 	// Be sure that the initial call has time set to zero
-	if init == "y" {
+	if init == 'y' {
 		zm = zmos
 	}
 
@@ -49,7 +49,7 @@ func dpper(e3, ee2, peo, pgho, pho, pinco, plo, se2, se3, sgh2,
 	shs := sh2*f2 + sh3*f3
 
 	zm = zmol + znl*t
-	if init == "y" {
+	if init == 'y' {
 		zm = zmol
 	}
 
@@ -70,7 +70,7 @@ func dpper(e3, ee2, peo, pgho, pho, pinco, plo, se2, se3, sgh2,
 	pgh := sghs + sghl
 	ph := shs + shll
 
-	if init == "n" {
+	if init == 'n' {
 		pe = pe - peo
 		pinc = pinc - pinco
 		pl = pl - plo
@@ -103,7 +103,7 @@ func dpper(e3, ee2, peo, pgho, pho, pinco, plo, se2, se3, sgh2,
 			rec.Nodep = math.Mod(rec.Nodep, twopi)
 
 			// sgp4fix for afspc written intrinsic functions
-			if rec.Nodep < 0.0 && opsmode == "a" {
+			if rec.Nodep < 0.0 && opsmode == 'a' {
 				rec.Nodep = rec.Nodep + twopi
 			}
 
@@ -115,7 +115,7 @@ func dpper(e3, ee2, peo, pgho, pho, pinco, plo, se2, se3, sgh2,
 			rec.Nodep = math.Atan2(alfdp, betdp)
 
 			// sgp4fix for afspc written intrinsic functions
-			if rec.Nodep < 0.0 && opsmode == "a" {
+			if rec.Nodep < 0.0 && opsmode == 'a' {
 				rec.Nodep = rec.Nodep + twopi
 			}
 
@@ -689,7 +689,7 @@ func initl(epoch float64, rec *ElsetRec) {
 	rec.Ainv = 1.0 / rec.Ao
 	rec.Posq = po * po
 	rec.Rp = rec.Ao * (1.0 - rec.Ecco)
-	rec.Method = "n"
+	rec.Method = 'n'
 
 	// Modern approach to finding sidereal time
 	ts70 := epoch - 7305.0
@@ -745,7 +745,7 @@ func GetGravConst(whichconst int, rec *ElsetRec) {
 	}
 }
 
-func sgp4init(opsmode string, satrec *ElsetRec) bool {
+func sgp4init(opsmode rune, satrec *ElsetRec) bool {
 	// Local variables
 	const temp4 = 1.5e-12
 
@@ -753,7 +753,7 @@ func sgp4init(opsmode string, satrec *ElsetRec) bool {
 
 	// Initialize all near-Earth variables to zero
 	satrec.Isimp = 0
-	satrec.Method = "n"
+	satrec.Method = 'n'
 	satrec.Aycof = 0.0
 	satrec.Con41 = 0.0
 	satrec.Cc1 = 0.0
@@ -858,7 +858,7 @@ func sgp4init(opsmode string, satrec *ElsetRec) bool {
 	qzms2t := qzms2ttemp * qzms2ttemp * qzms2ttemp * qzms2ttemp
 	x2o3 := 2.0 / 3.0
 
-	satrec.Init = "y"
+	satrec.Init = 'y'
 	satrec.T = 0.0
 
 	// Initialize orbital elements
@@ -960,7 +960,7 @@ func sgp4init(opsmode string, satrec *ElsetRec) bool {
 
 		// Deep space initialization
 		if (2 * pi / satrec.NoUnkozai) >= 225.0 {
-			satrec.Method = "d"
+			satrec.Method = 'd'
 			satrec.Isimp = 1
 			tc := 0.0
 			satrec.Inclm = satrec.Inclo
@@ -1017,7 +1017,7 @@ func sgp4init(opsmode string, satrec *ElsetRec) bool {
 
 	Sgp4(satrec, 0.0, &r, &v)
 
-	satrec.Init = "n"
+	satrec.Init = 'n'
 
 	return true
 
@@ -1075,7 +1075,7 @@ func Sgp4(satrec *ElsetRec, tsince float64, r, v *[3]float64) bool {
 	satrec.Em = satrec.Ecco
 	satrec.Inclm = satrec.Inclo
 
-	if satrec.Method == "d" {
+	if satrec.Method == 'd' {
 		tc = satrec.T
 		dspace(tc, satrec)
 	}
@@ -1122,7 +1122,7 @@ func Sgp4(satrec *ElsetRec, tsince float64, r, v *[3]float64) bool {
 	sinip := satrec.Sinim
 	cosip := satrec.Cosim
 
-	if satrec.Method == "d" {
+	if satrec.Method == 'd' {
 		dpper(satrec.E3, satrec.Ee2, satrec.Peo, satrec.Pgho,
 			satrec.Pho, satrec.Pinco, satrec.Plo, satrec.Se2,
 			satrec.Se3, satrec.Sgh2, satrec.Sgh3, satrec.Sgh4,
@@ -1131,7 +1131,7 @@ func Sgp4(satrec *ElsetRec, tsince float64, r, v *[3]float64) bool {
 			satrec.Xgh2, satrec.Xgh3, satrec.Xgh4, satrec.Xh2,
 			satrec.Xh3, satrec.Xi2, satrec.Xi3, satrec.Xl2,
 			satrec.Xl3, satrec.Xl4, satrec.Zmol, satrec.Zmos,
-			"n", satrec, satrec.OperationMode)
+			'n', satrec, satrec.OperationMode)
 		xincp = satrec.Inclp
 		if xincp < 0.0 {
 			xincp = -xincp
@@ -1145,7 +1145,7 @@ func Sgp4(satrec *ElsetRec, tsince float64, r, v *[3]float64) bool {
 	}
 
 	// Long period periodics
-	if satrec.Method == "d" {
+	if satrec.Method == 'd' {
 		sinip = math.Sin(xincp)
 		cosip = math.Cos(xincp)
 		satrec.Aycof = -0.5 * satrec.J3oj2 * sinip
@@ -1213,7 +1213,7 @@ func Sgp4(satrec *ElsetRec, tsince float64, r, v *[3]float64) bool {
 	temp2 := temp1 * temp
 
 	// Update for short period periodics
-	if satrec.Method == "d" {
+	if satrec.Method == 'd' {
 		cosisq := cosip * cosip
 		satrec.Con41 = 3.0*cosisq - 1.0
 		satrec.X1mth2 = 1.0 - cosisq
