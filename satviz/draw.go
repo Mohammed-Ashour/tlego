@@ -2,9 +2,9 @@ package satviz
 
 import (
 	"fmt"
-	"go_tle/sgp4"
 	sat "go_tle/sgp4"
 	"go_tle/tle"
+	utils "go_tle/utils"
 	"math"
 	"time"
 )
@@ -23,7 +23,7 @@ func CalculatePositionECI(s sat.Satellite, t time.Time) (position [3]float64, ve
 	//convert the time to minutes
 	diffInMins := timeDiff.Minutes()
 
-	position, velocity, err = sgp4.Sgp4(&s, diffInMins)
+	position, velocity, err = sat.Sgp4(&s, diffInMins)
 	if err != nil {
 		return [3]float64{}, [3]float64{}, err
 	}
@@ -53,7 +53,7 @@ func CalculatePositionLLA(s sat.Satellite, time time.Time) (latitude, longitude 
 		jdate,
 	)
 
-	latitude, longitude, altitude = tle.ECIToLLA(position, gmst)
+	latitude, longitude, altitude = utils.ECIToLLA(position, gmst)
 
 	// Convert latitude to degrees and normalize to [-90, 90]
 	latitude = math.Mod(latitude, 360)

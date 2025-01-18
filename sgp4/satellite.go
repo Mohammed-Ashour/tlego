@@ -2,6 +2,7 @@ package sgp4
 
 import (
 	tle "go_tle/tle"
+	utils "go_tle/utils"
 	"log"
 	"math"
 	"strconv"
@@ -282,7 +283,7 @@ func Days2mdhms(year int64, days float64) (month, day, hour, minute int, second 
 	isLeap := year%400 == 0 || (year%4 == 0 && year%100 != 0)
 
 	// Convert day of year to month and day
-	month, day = tle.DayOfYearToMonthDay(int(whole), isLeap)
+	month, day = utils.DayOfYearToMonthDay(int(whole), isLeap)
 
 	// Handle edge case where month becomes 13
 	if month == 13 {

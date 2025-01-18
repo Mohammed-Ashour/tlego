@@ -3,6 +3,7 @@ package tle
 import (
 	"bufio"
 	"fmt"
+	"go_tle/utils"
 	"os"
 	"strings"
 )
@@ -97,11 +98,11 @@ func ReadTLELine1(line string) (TLELine1, error) {
 		case "EpochDay":
 			tleLine1.EpochDay = value
 		case "FirstDerivative":
-			tleLine1.FirstDerivative = parseScientificNotation(value)
+			tleLine1.FirstDerivative = utils.ParseScientificNotation(value)
 		case "SecondDerivative":
-			tleLine1.SecondDerivative = parseScientificNotation(value)
+			tleLine1.SecondDerivative = utils.ParseScientificNotation(value)
 		case "Bstar":
-			tleLine1.Bstar = parseScientificNotation(value)
+			tleLine1.Bstar = utils.ParseScientificNotation(value)
 		case "EphemerisType":
 			tleLine1.EphemerisType = value
 		case "ElementSetNumber":

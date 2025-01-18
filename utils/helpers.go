@@ -1,4 +1,4 @@
-package tle
+package utils
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 )
 
 // Helper function to parse scientific notation in TLE format
-func parseScientificNotation(value string) string {
+func ParseScientificNotation(value string) string {
 	if len(value) == 0 {
 		return "0.0"
 	}
@@ -42,7 +42,7 @@ func ValidateTLE(line1, line2 string) error {
 	}
 
 	// Verify checksums
-	if !verifyChecksum(line1) || !verifyChecksum(line2) {
+	if !VerifyChecksum(line1) || !VerifyChecksum(line2) {
 		return fmt.Errorf("checksum verification failed")
 	}
 
@@ -50,7 +50,7 @@ func ValidateTLE(line1, line2 string) error {
 }
 
 // Calculate and verify TLE line checksum
-func verifyChecksum(line string) bool {
+func VerifyChecksum(line string) bool {
 	sum := 0
 	for i := 0; i < 68; i++ {
 		if line[i] == '-' {
@@ -69,7 +69,7 @@ func verifyChecksum(line string) bool {
 }
 
 // Helper function to normalize angles
-func normalizeAngle(angle float64) float64 {
+func NormalizeAngle(angle float64) float64 {
 	angle = math.Mod(angle, 360)
 	if angle > 180 {
 		angle -= 360
