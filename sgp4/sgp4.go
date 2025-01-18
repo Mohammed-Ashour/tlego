@@ -1249,7 +1249,7 @@ func Sgp4(sat *Satellite, tsince float64) ([3]float64, [3]float64, error) {
 	// Sgp4fix for decaying satellites
 	if mrt < 1.0 {
 		sat.Error = 6
-		return r, v, fmt.Errorf("Satellite decay, mrt < 1.0, mrt = (%f)", mrt)
+		slog.Warn("Satellite decay, mrt < 1.0, mrt = (%f)", mrt)
 	}
 
 	return r, v, nil

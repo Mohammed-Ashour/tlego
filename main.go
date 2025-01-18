@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	viz "go_tle/satviz"
+	sat "go_tle/sgp4"
 	tle "go_tle/tle"
 )
 
@@ -17,8 +19,9 @@ func main() {
 		fmt.Println("Error:", err)
 		return
 	}
-	tle := tles[0]
-	fmt.Println(tle.Line1.Classification)
-	tle.DrawOnMap(time.Now().UTC())
+	t := tles[0]
+	fmt.Println(t.Line1.Classification)
+	s := sat.NewSatelliteFromTLE(t)
+	viz.DrawOnMap(t, s, time.Now())
 
 }
