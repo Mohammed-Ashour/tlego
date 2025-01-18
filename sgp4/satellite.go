@@ -263,7 +263,7 @@ func NewSatelliteFromTLE(tle tle.TLE) Satellite {
 		year = sat.EpochYr + 1900
 	}
 
-	mon, day, hr, min, sec := days2mdhms(year, sat.EpochDays)
+	mon, day, hr, min, sec := Days2mdhms(year, sat.EpochDays)
 
 	sat.JdsatEpoch, _ = Jday(int(year), int(mon), int(day), int(hr), int(min), sec)
 
@@ -272,8 +272,8 @@ func NewSatelliteFromTLE(tle tle.TLE) Satellite {
 	return *sat
 }
 
-// days2mdhms converts a float point number of days in a year into date and time components
-func days2mdhms(year int64, days float64) (month, day, hour, minute int, second float64) {
+// Days2mdhms converts a float point number of days in a year into date and time components
+func Days2mdhms(year int64, days float64) (month, day, hour, minute int, second float64) {
 	// Split days into whole and fractional parts
 	whole := math.Floor(days)
 	fraction := days - whole
@@ -282,7 +282,7 @@ func days2mdhms(year int64, days float64) (month, day, hour, minute int, second 
 	isLeap := year%400 == 0 || (year%4 == 0 && year%100 != 0)
 
 	// Convert day of year to month and day
-	month, day = dayOfYearToMonthDay(int(whole), isLeap)
+	month, day = tle.DayOfYearToMonthDay(int(whole), isLeap)
 
 	// Handle edge case where month becomes 13
 	if month == 13 {
@@ -305,29 +305,6 @@ func days2mdhms(year int64, days float64) (month, day, hour, minute int, second 
 	second = math.Floor(second*1e6) / 1e6
 
 	return month, day, hour, minute, second
-}
-
-// dayOfYearToMonthDay converts day of year to month and day
-func dayOfYearToMonthDay(dayOfYear int, isLeap bool) (month, day int) {
-	// Days in each month for normal and leap years
-	daysInMonth := [...]int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
-	if isLeap {
-		daysInMonth[1] = 29
-	}
-
-	dayCount := dayOfYear
-	month = 1
-
-	for i, days := range daysInMonth {
-		if dayCount <= days {
-			month = i + 1
-			day = dayCount
-			break
-		}
-		dayCount -= days
-	}
-
-	return month, day
 }
 
 // Parses a string into a float64 value.

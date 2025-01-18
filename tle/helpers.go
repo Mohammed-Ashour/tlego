@@ -78,3 +78,60 @@ func normalizeAngle(angle float64) float64 {
 	}
 	return angle
 }
+
+// dayOfYearToMonthDay converts day of year to month and day
+func DayOfYearToMonthDay(dayOfYear int, isLeap bool) (month, day int) {
+	// Days in each month for normal and leap years
+	daysInMonth := [...]int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	if isLeap {
+		daysInMonth[1] = 29
+	}
+
+	dayCount := dayOfYear
+	month = 1
+
+	for i, days := range daysInMonth {
+		if dayCount <= days {
+			month = i + 1
+			day = dayCount
+			break
+		}
+		dayCount -= days
+	}
+
+	return month, day
+}
+
+// Convert Earth Centered Inertial coordinated into equivalent latitude, longitude, altitude and velocity.
+// Reference: http://celestrak.com/columns/v02n03/
+func ECIToLLA(eciCoords [3]float64, gmst float64) (altitude, velocity float64, ret [2]float64) {
+	a := 6378.137     // Semi-major Axis
+	b := 6356.7523142 // Semi-minor Axis
+	f := (a - b) / a  // Flattening
+	e2 := ((2 * f) - math.Pow(f, 2))
+	X, Y, Z := eciCoords[0], eciCoords[1], eciCoords[2]
+
+	sqx2y2 := math.Sqrt(math.Pow(X, 2) + math.Pow(Y, 2))
+
+	// Spherical Earth Calculations
+	longitude := math.Atan2(Y, X) - gmst
+	latitude := math.Atan2(Z, sqx2y2)
+
+	// Oblate Earth Fix
+	C := 0.0
+	for i := 0; i < 20; i++ {
+		C = 1 / math.Sqrt(1-e2*(math.Sin(latitude)*math.Sin(latitude)))
+		latitude = math.Atan2(Z+(a*C*e2*math.Sin(latitude)), sqx2y2)
+	}
+
+	// Calc Alt
+	altitude = (sqx2y2 / math.Cos(latitude)) - (a * C)
+
+	// Orbital Speed ≈ sqrt(μ / r) where μ = std. gravitaional parameter
+	velocity = math.Sqrt(398600.4418 / (altitude + 6378.137))
+
+	ret[0] = latitude
+	ret[1] = longitude
+
+	return
+}

@@ -1,67 +1,85 @@
-package draw
+package satviz
 
 import (
+	"fmt"
+	"go_tle/sgp4"
+	sat "go_tle/sgp4"
+	"go_tle/tle"
 	"math"
-
-	"github.com/fogleman/gg"
+	"time"
 )
 
 // This package is responsible to draw 1 frame of the satalite location using 1 tle
-
-type ContextConfig struct {
-	Width  int
-	Height int
-}
-
-func CreateGraphContext(config ContextConfig) *gg.Context {
-	// define the context of the draw
-	W := config.Width  // draw width
-	H := config.Height // draw height
-
-	C := gg.NewContext(W, H)
-	DrawGlobe(C, W, H)
-	return C
-
-}
-
-func DrawDot(C *gg.Context, x float64, y float64) {
-	C.SetRGB(x+y, x, y) // Red color
-	dotSize := 3
-	C.DrawCircle(x+1, y+1, float64(dotSize))
-}
-
-func DrawGlobe(C *gg.Context, W int, H int) {
-	// Draw the globe
-	C.SetRGB(0, 0, 1)
-
-	// Draw the globe
-	C.DrawCircle(float64(W)/2, float64(H)/2, float64(W)/2)
-
-	// Fill the circle with the current color (blue)
-	C.Fill()
-	C.Stroke()
-
-	//reset the color to black
-	C.SetRGB(1, 0, 0)
-	// Draw latitude lines
-	for lat := -80; lat <= 80; lat += 20 {
-		y := float64(H)/2 - float64(H)/2*float64(lat)/90
-		// Calculate the x-coordinates based on the y-coordinate
-		x1 := float64(W)/2 - math.Sqrt(math.Pow(float64(W)/2, 2)-math.Pow(y-float64(H)/2, 2))
-		x2 := float64(W)/2 + math.Sqrt(math.Pow(float64(W)/2, 2)-math.Pow(y-float64(H)/2, 2))
-		C.DrawLine(x1, y, x2, y)
-		C.Stroke()
-	}
-	C.SetRGB(0, 0, 0)
-	// Draw longitude lines
-	for lon := -180; lon <= 180; lon += 20 {
-		C.MoveTo(float64(W)/2, float64(H)/2)
-		for lat := -90; lat <= 90; lat++ {
-			x := float64(W)/2 + float64(W)/2*math.Sin(float64(lon)*math.Pi/180)*math.Cos(float64(lat)*math.Pi/180)
-			y := float64(H)/2 + float64(H)/2*math.Sin(float64(lat)*math.Pi/180)
-			C.LineTo(x, y)
+func CalculatePositionECI(s sat.Satellite, t time.Time) (position [3]float64, velocity [3]float64, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("calculation error: %v", r)
 		}
-		C.Stroke()
+	}()
+	//get the diff between the time and the time of the tle
+	month, day, hour, min, sec := sat.Days2mdhms(s.EpochYr, s.EpochDays)
+	tleTime := time.Date(int(s.EpochYr), time.Month(month), day, hour, min, int(sec), 0, time.UTC)
+	timeDiff := t.Sub(tleTime)
+	//convert the time to minutes
+	diffInMins := timeDiff.Minutes()
+
+	position, velocity, err = sgp4.Sgp4(&s, diffInMins)
+	if err != nil {
+		return [3]float64{}, [3]float64{}, err
 	}
 
+	return position, velocity, nil
+}
+
+func CalculatePositionLLA(s sat.Satellite, time time.Time) (latitude, longitude float64, altitude [2]float64, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("calculation error: %v", r)
+		}
+	}()
+
+	position, _, err := CalculatePositionECI(s, time)
+	if err != nil {
+		return 0, 0, [2]float64{}, err
+	}
+	jdate, _ := sat.Jday(time.Year(),
+		int(time.Month()),
+		time.Day(),
+		time.Hour(),
+		time.Minute(),
+		float64(time.Second()))
+
+	gmst := sat.Gstime(
+		jdate,
+	)
+
+	latitude, longitude, altitude = tle.ECIToLLA(position, gmst)
+
+	// Convert latitude to degrees and normalize to [-90, 90]
+	latitude = math.Mod(latitude, 360)
+
+	// Validate results
+
+	if latitude < -90 || latitude > 90 {
+		return 0, 0, [2]float64{}, fmt.Errorf("invalid latitude: %v", latitude)
+	}
+	if longitude < -180 || longitude > 180 {
+		return 0, 0, [2]float64{}, fmt.Errorf("invalid longitude: %v", longitude)
+	}
+
+	return latitude, longitude, altitude, nil
+}
+
+func DrawOnMap(t tle.TLE, s sat.Satellite, time time.Time) error {
+	latitude, longitude, _, err := CalculatePositionLLA(s, time)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	fmt.Printf("OpenStreetMap: http://www.openstreetmap.org/?mlat=%.6f&mlon=%.6f&zoom=12\n",
+		latitude, longitude)
+	fmt.Printf("Google Maps: https://www.google.com/maps/?q=%.6f,%.6f\n",
+		latitude, longitude)
+	return nil
 }

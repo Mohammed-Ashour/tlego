@@ -1,6 +1,8 @@
 package sgp4
 
 import (
+	"fmt"
+	"log/slog"
 	"math"
 )
 
@@ -622,7 +624,15 @@ func dspace(tc float64, sat *Satellite) {
 	}
 }
 
-func gstime(jdut1 float64) float64 {
+// Gstime calculates Greenwich sidereal time.
+// The function converts the Julian Date UT1 into Greenwich sidereal time in radians.
+//
+// Parameters:
+//   - jdut1: Julian Date in UT1 timescale
+//
+// Returns:
+//   - float64: Greenwich sidereal time in radians
+func Gstime(jdut1 float64) float64 {
 	tut1 := (jdut1 - 2451545.0) / 36525.0
 
 	temp := (-6.2e-6*tut1*tut1*tut1 +
@@ -686,7 +696,7 @@ func initl(epoch float64, sat *Satellite) {
 		gsto1 = gsto1 + twopi
 	}
 
-	sat.Gsto = gstime(epoch + 2433281.5)
+	sat.Gsto = Gstime(epoch + 2433281.5)
 }
 
 func SetGravConst(whichconst int, sat *Satellite) {
@@ -995,23 +1005,24 @@ func sgp4init(opsmode rune, sat *Satellite) bool {
 		}
 	}
 
-	r := [3]float64{0, 0, 0}
-	v := [3]float64{0, 0, 0}
-
-	Sgp4(sat, 0.0, &r, &v)
-
+	r, v, err := Sgp4(sat, 0.0)
+	slog.Debug("r: %v, v: %v, err: %v", r, v, err)
+	if err != nil {
+		return false
+	}
 	sat.Init = 'n'
 
 	return true
 
 }
 
-func Sgp4(sat *Satellite, tsince float64, r, v *[3]float64) bool {
+func Sgp4(sat *Satellite, tsince float64) ([3]float64, [3]float64, error) {
 	const (
 		twopi = 2.0 * math.Pi
 		temp4 = 1.5e-12
 		x2o3  = 2.0 / 3.0
 	)
+	r, v := [3]float64{}, [3]float64{}
 
 	vkmpersec := sat.RadiusEarthKm * sat.Xke / 60.0
 
@@ -1065,7 +1076,7 @@ func Sgp4(sat *Satellite, tsince float64, r, v *[3]float64) bool {
 
 	if sat.Nm <= 0.0 {
 		sat.Error = 2
-		return false
+		return r, v, fmt.Errorf("Nm <= 0.0, nm = (%f)", sat.Nm)
 	}
 
 	sat.Am = math.Pow((sat.Xke/sat.Nm), x2o3) * tempa * tempa
@@ -1074,7 +1085,7 @@ func Sgp4(sat *Satellite, tsince float64, r, v *[3]float64) bool {
 
 	if sat.Em >= 1.0 || sat.Em < -0.001 {
 		sat.Error = 1
-		return false
+		return r, v, fmt.Errorf("Em >= 1.0 or Em < -0.001, em = (%f)", sat.Em)
 	}
 
 	if sat.Em < 1.0e-6 {
@@ -1123,7 +1134,7 @@ func Sgp4(sat *Satellite, tsince float64, r, v *[3]float64) bool {
 		}
 		if sat.Ep < 0.0 || sat.Ep > 1.0 {
 			sat.Error = 3
-			return false
+			return r, v, fmt.Errorf("Ep < 0.0 or Ep > 1.0, ep = (%f)", sat.Ep)
 		}
 	}
 
@@ -1177,7 +1188,7 @@ func Sgp4(sat *Satellite, tsince float64, r, v *[3]float64) bool {
 
 	if pl < 0.0 {
 		sat.Error = 4
-		return false
+		return r, v, fmt.Errorf("Pl < 0.0, pl = (%f)", pl)
 	}
 
 	rl := sat.Am * (1.0 - ecose)
@@ -1227,6 +1238,7 @@ func Sgp4(sat *Satellite, tsince float64, r, v *[3]float64) bool {
 	vz := sini * cossu
 
 	// Position and velocity
+
 	r[0] = (mrt * ux) * sat.RadiusEarthKm
 	r[1] = (mrt * uy) * sat.RadiusEarthKm
 	r[2] = (mrt * uz) * sat.RadiusEarthKm
@@ -1237,12 +1249,29 @@ func Sgp4(sat *Satellite, tsince float64, r, v *[3]float64) bool {
 	// Sgp4fix for decaying satellites
 	if mrt < 1.0 {
 		sat.Error = 6
-		return false
+		return r, v, fmt.Errorf("Satellite decay, mrt < 1.0, mrt = (%f)", mrt)
 	}
 
-	return true
+	return r, v, nil
 }
 
+// Jday converts calendar date and time to Julian date.
+//
+// Parameters:
+//   - year: Calendar year (e.g., 2023)
+//   - mon: Calendar month (1-12)
+//   - day: Calendar day (1-31)
+//   - hr: Hour of day (0-23)
+//   - minute: Minutes (0-59)
+//   - sec: Seconds (0-59.999)
+//
+// Returns:
+//   - jd: Julian date (whole days)
+//   - jdFrac: Fractional portion of Julian date
+//
+// The Julian date is the continuous count of days since the beginning of the
+// Julian period. JD 0 corresponds to noon on January 1, 4713 BC (on the Julian calendar).
+// This function follows the algorithm from "Astronomical Algorithms" by Jean Meeus.
 func Jday(year, mon, day, hr, minute int, sec float64) (float64, float64) {
 	var jd, jdFrac float64
 
