@@ -3,12 +3,8 @@ package tle
 import (
 	"bufio"
 	"fmt"
-	"math"
 	"os"
 	"strings"
-	"time"
-
-	"github.com/joshuaferrara/go-satellite"
 )
 
 type TLELine1 struct {
@@ -48,11 +44,11 @@ ISS (ZARYA)
 2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391563537
 */
 type TLE struct {
-	Name             string
-	NoradID          string
-	Line1            TLELine1
-	Line2            TLELine2
-	SatallliteObject satellite.Satellite
+	Name    string
+	NoradID string
+	Line1   TLELine1
+	Line2   TLELine2
+	// SatallliteObject satellite.Satellite
 }
 
 func ReadTLELine1(line string) (TLELine1, error) {
@@ -195,11 +191,8 @@ func ReadTLEFile(filePath string) ([]TLE, error) {
 			if err != nil {
 				return nil, err
 			}
-			currentTLE.SatallliteObject = satellite.TLEToSat(currentTLE.Line1.LineString, currentTLE.Line2.LineString, "wgs84")
 
 			tles = append(tles, currentTLE)
-			// t, _ := json.MarshalIndent(currentTLE, "", "  ")
-			// fmt.Println(string(t))
 			currentTLE = TLE{}
 		} else {
 			currentTLE.Name = line
@@ -214,73 +207,73 @@ func ReadTLEFile(filePath string) ([]TLE, error) {
 	return tles, nil
 }
 
-func (t TLE) CalculatePositionECI(time time.Time) (position satellite.Vector3, velocity satellite.Vector3, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("calculation error: %v", r)
-		}
-	}()
+// func (t TLE) CalculatePositionECI(time time.Time) (position satellite.Vector3, velocity satellite.Vector3, err error) {
+// 	defer func() {
+// 		if r := recover(); r != nil {
+// 			err = fmt.Errorf("calculation error: %v", r)
+// 		}
+// 	}()
 
-	position, velocity = satellite.Propagate(
-		t.SatallliteObject,
-		time.Year(),
-		int(time.Month()),
-		time.Day(),
-		time.Hour(),
-		time.Minute(),
-		time.Second(),
-	)
-	return position, velocity, nil
-}
+// 	position, velocity = satellite.Propagate(
+// 		t.SatallliteObject,
+// 		time.Year(),
+// 		int(time.Month()),
+// 		time.Day(),
+// 		time.Hour(),
+// 		time.Minute(),
+// 		time.Second(),
+// 	)
+// 	return position, velocity, nil
+// }
 
-func (t TLE) CalculatePositionLLA(time time.Time) (latitude, longitude float64, altitude satellite.LatLong, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("calculation error: %v", r)
-		}
-	}()
+// func (t TLE) CalculatePositionLLA(time time.Time) (latitude, longitude float64, altitude satellite.LatLong, err error) {
+// 	defer func() {
+// 		if r := recover(); r != nil {
+// 			err = fmt.Errorf("calculation error: %v", r)
+// 		}
+// 	}()
 
-	position, _, err := t.CalculatePositionECI(time.UTC())
-	if err != nil {
-		return 0, 0, satellite.LatLong{}, err
-	}
+// 	position, _, err := t.CalculatePositionECI(time.UTC())
+// 	if err != nil {
+// 		return 0, 0, satellite.LatLong{}, err
+// 	}
 
-	gmst := satellite.GSTimeFromDate(
-		time.Year(),
-		int(time.Month()),
-		time.Day(),
-		time.Hour(),
-		time.Minute(),
-		time.Second(),
-	)
+// 	gmst := satellite.GSTimeFromDate(
+// 		time.Year(),
+// 		int(time.Month()),
+// 		time.Day(),
+// 		time.Hour(),
+// 		time.Minute(),
+// 		time.Second(),
+// 	)
 
-	latitude, longitude, altitude = satellite.ECIToLLA(position, gmst)
+// 	latitude, longitude, altitude = satellite.ECIToLLA(position, gmst)
 
-	// Convert latitude to degrees and normalize to [-90, 90]
-	latitude = math.Mod(latitude, 360)
+// 	// Convert latitude to degrees and normalize to [-90, 90]
+// 	latitude = math.Mod(latitude, 360)
 
-	// Validate results
+// 	// Validate results
 
-	if latitude < -90 || latitude > 90 {
-		return 0, 0, satellite.LatLong{}, fmt.Errorf("invalid latitude: %v", latitude)
-	}
-	if longitude < -180 || longitude > 180 {
-		return 0, 0, satellite.LatLong{}, fmt.Errorf("invalid longitude: %v", longitude)
-	}
+// 	if latitude < -90 || latitude > 90 {
+// 		return 0, 0, satellite.LatLong{}, fmt.Errorf("invalid latitude: %v", latitude)
+// 	}
+// 	if longitude < -180 || longitude > 180 {
+// 		return 0, 0, satellite.LatLong{}, fmt.Errorf("invalid longitude: %v", longitude)
+// 	}
 
-	return latitude, longitude, altitude, nil
-}
+// 	return latitude, longitude, altitude, nil
+// }
 
-func (t TLE) DrawOnMap(time time.Time) error {
-	latitude, longitude, _, err := t.CalculatePositionLLA(time)
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
+// func (t TLE) DrawOnMap(time time.Time) error {
+// 	latitude, longitude, _, err := t.CalculatePositionLLA(time)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return err
+// 	}
 
-	fmt.Printf("OpenStreetMap: http://www.openstreetmap.org/?mlat=%.6f&mlon=%.6f&zoom=12\n",
-		latitude, longitude)
-	fmt.Printf("Google Maps: https://www.google.com/maps/?q=%.6f,%.6f\n",
-		latitude, longitude)
-	return nil
-}
+// 	fmt.Printf("OpenStreetMap: http://www.openstreetmap.org/?mlat=%.6f&mlon=%.6f&zoom=12\n",
+// 		latitude, longitude)
+// 	fmt.Printf("Google Maps: https://www.google.com/maps/?q=%.6f,%.6f\n",
+// 		latitude, longitude)
+// 	return nil
+// }

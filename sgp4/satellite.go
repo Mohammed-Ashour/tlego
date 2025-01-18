@@ -1,10 +1,17 @@
 package sgp4
 
-type ElsetRec struct {
+import (
+	tle "go_tle/tle"
+	"log"
+	"math"
+	"strconv"
+)
+
+type Satellite struct {
 	// Main satellite parameters
 	WhichConst    int // SGP4.wgs72
-	SatNum        int
-	EpochYr       int
+	SatNum        string
+	EpochYr       int64
 	EpochTynumrev int
 	Error         int
 	OperationMode rune // a character
@@ -223,9 +230,120 @@ type ElsetRec struct {
 }
 
 // NewElsetRec creates a new ElsetRec with default values
-func NewElsetRec() *ElsetRec {
-	return &ElsetRec{
+func NewSatellite() *Satellite {
+	return &Satellite{
 		WhichConst: 2, // SGP4.wgs72
 		// All other fields will be initialized to their zero values
 	}
+}
+
+func NewSatelliteFromTLE(tle tle.TLE) Satellite {
+	sat := NewSatellite()
+	sat.Error = 0
+	SetGravConst(Wgs84, sat)
+	sat.SatNum = tle.Line1.SataliteID
+	sat.EpochYr = parseInt(tle.Line1.EpochYear)
+	sat.EpochDays = parseFloat(tle.Line1.EpochDay)
+	sat.Ndot = parseFloat(tle.Line1.FirstDerivative) / (Xpdotp * 1440.0)
+	sat.Nddot = parseFloat(tle.Line1.SecondDerivative) / (Xpdotp * 1440.0 * 1440)
+	sat.Bstar = parseFloat(tle.Line1.Bstar)
+	sat.Inclo = parseFloat(tle.Line2.Inclination) * deg2Rad
+	sat.Nodeo = parseFloat(tle.Line2.RightAscension) * deg2Rad
+	sat.Ecco = parseFloat(tle.Line2.Eccentricity)
+	sat.Argpo = parseFloat(tle.Line2.ArgumentOfPerigee) * deg2Rad
+	sat.Mo = parseFloat(tle.Line2.MeanAnomaly) * deg2Rad
+	sat.NoKozai = parseFloat(tle.Line2.MeanMotion)
+
+	opsmode := 'i'
+
+	var year int64 = 0
+	if sat.EpochYr < 57 {
+		year = sat.EpochYr + 2000
+	} else {
+		year = sat.EpochYr + 1900
+	}
+
+	mon, day, hr, min, sec := days2mdhms(year, sat.EpochDays)
+
+	sat.JdsatEpoch, _ = Jday(int(year), int(mon), int(day), int(hr), int(min), sec)
+
+	sgp4init(opsmode, sat)
+
+	return *sat
+}
+
+// days2mdhms converts a float point number of days in a year into date and time components
+func days2mdhms(year int64, days float64) (month, day, hour, minute int, second float64) {
+	// Split days into whole and fractional parts
+	whole := math.Floor(days)
+	fraction := days - whole
+
+	// Check if it's a leap year
+	isLeap := year%400 == 0 || (year%4 == 0 && year%100 != 0)
+
+	// Convert day of year to month and day
+	month, day = dayOfYearToMonthDay(int(whole), isLeap)
+
+	// Handle edge case where month becomes 13
+	if month == 13 {
+		month = 12
+		day += 31
+	}
+
+	// Convert fractional day to hour, minute, second
+	// Add half a microsecond to handle rounding
+	fraction += 0.5 / 86400e6
+
+	// Convert to seconds and break down into components
+	secondsTotal := fraction * 86400.0
+	minute = int(math.Floor(secondsTotal / 60.0))
+	second = math.Mod(secondsTotal, 60.0)
+	hour = minute / 60
+	minute = minute % 60
+
+	// Round to microseconds
+	second = math.Floor(second*1e6) / 1e6
+
+	return month, day, hour, minute, second
+}
+
+// dayOfYearToMonthDay converts day of year to month and day
+func dayOfYearToMonthDay(dayOfYear int, isLeap bool) (month, day int) {
+	// Days in each month for normal and leap years
+	daysInMonth := [...]int{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+	if isLeap {
+		daysInMonth[1] = 29
+	}
+
+	dayCount := dayOfYear
+	month = 1
+
+	for i, days := range daysInMonth {
+		if dayCount <= days {
+			month = i + 1
+			day = dayCount
+			break
+		}
+		dayCount -= days
+	}
+
+	return month, day
+}
+
+// Parses a string into a float64 value.
+func parseFloat(strIn string) (ret float64) {
+	ret, err := strconv.ParseFloat(strIn, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return ret
+}
+
+// Parses a string into a int64 value.
+func parseInt(strIn string) (ret int64) {
+	ret, err := strconv.ParseInt(strIn, 10, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return ret
 }
