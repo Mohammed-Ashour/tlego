@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	viz "go_tle/satviz"
-	sat "go_tle/sgp4"
-	tle "go_tle/tle"
+	viz "tlego/satviz"
+	sat "tlego/sgp4"
+	tle "tlego/tle"
 )
 
 func main() {

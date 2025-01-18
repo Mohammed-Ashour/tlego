@@ -1,11 +1,11 @@
 package sgp4
 
 import (
-	tle "go_tle/tle"
-	utils "go_tle/utils"
 	"log"
 	"math"
 	"strconv"
+	tle "tlego/tle"
+	utils "tlego/utils"
 )
 
 type Satellite struct {

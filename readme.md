@@ -1,5 +1,5 @@
 
-# Go-TLE (Two Line Elements) [Still in progress]
+# TLEGO (Two Line Elements) [Still in progress]
 
 A Go library for parsing and processing Two Line Elements (TLE) data and calculating satellite positions using the SGP4 propagation model.
 
@@ -15,7 +15,7 @@ This library provides functionalities to:
 ## Usage
 
 ```go
-import "github.com/username/go-tle"
+import "github.com/Mohammed-Ashour/tlego"
 
 // Parse TLE data
 tle := gotle.ParseTLE(`

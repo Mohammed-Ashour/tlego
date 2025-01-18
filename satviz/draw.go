@@ -2,11 +2,11 @@ package satviz
 
 import (
 	"fmt"
-	sat "go_tle/sgp4"
-	"go_tle/tle"
-	utils "go_tle/utils"
 	"math"
 	"time"
+	sat "tlego/sgp4"
+	"tlego/tle"
+	utils "tlego/utils"
 )
 
 // This package is responsible to draw 1 frame of the satalite location using 1 tle

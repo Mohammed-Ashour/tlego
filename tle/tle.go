@@ -3,9 +3,9 @@ package tle
 import (
 	"bufio"
 	"fmt"
-	"go_tle/utils"
 	"os"
 	"strings"
+	"tlego/utils"
 )
 
 type TLELine1 struct {
