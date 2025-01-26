@@ -1,11 +1,8 @@
 package sgp4
 
 import (
-	"log"
-	"math"
-	"strconv"
-	tle "tlego/tle"
-	utils "tlego/utils"
+	tle "github.com/Mohammed-Ashour/tlego/tle"
+	utils "github.com/Mohammed-Ashour/tlego/utils"
 )
 
 type Satellite struct {
@@ -243,17 +240,17 @@ func NewSatelliteFromTLE(tle tle.TLE) Satellite {
 	sat.Error = 0
 	SetGravConst(Wgs84, sat)
 	sat.SatNum = tle.Line1.SataliteID
-	sat.EpochYr = parseInt(tle.Line1.EpochYear)
-	sat.EpochDays = parseFloat(tle.Line1.EpochDay)
-	sat.Ndot = parseFloat(tle.Line1.FirstDerivative) / (Xpdotp * 1440.0)
-	sat.Nddot = parseFloat(tle.Line1.SecondDerivative) / (Xpdotp * 1440.0 * 1440)
-	sat.Bstar = parseFloat(tle.Line1.Bstar)
-	sat.Inclo = parseFloat(tle.Line2.Inclination) * deg2Rad
-	sat.Nodeo = parseFloat(tle.Line2.RightAscension) * deg2Rad
-	sat.Ecco = parseFloat(tle.Line2.Eccentricity)
-	sat.Argpo = parseFloat(tle.Line2.ArgumentOfPerigee) * deg2Rad
-	sat.Mo = parseFloat(tle.Line2.MeanAnomaly) * deg2Rad
-	sat.NoKozai = parseFloat(tle.Line2.MeanMotion)
+	sat.EpochYr = utils.ParseInt(tle.Line1.EpochYear)
+	sat.EpochDays = utils.ParseFloat(tle.Line1.EpochDay)
+	sat.Ndot = utils.ParseFloat(tle.Line1.FirstDerivative) / (Xpdotp * 1440.0)
+	sat.Nddot = utils.ParseFloat(tle.Line1.SecondDerivative) / (Xpdotp * 1440.0 * 1440)
+	sat.Bstar = utils.ParseFloat(tle.Line1.Bstar)
+	sat.Inclo = utils.ParseFloat(tle.Line2.Inclination) * deg2Rad
+	sat.Nodeo = utils.ParseFloat(tle.Line2.RightAscension) * deg2Rad
+	sat.Ecco = utils.ParseFloat(tle.Line2.Eccentricity)
+	sat.Argpo = utils.ParseFloat(tle.Line2.ArgumentOfPerigee) * deg2Rad
+	sat.Mo = utils.ParseFloat(tle.Line2.MeanAnomaly) * deg2Rad
+	sat.NoKozai = utils.ParseFloat(tle.Line2.MeanMotion)
 
 	opsmode := 'i'
 
@@ -264,64 +261,11 @@ func NewSatelliteFromTLE(tle tle.TLE) Satellite {
 		year = sat.EpochYr + 1900
 	}
 
-	mon, day, hr, min, sec := Days2mdhms(year, sat.EpochDays)
+	mon, day, hr, min, sec := utils.Days2mdhms(year, sat.EpochDays)
 
 	sat.JdsatEpoch, _ = Jday(int(year), int(mon), int(day), int(hr), int(min), sec)
 
 	sgp4init(opsmode, sat)
 
 	return *sat
-}
-
-// Days2mdhms converts a float point number of days in a year into date and time components
-func Days2mdhms(year int64, days float64) (month, day, hour, minute int, second float64) {
-	// Split days into whole and fractional parts
-	whole := math.Floor(days)
-	fraction := days - whole
-
-	// Check if it's a leap year
-	isLeap := year%400 == 0 || (year%4 == 0 && year%100 != 0)
-
-	// Convert day of year to month and day
-	month, day = utils.DayOfYearToMonthDay(int(whole), isLeap)
-
-	// Handle edge case where month becomes 13
-	if month == 13 {
-		month = 12
-		day += 31
-	}
-
-	// Convert fractional day to hour, minute, second
-	// Add half a microsecond to handle rounding
-	fraction += 0.5 / 86400e6
-
-	// Convert to seconds and break down into components
-	secondsTotal := fraction * 86400.0
-	minute = int(math.Floor(secondsTotal / 60.0))
-	second = math.Mod(secondsTotal, 60.0)
-	hour = minute / 60
-	minute = minute % 60
-
-	// Round to microseconds
-	second = math.Floor(second*1e6) / 1e6
-
-	return month, day, hour, minute, second
-}
-
-// Parses a string into a float64 value.
-func parseFloat(strIn string) (ret float64) {
-	ret, err := strconv.ParseFloat(strIn, 64)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return ret
-}
-
-// Parses a string into a int64 value.
-func parseInt(strIn string) (ret int64) {
-	ret, err := strconv.ParseInt(strIn, 10, 0)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return ret
 }

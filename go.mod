@@ -1,4 +1,4 @@
-module tlego
+module github.com/Mohammed-Ashour/tlego
 
 go 1.22
 

@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"tlego/utils"
+	"time"
+
+	utils "github.com/Mohammed-Ashour/tlego/utils"
 )
 
 type TLELine1 struct {
@@ -223,4 +225,12 @@ func ReadTLEFile(filePath string) ([]TLE, error) {
 	}
 
 	return tles, nil
+}
+
+func (t TLE) GetTLETime() time.Time {
+	epochYear := utils.ParseInt(t.Line1.EpochYear)
+	year := 2000 + epochYear
+	day := utils.ParseFloat(t.Line1.EpochDay)
+	month, d, hour, min, sec := utils.Days2mdhms(year, day)
+	return time.Date(int(year), time.Month(month), d, hour, min, int(sec), 0, time.UTC)
 }

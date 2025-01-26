@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -134,4 +135,56 @@ func ECIToLLA(eciCoords [3]float64, gmst float64) (altitude, velocity float64, r
 	ret[1] = longitude
 
 	return
+}
+
+func ParseFloat(strIn string) (ret float64) {
+	ret, err := strconv.ParseFloat(strIn, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return ret
+}
+
+// Parses a string into a int64 value.
+func ParseInt(strIn string) (ret int64) {
+	ret, err := strconv.ParseInt(strIn, 10, 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return ret
+}
+
+// Days2mdhms converts a float point number of days in a year into date and time components
+func Days2mdhms(year int64, days float64) (month, day, hour, minute int, second float64) {
+	// Split days into whole and fractional parts
+	whole := math.Floor(days)
+	fraction := days - whole
+
+	// Check if it's a leap year
+	isLeap := year%400 == 0 || (year%4 == 0 && year%100 != 0)
+
+	// Convert day of year to month and day
+	month, day = DayOfYearToMonthDay(int(whole), isLeap)
+
+	// Handle edge case where month becomes 13
+	if month == 13 {
+		month = 12
+		day += 31
+	}
+
+	// Convert fractional day to hour, minute, second
+	// Add half a microsecond to handle rounding
+	fraction += 0.5 / 86400e6
+
+	// Convert to seconds and break down into components
+	secondsTotal := fraction * 86400.0
+	minute = int(math.Floor(secondsTotal / 60.0))
+	second = math.Mod(secondsTotal, 60.0)
+	hour = minute / 60
+	minute = minute % 60
+
+	// Round to microseconds
+	second = math.Floor(second*1e6) / 1e6
+
+	return month, day, hour, minute, second
 }

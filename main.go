@@ -3,11 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"time"
 
-	viz "tlego/satviz"
-	sat "tlego/sgp4"
-	tle "tlego/tle"
+	viz "github.com/Mohammed-Ashour/tlego/satviz"
+	sat "github.com/Mohammed-Ashour/tlego/sgp4"
+	tle "github.com/Mohammed-Ashour/tlego/tle"
 )
 
 func main() {
@@ -22,6 +21,25 @@ func main() {
 	t := tles[0]
 	fmt.Println(t.Line1.Classification)
 	s := sat.NewSatelliteFromTLE(t)
-	viz.DrawOnMap(t, s, time.Now())
+
+	// Use epoch time instead of current time
+	epochTime := t.GetTLETime()
+
+	lat, long, alt, err := viz.CalculatePositionLLA(s, epochTime)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	fmt.Println("Latitude:", lat)
+	fmt.Println("Longitude:", long)
+	fmt.Println("Altitude:", alt)
+
+	googleMapsURL, err := viz.GetGoogleMapsURL(t, s, epochTime)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	fmt.Println("Google Maps URL:", googleMapsURL)
 
 }
