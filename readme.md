@@ -45,9 +45,9 @@ package main
 import (
     "fmt"
     "time"
-    "github.com/Mohammed-Ashour/tlego/tle"
-    "github.com/Mohammed-Ashour/tlego/sgp4"
-    "github.com/Mohammed-Ashour/tlego/satviz"
+    "github.com/Mohammed-Ashour/tlego/pkg/tle"
+    "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
+    "github.com/Mohammed-Ashour/tlego/pkg/satviz"
 )
 
 func main() {
@@ -70,51 +70,45 @@ func main() {
 package main
 
 import (
-	"fmt"
-	"os"
-
-	viz "github.com/Mohammed-Ashour/tlego/satviz"
-	sat "github.com/Mohammed-Ashour/tlego/sgp4"
-	tle "github.com/Mohammed-Ashour/tlego/tle"
+    "os"
+    
+    "github.com/Mohammed-Ashour/tlego/pkg/logger"
+    "github.com/Mohammed-Ashour/tlego/pkg/satviz"
+    "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
+    "github.com/Mohammed-Ashour/tlego/pkg/tle"
 )
 
 func main() {
+    filePath := os.Args[1]
+    tles, err := tle.ReadTLEFile(filePath)
+    if err != nil {
+        logger.Error("Failed to read TLE file", "error", err)
+        return
+    }
+    
+    t := tles[0]
+    logger.Info("Processing TLE", "classification", t.Line1.Classification)
+    
+    s := sgp4.NewSatelliteFromTLE(t)
+    epochTime := t.GetTLETime()
 
-	// example
-	filePath := os.Args[1]
-	tles, err := tle.ReadTLEFile(filePath)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	t := tles[0]
-	fmt.Println(t.Line1.Classification)
-	s := sat.NewSatelliteFromTLE(t)
+    // Calculate LLA coordinates
+    lat, long, alt, err := satviz.CalculatePositionLLA(s, epochTime)
 
-	// Use epoch time instead of current time
-	epochTime := t.GetTLETime()
+    if err != nil {
+        logger.Error("Failed to calculate position", "error", err)
+        return
+    }
+    logger.Info("Calculated Position", "latitude", lat, "longitude", long, "altitude", alt)
 
-	// Calculate LLA coordinates
-	lat, long, alt, err := viz.CalculatePositionLLA(s, epochTime)
-
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println("Latitude:", lat)
-	fmt.Println("Longitude:", long)
-	fmt.Println("Altitude:", alt)
-
-	// Get Google Maps URL
-	googleMapsURL, err := viz.GetGoogleMapsURL(t, s, epochTime)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println("Google Maps URL:", googleMapsURL)
-
+    // Get Google Maps URL
+    googleMapsURL, err := satviz.GetGoogleMapsURL(t, s, epochTime)
+    if err != nil {
+        logger.Error("Failed to get Google Maps URL", "error", err)
+        return
+    }
+    logger.Info("Google Maps URL", "url", googleMapsURL)
 }
-
 ```
 ## Features
 
