@@ -135,6 +135,17 @@ func main() {
 - Push to the branch (git push origin feature/amazing-feature)
 - Open a Pull Request
 
+## References & Credits
+
+This project is a Go implementation of the SGP4 satellite propagation algorithm, adapted from the [Multi-Language SGP4 Implementation](https://github.com/aholinch/sgp4) by Aaron Holinch. The original repository provides implementations in multiple languages (Java, Python, C++), but did not include a Go version.
+
+Key adaptations:
+- Converted Java classes to Go structs
+- Implemented Go-specific error handling
+- Added Go-idiomatic features
+- Maintained algorithm accuracy and precision
+
+Please refer to the original repository for detailed algorithm documentation and mathematical background.
 
 ## License
 
@@ -161,3 +172,4 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
