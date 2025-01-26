@@ -3,10 +3,10 @@ package main
 import (
 	"os"
 
-	"github.com/Mohammed-Ashour/tlego/logger"
-	viz "github.com/Mohammed-Ashour/tlego/satviz"
-	sat "github.com/Mohammed-Ashour/tlego/sgp4"
-	tle "github.com/Mohammed-Ashour/tlego/tle"
+	"github.com/Mohammed-Ashour/tlego/pkg/logger"
+	viz "github.com/Mohammed-Ashour/tlego/pkg/satviz"
+	sat "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
+	tle "github.com/Mohammed-Ashour/tlego/pkg/tle"
 )
 
 func main() {

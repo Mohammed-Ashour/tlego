@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"math"
 
-	"github.com/Mohammed-Ashour/tlego/logger"
+	"github.com/Mohammed-Ashour/tlego/pkg/logger"
 )
 
 // Constants

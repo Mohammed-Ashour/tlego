@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	utils "github.com/Mohammed-Ashour/tlego/utils"
+	utils "github.com/Mohammed-Ashour/tlego/pkg/utils"
 )
 
 type TLELine1 struct {

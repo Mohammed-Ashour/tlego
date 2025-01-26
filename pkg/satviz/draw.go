@@ -5,10 +5,10 @@ import (
 	"math"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/logger"
-	sat "github.com/Mohammed-Ashour/tlego/sgp4"
-	"github.com/Mohammed-Ashour/tlego/tle"
-	utils "github.com/Mohammed-Ashour/tlego/utils"
+	"github.com/Mohammed-Ashour/tlego/pkg/logger"
+	sat "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
+	"github.com/Mohammed-Ashour/tlego/pkg/tle"
+	utils "github.com/Mohammed-Ashour/tlego/pkg/utils"
 )
 
 // This package is responsible to draw 1 frame of the satalite location using 1 tle

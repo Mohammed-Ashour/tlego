@@ -1,8 +1,8 @@
 package sgp4
 
 import (
-	tle "github.com/Mohammed-Ashour/tlego/tle"
-	utils "github.com/Mohammed-Ashour/tlego/utils"
+	tle "github.com/Mohammed-Ashour/tlego/pkg/tle"
+	utils "github.com/Mohammed-Ashour/tlego/pkg/utils"
 )
 
 type Satellite struct {
