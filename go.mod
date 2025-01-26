@@ -1,4 +1,4 @@
-module go_tle
+module tlego
 
 go 1.22
 

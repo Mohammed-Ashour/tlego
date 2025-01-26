@@ -49,7 +49,6 @@ type TLE struct {
 	NoradID string
 	Line1   TLELine1
 	Line2   TLELine2
-	// SatallliteObject satellite.Satellite
 }
 
 func ReadTLELine1(line string) (TLELine1, error) {
@@ -164,6 +163,24 @@ func ReadTLELine2(line string) (TLELine2, error) {
 	}
 
 	return tleLine2, err
+}
+func ParseTLE(line1, line2, name string) (TLE, error) {
+	tle := TLE{
+		Name: name,
+	}
+
+	var err error
+	tle.Line1, err = ReadTLELine1(line1)
+	if err != nil {
+		return TLE{}, err
+	}
+
+	tle.Line2, err = ReadTLELine2(line2)
+	if err != nil {
+		return TLE{}, err
+	}
+
+	return tle, nil
 }
 
 func ReadTLEFile(filePath string) ([]TLE, error) {
