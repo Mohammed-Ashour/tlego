@@ -9,6 +9,7 @@ This library provides functionalities to:
 - Calculate satellite positions using SGP4 propagation model
 - Track satellite positions in real-time
 - Convert coordinates between different reference frames
+- Generate Google Maps and Open Street Maps URLs for the satellite location
 
 
 
