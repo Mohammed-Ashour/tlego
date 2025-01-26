@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+
+	"github.com/Mohammed-Ashour/tlego/logger"
 )
 
 // Constants
@@ -1006,7 +1008,7 @@ func sgp4init(opsmode rune, sat *Satellite) bool {
 	}
 
 	r, v, err := Sgp4(sat, 0.0)
-	slog.Debug("r: %v, v: %v, err: %v", r, v, err)
+	logger.Debug("SGP4: ", "r", r, "v", v, "err", err)
 	if err != nil {
 		return false
 	}
@@ -1249,7 +1251,7 @@ func Sgp4(sat *Satellite, tsince float64) ([3]float64, [3]float64, error) {
 	// Sgp4fix for decaying satellites
 	if mrt < 1.0 {
 		sat.Error = 6
-		slog.Warn("Satellite decay, mrt < 1.0, mrt = (%v)", mrt)
+		slog.Warn("Satellite decay, mrt < 1.0", "mrt", mrt)
 	}
 
 	return r, v, nil

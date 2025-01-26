@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
+	"github.com/Mohammed-Ashour/tlego/logger"
 	viz "github.com/Mohammed-Ashour/tlego/satviz"
 	sat "github.com/Mohammed-Ashour/tlego/sgp4"
 	tle "github.com/Mohammed-Ashour/tlego/tle"
@@ -15,11 +15,13 @@ func main() {
 	filePath := os.Args[1]
 	tles, err := tle.ReadTLEFile(filePath)
 	if err != nil {
-		fmt.Println("Error:", err)
+		logger.Error("Failed to read TLE file", "error", err)
 		return
 	}
 	t := tles[0]
-	fmt.Println(t.Line1.Classification)
+	logger.Info("Processing TLE",
+		"classification", t.Line1.Classification,
+		"satellite_id", t.Line1.SataliteID)
 	s := sat.NewSatelliteFromTLE(t)
 
 	// Use epoch time instead of current time
@@ -28,18 +30,19 @@ func main() {
 	lat, long, alt, err := viz.CalculatePositionLLA(s, epochTime)
 
 	if err != nil {
-		fmt.Println("Error:", err)
+		logger.Error("Failed to calculate position", "error", err)
 		return
 	}
-	fmt.Println("Latitude:", lat)
-	fmt.Println("Longitude:", long)
-	fmt.Println("Altitude:", alt)
+	logger.Info("Satellite position calculated",
+		"latitude", lat,
+		"longitude", long,
+		"altitude", alt)
 
 	googleMapsURL, err := viz.GetGoogleMapsURL(t, s, epochTime)
 	if err != nil {
-		fmt.Println("Error:", err)
+		logger.Error("Error:", err)
 		return
 	}
-	fmt.Println("Google Maps URL:", googleMapsURL)
+	logger.Info("Google Maps:", "URL", googleMapsURL)
 
 }

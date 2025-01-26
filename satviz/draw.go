@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/Mohammed-Ashour/tlego/logger"
 	sat "github.com/Mohammed-Ashour/tlego/sgp4"
 	"github.com/Mohammed-Ashour/tlego/tle"
 	utils "github.com/Mohammed-Ashour/tlego/utils"
@@ -15,6 +16,7 @@ func CalculatePositionECI(s sat.Satellite, t time.Time) (position [3]float64, ve
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("calculation error: %v", r)
+			logger.Error("Calculation panic recovered", "error", r)
 		}
 	}()
 	//get the diff between the time and the time of the tle
@@ -26,15 +28,23 @@ func CalculatePositionECI(s sat.Satellite, t time.Time) (position [3]float64, ve
 	// Don't allow calculations too far from epoch
 	maxPropagationDays := 30.0 // Maximum days to propagate
 	if math.Abs(timeDiff.Hours()/24) > maxPropagationDays {
-		return [3]float64{}, [3]float64{}, fmt.Errorf("time too far from epoch: %.2f days", timeDiff.Hours()/24)
+		err = fmt.Errorf("time too far from epoch: %.2f days", timeDiff.Hours()/24)
+		logger.Error("Time out of range",
+			"days_from_epoch", timeDiff.Hours()/24,
+			"max_days", maxPropagationDays)
+		return position, velocity, err
 	}
 
 	//convert the time to minutes
 	diffInMins := timeDiff.Minutes()
+	logger.Debug("Calculating position",
+		"minutes_from_epoch", diffInMins,
+		"epoch_time", tleTime)
 
 	position, velocity, err = sat.Sgp4(&s, diffInMins)
 	if err != nil {
-		return [3]float64{}, [3]float64{}, err
+		logger.Error("SGP4 calculation failed", "error", err)
+		return position, velocity, err
 	}
 
 	return position, velocity, nil
@@ -87,7 +97,7 @@ func CalculatePositionLLA(s sat.Satellite, time time.Time) (latitude, longitude 
 func GetGoogleMapsURL(t tle.TLE, s sat.Satellite, time time.Time) (string, error) {
 	latitude, longitude, _, err := CalculatePositionLLA(s, time)
 	if err != nil {
-		fmt.Println(err)
+		logger.Error(err.Error())
 		return "", err
 	}
 

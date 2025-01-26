@@ -4,7 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
-	utils "tlego/utils"
+
+	utils "github.com/Mohammed-Ashour/tlego/utils"
 )
 
 const sampleTLE = `STARLINK-1039
