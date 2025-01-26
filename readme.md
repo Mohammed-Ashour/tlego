@@ -7,7 +7,7 @@ A Go library for parsing and processing Two Line Elements (TLE) data and calcula
 This library provides functionalities to:
 - Parse TLE (Two Line Elements) data
 - Calculate satellite positions using SGP4 propagation model
-- Track satellite positions in real-time
+- Track satellite positions in semi real-time
 - Convert coordinates between different reference frames
 - Generate Google Maps and Open Street Maps URLs for the satellite location
 
