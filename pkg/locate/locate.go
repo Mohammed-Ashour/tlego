@@ -1,4 +1,4 @@
-package satviz
+package locate
 
 import (
 	"fmt"

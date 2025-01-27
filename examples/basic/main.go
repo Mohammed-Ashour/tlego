@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
+	viz "github.com/Mohammed-Ashour/tlego/pkg/locate"
 	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	viz "github.com/Mohammed-Ashour/tlego/pkg/satviz"
 	sat "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
 	tle "github.com/Mohammed-Ashour/tlego/pkg/tle"
 )

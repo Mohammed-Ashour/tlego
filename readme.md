@@ -47,7 +47,7 @@ import (
     "time"
     "github.com/Mohammed-Ashour/tlego/pkg/tle"
     "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
-    "github.com/Mohammed-Ashour/tlego/pkg/satviz"
+    "github.com/Mohammed-Ashour/tlego/pkg/locate"
 )
 
 func main() {
@@ -59,7 +59,7 @@ func main() {
     
     // Get position at epoch
     epochTime := tles[0].GetTLETime()
-    lat, long, alt, _ := satviz.CalculatePositionLLA(satellite, epochTime)
+    lat, long, alt, _ := locate.CalculatePositionLLA(satellite, epochTime)
     
     fmt.Printf("Position: %.6f, %.6f, %.6f\n", lat, long, alt)
 }
@@ -73,7 +73,7 @@ import (
     "os"
     
     "github.com/Mohammed-Ashour/tlego/pkg/logger"
-    "github.com/Mohammed-Ashour/tlego/pkg/satviz"
+    "github.com/Mohammed-Ashour/tlego/pkg/locate"
     "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
     "github.com/Mohammed-Ashour/tlego/pkg/tle"
 )
@@ -93,7 +93,7 @@ func main() {
     epochTime := t.GetTLETime()
 
     // Calculate LLA coordinates
-    lat, long, alt, err := satviz.CalculatePositionLLA(s, epochTime)
+    lat, long, alt, err := locate.CalculatePositionLLA(s, epochTime)
 
     if err != nil {
         logger.Error("Failed to calculate position", "error", err)
@@ -102,7 +102,7 @@ func main() {
     logger.Info("Calculated Position", "latitude", lat, "longitude", long, "altitude", alt)
 
     // Get Google Maps URL
-    googleMapsURL, err := satviz.GetGoogleMapsURL(t, s, epochTime)
+    googleMapsURL, err := locate.GetGoogleMapsURL(t, s, epochTime)
     if err != nil {
         logger.Error("Failed to get Google Maps URL", "error", err)
         return
