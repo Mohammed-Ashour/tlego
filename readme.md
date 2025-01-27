@@ -10,7 +10,7 @@ This library provides functionalities to:
 - Track satellite positions in semi real-time
 - Convert coordinates between different reference frames
 - Generate Google Maps and Open Street Maps URLs for the satellite location
-
+- Fetch TLE for specific satellite of satellite groups from Celestrak
 
 
 ## Installation
@@ -110,6 +110,34 @@ func main() {
     logger.Info("Google Maps URL", "url", googleMapsURL)
 }
 ```
+
+#### Fetching TLEs from Celestrak
+```go
+package main
+
+import (
+    "github.com/Mohammed-Ashour/tlego/pkg/celestrak"
+    "github.com/Mohammed-Ashour/tlego/pkg/logger"
+)
+
+func main() {
+    // Get TLEs for entire satellite group
+    satelliteGroup := "Starlink"
+    tles, err := celestrak.GetSatelliteGroupTLEs(satelliteGroup)
+    if err != nil {
+        logger.Error("Failed to get Starlink TLEs", "error", err)
+        return
+    }
+
+    // Get TLE for specific satellite by NORAD ID
+    noradID := "25544" // ISS
+    tle, err := celestrak.GetSatelliteTLEByNoradID(noradID)
+    if err != nil {
+        logger.Error("Failed to get ISS TLE", "error", err)
+        return
+    }
+}
+```
 ## Features
 
 - Full SGP4 implementation in pure Go
@@ -121,7 +149,7 @@ func main() {
 
 ## Dependencies
 - Go 1.22 or later
-- No external dependencies required
+- gopkg.in/yaml.v3
 
 ## Contributing
 - Fork the repository
