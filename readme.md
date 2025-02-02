@@ -123,7 +123,12 @@ import (
 func main() {
     // Get TLEs for entire satellite group
     satelliteGroup := "Starlink"
-    tles, err := celestrak.GetSatelliteGroupTLEs(satelliteGroup)
+	config, err := celestrak.ReadCelestrakConfig()
+	if err != nil {
+		logger.Error("Can't get the Celestrak config", "Error", err)
+		return
+	}
+	tles, err := celestrak.GetSatelliteGroupTLEs(satelliteGroup, config)
     if err != nil {
         logger.Error("Failed to get Starlink TLEs", "error", err)
         return
