@@ -1,7 +1,6 @@
 package celestrak
 
 import (
-	"fmt"
 	"os"
 	"runtime"
 
@@ -16,7 +15,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php?CATNR=NORADID&FORMAT=TLE"
+var CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php?CATNR=NORADID&FORMAT=TLE"
 
 type SatelliteGroup struct {
 	Name string `yaml:"name"`
@@ -44,13 +43,8 @@ func GetSatelliteTLEByNoradID(noradID string) (tle.TLE, error) {
 	return tles[0], nil
 }
 
-func GetSatelliteGroupTLEs(groupName string) ([]tle.TLE, error) {
-	groups, err := ReadCelestrakConfig()
-	if err != nil {
-		return []tle.TLE{}, err
-	}
-	fmt.Println(groups)
-	for _, group := range groups.SatelliteGroups {
+func GetSatelliteGroupTLEs(groupName string, config CelestrakConfig) ([]tle.TLE, error) {
+	for _, group := range config.SatelliteGroups {
 		if group.Name == groupName {
 			return DownloadTLEs(group.URL, groupName+".tle")
 		}
