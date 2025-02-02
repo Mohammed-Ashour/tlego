@@ -1,0 +1,97 @@
+satellite_groups:
+  - name: Last 30 Days' Launches
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=last-30-days&FORMAT=tle
+  - name: Space Stations
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle
+  - name: 100 (or so) Brightest
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=tle
+  - name: Active Satellites
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle
+  - name: Analyst Satellites
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=analyst&FORMAT=tle
+  - name: Weather
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=weather&FORMAT=tle
+  - name: NOAA
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=noaa&FORMAT=tle
+  - name: GOES
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=goes&FORMAT=tle
+  - name: Earth Resources
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=resource&FORMAT=tle
+  - name: Search & Rescue (SARSAT)
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=sarsat&FORMAT=tle
+  - name: Disaster Monitoring
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=dmc&FORMAT=tle
+  - name: Tracking and Data Relay Satellite System (TDRSS)
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=tdrss&FORMAT=tle
+  - name: Geosynchronous
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=geo&FORMAT=tle
+  - name: Intelsat
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=intelsat&FORMAT=tle
+  - name: SES
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=ses&FORMAT=tle
+  - name: Iridium
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=iridium&FORMAT=tle
+  - name: Iridium NEXT
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=iridium-NEXT&FORMAT=tle
+  - name: Starlink
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle
+  - name: OneWeb
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=oneweb&FORMAT=tle
+  - name: Planet
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=planet&FORMAT=tle
+  - name: Spire
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=spire&FORMAT=tle
+  - name: Globalstar
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=globalstar&FORMAT=tle
+  - name: Swarm
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=swarm&FORMAT=tle
+  - name: Amateur Radio
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=tle
+  - name: GPS Operational
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=tle
+  - name: GLONASS Operational
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=glo-ops&FORMAT=tle
+  - name: Galileo
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=galileo&FORMAT=tle
+  - name: Beidou
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=beidou&FORMAT=tle
+  - name: Satellite-Based Augmentation System (WAAS/EGNOS/MSAS)
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=sbas&FORMAT=tle
+  - name: Navy Navigation Satellite System (NNSS)
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=nnss&FORMAT=tle
+  - name: Russian LEO Navigation
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=musson&FORMAT=tle
+  - name: Space & Earth Science
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=science&FORMAT=tle
+  - name: Geodetic
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=geodetic&FORMAT=tle
+  - name: Engineering
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=engineering&FORMAT=tle
+  - name: Education
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=education&FORMAT=tle
+  - name: Military
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=military&FORMAT=tle
+  - name: Radar Calibration
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=radar&FORMAT=tle
+  - name: CubeSats
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=cubesat&FORMAT=tle
+  - name: Other
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=other&FORMAT=tle
+  - name: Indian ASAT Test Debris
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=1999-025&FORMAT=tle
+  - name: COSMOS 1408 Debris
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=1982-092&FORMAT=tle
+  - name: COSMOS 2251 Debris
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=1993-036&FORMAT=tle
+  - name: IRIDIUM 33 Debris
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=iridium-33-debris&FORMAT=tle
+  - name: FENGYUN 1C Debris
+    url: https://celestrak.org/NORAD/elements/gp.php?GROUP=1999-025&FORMAT=tle
+
+metadata:
+  source: CelesTrak NORAD Two-Line Element Sets
+  url: https://celestrak.org/NORAD/elements/
+  format: Three-line format (Name + TLE) [[2]]
+  provider: CelesTrak (501(c)(3) non-profit) [[1]]
+  data_source: 18th Space Control Squadron (18 SPCS) [[3]]
+  last_updated: 2025-01-27 20:05:33 UTC [[5]]
