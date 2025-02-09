@@ -129,17 +129,11 @@ func handleIndex(points []Point, satelliteName string) string {
         
         orbitGroup.add(new THREE.Line(orbitGeometry, orbitMaterial));
         orbitGroup.add(new THREE.Line(orbitGeometry, glowMaterial));
-    `,
-		satelliteName,
-		satelliteName,
-		pointsToJSArray(points),
-	)
-	html += `
 		// Orbit markers
         const markerGeometry = new THREE.SphereGeometry(0.02, 8, 8);
         const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
         orbitPoints.forEach((point, i) => {
-            if (i % 20 === 0) {
+            if (i %% 20 === 0) {
                 const marker = new THREE.Mesh(markerGeometry, markerMaterial);
                 marker.position.set(point.X * mag_factor, point.Y * mag_factor, point.Z * mag_factor);
                 orbitGroup.add(marker);
@@ -192,9 +186,9 @@ func handleIndex(points []Point, satelliteName string) string {
             requestAnimationFrame(animate);
             earthGroup.rotation.y += 0.001;
             
-            time = (time + timeStep) % totalPoints;
+            time = (time + timeStep) %% totalPoints;
             const index = Math.floor(time);
-            const nextIndex = (index + 1) % totalPoints;
+            const nextIndex = (index + 1) %% totalPoints;
             
             const currentPoint = orbitPoints[index];
             const nextPoint = orbitPoints[nextIndex];
@@ -220,7 +214,13 @@ func handleIndex(points []Point, satelliteName string) string {
         });
     </script>
 </body>
-</html>`
+</html>
+    `,
+		satelliteName,
+		satelliteName,
+		pointsToJSArray(points),
+	)
+
 	htmlFileName := satelliteName + ".html"
 	if err := os.WriteFile(htmlFileName, []byte(html), 0644); err != nil {
 		fmt.Println("Error writing HTML file:", err)
