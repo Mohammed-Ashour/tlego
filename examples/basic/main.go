@@ -7,6 +7,7 @@ import (
 	"github.com/Mohammed-Ashour/tlego/pkg/logger"
 	sat "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
 	tle "github.com/Mohammed-Ashour/tlego/pkg/tle"
+	visual "github.com/Mohammed-Ashour/tlego/pkg/visual"
 )
 
 func main() {
@@ -19,6 +20,7 @@ func main() {
 		return
 	}
 	t := tles[0]
+	visual.DrawOrbit(t, 3600)
 	logger.Info("Processing TLE",
 		"classification", t.Line1.Classification,
 		"satellite_id", t.Line1.SataliteID)

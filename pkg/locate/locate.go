@@ -37,9 +37,6 @@ func CalculatePositionECI(s sat.Satellite, t time.Time) (position [3]float64, ve
 
 	//convert the time to minutes
 	diffInMins := timeDiff.Minutes()
-	logger.Debug("Calculating position",
-		"minutes_from_epoch", diffInMins,
-		"epoch_time", tleTime)
 
 	position, velocity, err = sat.Sgp4(&s, diffInMins)
 	if err != nil {
@@ -51,7 +48,7 @@ func CalculatePositionECI(s sat.Satellite, t time.Time) (position [3]float64, ve
 }
 
 // CalculatePositionLLA converts Earth Centered Inertial coordinated into equivalent latitude, longitude, altitude and velocity.
-func CalculatePositionLLA(s sat.Satellite, time time.Time) (latitude, longitude float64, altitude [2]float64, err error) {
+func CalculatePositionLLA(s sat.Satellite, time time.Time) (latitude, longitude float64, altitude float64, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("calculation error: %v", r)
@@ -60,7 +57,7 @@ func CalculatePositionLLA(s sat.Satellite, time time.Time) (latitude, longitude 
 
 	position, _, err := CalculatePositionECI(s, time)
 	if err != nil {
-		return 0, 0, [2]float64{}, err
+		return 0, 0, 0, err
 	}
 	jdate, jdFrac := sat.Jday(time.Year(),
 		int(time.Month()),
@@ -73,7 +70,9 @@ func CalculatePositionLLA(s sat.Satellite, time time.Time) (latitude, longitude 
 		jdate + jdFrac,
 	)
 
-	latitude, longitude, altitude = utils.ECIToLLA(position, gmst)
+	altitude, _, latlon := utils.ECIToLLA(position, gmst)
+	latitude = latlon[0]
+	longitude = latlon[1]
 
 	// Convert to degrees with proper normalization
 	latitude = math.Asin(math.Sin(latitude)) * 180 / math.Pi // Ensures -90 to +90
@@ -85,10 +84,10 @@ func CalculatePositionLLA(s sat.Satellite, time time.Time) (latitude, longitude 
 	// Validate results
 
 	if latitude < -90.001 || latitude > 90.001 {
-		return 0, 0, [2]float64{}, fmt.Errorf("invalid latitude: %v", latitude)
+		return 0, 0, 0, fmt.Errorf("invalid latitude: %v", latitude)
 	}
 	if longitude < -180.001 || longitude > 180.001 {
-		return 0, 0, [2]float64{}, fmt.Errorf("invalid longitude: %v", longitude)
+		return 0, 0, 0, fmt.Errorf("invalid longitude: %v", longitude)
 	}
 
 	return latitude, longitude, altitude, nil
