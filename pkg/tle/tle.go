@@ -215,7 +215,7 @@ func ReadTLEFile(filePath string) ([]TLE, error) {
 			tles = append(tles, currentTLE)
 			currentTLE = TLE{}
 		} else {
-			currentTLE.Name = line
+			currentTLE.Name = strings.TrimSpace(line)
 		}
 
 	}
