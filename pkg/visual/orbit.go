@@ -43,10 +43,10 @@ func DrawOrbit(tle tle.TLE, numPoints int) (filename string, err error) {
 		})
 	}
 
-	return handleIndex(points, tle.Name), nil
+	return createHTMLVisual(points, tle.Name), nil
 }
 
-func handleIndex(points []Point, satelliteName string) string {
+func createHTMLVisual(points []Point, satelliteName string) string {
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
