@@ -352,7 +352,7 @@ func dsinit(tc float64, xpidot float64, sat *Satellite) {
 	sghs := sat.Ss4 * zns * (sat.Sz31 + sat.Sz33 - 6.0)
 	shs := -zns * sat.Ss2 * (sat.Sz21 + sat.Sz23)
 
-	//sgp4fix for 180 deg incl
+	// sgp4fix for 180 deg incl
 	if (sat.Inclm < 5.2359877e-2) || (sat.Inclm > pi-5.2359877e-2) {
 		shs = 0.0
 	}
@@ -376,8 +376,8 @@ func dsinit(tc float64, xpidot float64, sat *Satellite) {
 	sat.Domdt = sgs + sghl
 	sat.Dnodt = shs
 	if sat.Sinim != 0.0 {
-		sat.Domdt = sat.Domdt - sat.Cosim/sat.Sinim*shll
-		sat.Dnodt = sat.Dnodt + shll/sat.Sinim
+		sat.Dnodt = sat.Dnodt - shll/sat.Sinim
+		sat.Domdt = sat.Domdt - sat.Cosim*shll/sat.Sinim
 	}
 
 	sat.Dndt = 0.0
@@ -390,8 +390,8 @@ func dsinit(tc float64, xpidot float64, sat *Satellite) {
 	// sgp4fix for negative inclinations
 	if sat.Inclm < 0.0 {
 		sat.Inclm = -sat.Inclm
-		sat.Argpm = sat.Argpm - pi
 		sat.Nodem = sat.Nodem + pi
+		sat.Argpm = sat.Argpm - pi
 	}
 
 	if sat.Irez != 0 {
@@ -687,17 +687,6 @@ func initl(epoch float64, sat *Satellite) {
 	sat.Method = 'n'
 
 	// Modern approach to finding sidereal time
-	ts70 := epoch - 7305.0
-	ds70 := math.Floor(ts70 + 1.0e-8)
-	tfrac := ts70 - ds70
-
-	// Find Greenwich location at epoch
-	c1p2p := c1 + twopi
-	gsto1 := math.Mod(thgr70+c1*ds70+c1p2p*tfrac+ts70*ts70*fk5r, twopi)
-	if gsto1 < 0.0 {
-		gsto1 = gsto1 + twopi
-	}
-
 	sat.Gsto = Gstime(epoch + 2433281.5)
 }
 
