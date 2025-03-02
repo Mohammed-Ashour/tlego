@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
+	"math/rand"
 	"os"
 
+	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
 	viz "github.com/Mohammed-Ashour/tlego/pkg/locate"
 	"github.com/Mohammed-Ashour/tlego/pkg/logger"
 	sat "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
@@ -19,14 +22,42 @@ func main() {
 		logger.Error("Failed to read TLE file", "error", err)
 		return
 	}
-	t := tles[0]
-	points, err := visual.CreateOrbitPoints(t, 360)
+	satelliteGroup := "Spire"
+	config, err := celestrak.ReadCelestrakConfig()
 	if err != nil {
-		logger.Error("Failed to create orbit points", "err", err)
+		logger.Error("Can't get the Celestrak config", "Error", err)
 		return
 	}
+	cTles, err := celestrak.GetSatelliteGroupTLEs(satelliteGroup, config)
+	satData := make([]visual.SatelliteData, len(cTles))
+	for _, cTle := range cTles {
+		points, err := visual.CreateOrbitPoints(cTle, 360)
+		if err != nil {
+			logger.Error("Failed to create orbit points", "err", err)
+			continue
+		}
 
-	htmlFileName := visual.CreateHTMLVisual(points, t.Name)
+		r := rand.Intn(256)
+		g := rand.Intn(256)
+		b := rand.Intn(256)
+
+		satData = append(satData, visual.SatelliteData{
+			Name:   cTle.Name,
+			Points: points,
+			Color:  fmt.Sprintf("#%02X%02X%02X", r, g, b),
+		})
+
+	}
+	fmt.Println(len(cTles))
+
+	t := tles[0]
+	// points, err := visual.CreateOrbitPoints(t, 3600)
+	// if err != nil {
+	// 	logger.Error("Failed to create orbit points", "err", err)
+	// 	return
+	// }
+
+	htmlFileName := visual.CreateHTMLVisual(satData)
 	logger.Info("Created an html with orbit visualization", "filename", htmlFileName)
 	logger.Info("Processing TLE",
 		"classification", t.Line1.Classification,
