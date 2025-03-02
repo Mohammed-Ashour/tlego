@@ -143,6 +143,38 @@ func main() {
     }
 }
 ```
+#### Create a visualization of the Satellite orbit
+```go
+package main
+
+import (
+	"os"
+	"github.com/Mohammed-Ashour/tlego/pkg/logger"
+	tle "github.com/Mohammed-Ashour/tlego/pkg/tle"
+	visual "github.com/Mohammed-Ashour/tlego/pkg/visual"
+)
+
+func main() {
+
+	// example
+	filePath := os.Args[1]
+	tles, err := tle.ReadTLEFile(filePath)
+	if err != nil {
+		logger.Error("Failed to read TLE file", "error", err)
+		return
+	}
+	t := tles[0]
+	points, err := visual.CreateOrbitPoints(t, 360)
+	if err != nil {
+		logger.Error("Failed to create orbit points", "err", err)
+		return
+	}
+
+	htmlFileName := visual.CreateHTMLVisual(points, t.Name)
+	logger.Info("Created an html with orbit visualization", "filename", htmlFileName)
+}
+
+```
 ## Features
 
 - Full SGP4 implementation in pure Go
@@ -151,6 +183,7 @@ func main() {
 - Thread-safe operations
 - Extensible coordinate system transformations
 - Satellite Position on GoogleMaps and OpenStreetMaps
+- Create an html visualization of the Satellite orbit using the tle
 
 ## Dependencies
 - Go 1.22 or later
