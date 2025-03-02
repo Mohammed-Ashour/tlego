@@ -53,7 +53,7 @@ func CreateOrbitPoints(tle tle.TLE, numPoints int) ([]Point, error) {
 }
 
 // Modified CreateHTMLVisual to accept multiple satellites
-func CreateHTMLVisual(satellites []SatelliteData) string {
+func CreateHTMLVisual(satellites []SatelliteData, htmlFileName string) string {
 	// Convert satellites data to JS array
 	satellitesJS := "["
 	for i, sat := range satellites {
@@ -137,13 +137,13 @@ func CreateHTMLVisual(satellites []SatelliteData) string {
                 );
             });
             // Add the first point again to close the loop
-            if (sat.points.length > 0) {
-                vertices.push(
-                    sat.points[0].X * mag_factor,
-                    sat.points[0].Y * mag_factor,
-                    sat.points[0].Z * mag_factor
-                );
-            }
+            // if (sat.points.length > 0) {
+            //     vertices.push(
+            //         sat.points[0].X * mag_factor,
+            //         sat.points[0].Y * mag_factor,
+            //         sat.points[0].Z * mag_factor
+            //     );
+            // }
             
             const orbitGeometry = new THREE.BufferGeometry();
             orbitGeometry.setAttribute(
@@ -277,8 +277,7 @@ func CreateHTMLVisual(satellites []SatelliteData) string {
     </script>
 </body>
 </html>`, satellitesJS)
-
-	htmlFileName := "multiple_satellites.html"
+	htmlFileName = htmlFileName + ".html"
 	if err := os.WriteFile(htmlFileName, []byte(html), 0644); err != nil {
 		fmt.Println("Error writing HTML file:", err)
 	}
