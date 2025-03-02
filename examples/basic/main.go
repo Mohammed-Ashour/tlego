@@ -31,7 +31,7 @@ func main() {
 		Points: points,
 		Color:  "#345678",
 	}
-	htmlFileName := visual.CreateHTMLVisual([]visual.SatelliteData{satData})
+	htmlFileName := visual.CreateHTMLVisual([]visual.SatelliteData{satData}, t.Name)
 	logger.Info("Created an html with orbit visualization", "filename", htmlFileName)
 
 	logger.Info("Processing TLE",
