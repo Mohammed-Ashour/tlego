@@ -19,15 +19,21 @@ func main() {
 		logger.Error("Failed to read TLE file", "error", err)
 		return
 	}
+
 	t := tles[0]
-	points, err := visual.CreateOrbitPoints(t, 360)
+	points, err := visual.CreateOrbitPoints(t, 3600)
 	if err != nil {
 		logger.Error("Failed to create orbit points", "err", err)
 		return
 	}
-
-	htmlFileName := visual.CreateHTMLVisual(points, t.Name)
+	satData := visual.SatelliteData{
+		Name:   t.Name,
+		Points: points,
+		Color:  "#345678",
+	}
+	htmlFileName := visual.CreateHTMLVisual([]visual.SatelliteData{satData}, t.Name)
 	logger.Info("Created an html with orbit visualization", "filename", htmlFileName)
+
 	logger.Info("Processing TLE",
 		"classification", t.Line1.Classification,
 		"satellite_id", t.Line1.SataliteID)
