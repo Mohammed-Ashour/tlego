@@ -13,7 +13,7 @@ import (
 
 // Point represents a satellite position with an associated timestamp.
 
-func DrawOrbit(tle tle.TLE, numPoints int) (filename string, err error) {
+func CreateOrbitPoints(tle tle.TLE, numPoints int) ([]Point, error) {
 	sat := sgp4.NewSatelliteFromTLE(tle)
 	epochTime := tle.GetTLETime()
 
@@ -29,7 +29,7 @@ func DrawOrbit(tle tle.TLE, numPoints int) (filename string, err error) {
 		epoch := epochTime.Add(time.Duration(timeOffset * float64(time.Minute)))
 		position, _, err := locate.CalculatePositionECI(sat, epoch)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 
 		// Scale position relative to Earth's radius (6371 km),
@@ -42,11 +42,10 @@ func DrawOrbit(tle tle.TLE, numPoints int) (filename string, err error) {
 			Time: epoch,
 		})
 	}
-
-	return createHTMLVisual(points, tle.Name), nil
+	return points, nil
 }
 
-func createHTMLVisual(points []Point, satelliteName string) string {
+func CreateHTMLVisual(points []Point, satelliteName string) string {
 	html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>

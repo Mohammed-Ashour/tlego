@@ -20,7 +20,14 @@ func main() {
 		return
 	}
 	t := tles[0]
-	visual.DrawOrbit(t, 3600)
+	points, err := visual.CreateOrbitPoints(t, 360)
+	if err != nil {
+		logger.Error("Failed to create orbit points", "err", err)
+		return
+	}
+
+	htmlFileName := visual.CreateHTMLVisual(points, t.Name)
+	logger.Info("Created an html with orbit visualization", "filename", htmlFileName)
 	logger.Info("Processing TLE",
 		"classification", t.Line1.Classification,
 		"satellite_id", t.Line1.SataliteID)
