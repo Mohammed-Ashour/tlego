@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multiple Satellite Orbits</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: monospace;
+            padding: 10px;
+            background: rgba(0,0,0,0.7);
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>Multiple Satellite Visualization</h3>
+        <div id="satelliteList"></div>
+    </div>
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.dev/three@0.128.0';
+        import { OrbitControls } from 'https://cdn.skypack.dev/three@0.128.0/examples/jsm/controls/OrbitControls.js';
+
+        const satellites = {{ .SatellitesJS }};
+        const satelliteObjects = [];
+        
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // Earth setup
+        const earthGroup = new THREE.Group();
+        const textureLoader = new THREE.TextureLoader();
+
+        Promise.all([
+            textureLoader.load('https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg'),
+            textureLoader.load('https://threejs.org/examples/textures/planets/earth_normal_2048.jpg')
+        ]).then(([map, normalMap]) => {
+            const geometry = new THREE.SphereGeometry(1, 64, 64);
+            const material = new THREE.MeshPhongMaterial({
+                map: map,
+                normalMap: normalMap,
+                normalScale: new THREE.Vector2(0.85, 0.85)
+            });
+            earthGroup.add(new THREE.Mesh(geometry, material));
+        });
+        scene.add(earthGroup);
+
+        // Create orbit visualizations for each satellite
+        satellites.forEach(sat => {
+            const orbitGroup = new THREE.Group();
+            const mag_factor = 25;
+
+            const vertices = [];
+            sat.points.forEach(p => {
+                vertices.push(
+                    p.X * mag_factor, 
+                    p.Y * mag_factor, 
+                    p.Z * mag_factor
+                );
+            });
+            
+            const orbitGeometry = new THREE.BufferGeometry();
+            orbitGeometry.setAttribute(
+                'position',
+                new THREE.Float32BufferAttribute(vertices, 3)
+            );
+            
+            const color = new THREE.Color(sat.color);
+            const orbitMaterial = new THREE.LineBasicMaterial({
+                color: color,
+                linewidth: 3,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const glowMaterial = new THREE.LineBasicMaterial({
+                color: color,
+                linewidth: 6,
+                transparent: true,
+                opacity: 0.3
+            });
+            
+            orbitGroup.add(new THREE.Line(orbitGeometry, orbitMaterial));
+            orbitGroup.add(new THREE.Line(orbitGeometry, glowMaterial));
+
+            // Create satellite
+            const satellite = new THREE.Group();
+            const satelliteBody = new THREE.Mesh(
+                new THREE.SphereGeometry(0.05, 16, 16),
+                new THREE.MeshPhongMaterial({ 
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 0.8
+                })
+            );
+            const satelliteGlow = new THREE.Mesh(
+                new THREE.SphereGeometry(0.07, 16, 16),
+                new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.3
+                })
+            );
+            satellite.add(satelliteBody);
+            satellite.add(satelliteGlow);
+            
+            scene.add(orbitGroup);
+            scene.add(satellite);
+            
+            satelliteObjects.push({
+                satellite,
+                points: sat.points,
+                name: sat.name,
+                color: sat.color,
+                time: Math.random() * sat.points.length
+            });
+
+            if (sat.name && sat.name.trim() !== '') {
+                const satInfo = document.createElement('p');
+                satInfo.style.margin = '5px 0';
+                satInfo.innerHTML = '<span style="color:' + sat.color + '">■</span> ' + sat.name;
+                document.getElementById('satelliteList').appendChild(satInfo);
+            }       
+        });
+
+        scene.add(new THREE.AmbientLight(0x404040));
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+        sunLight.position.set(10, 10, 10);
+        scene.add(sunLight);
+
+        camera.position.set(3, 3, 3);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 1.5;
+        controls.maxDistance = 10;
+
+        const timeStep = 0.001;
+        const mag_factor = 25;
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            earthGroup.rotation.y += 0.001;
+            
+            satelliteObjects.forEach(obj => {
+                if (!obj.points || obj.points.length === 0) {
+                    console.warn('No points data for satellite ${obj.name}');
+                    return;
+                }
+
+                obj.time = (obj.time + timeStep) % obj.points.length;
+                const index = Math.floor(obj.time);
+                const nextIndex = (index + 1) % obj.points.length;
+                
+                const currentPoint = obj.points[index];
+                const nextPoint = obj.points[nextIndex];
+
+                if (!currentPoint || !nextPoint) {
+                    console.warn('Invalid points data for satellite ${obj.name} at index ${index}');
+                    return;
+                }
+
+                const fraction = obj.time - Math.floor(obj.time);
+                
+                obj.satellite.position.set(
+                    (currentPoint.X + (nextPoint.X - currentPoint.X) * fraction) * mag_factor,
+                    (currentPoint.Y + (nextPoint.Y - currentPoint.Y) * fraction) * mag_factor,
+                    (currentPoint.Z + (nextPoint.Z - currentPoint.Z) * fraction) * mag_factor
+                );
+            });
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
