@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 
 	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
 	"github.com/Mohammed-Ashour/tlego/pkg/logger"
@@ -21,6 +22,7 @@ type Author struct {
 var RootCmd = &cli.Command{
 	Name:        "tlego",
 	Version:     "v0.0.25",
+	Usage:       "A TLE client",
 	UsageText:   "TLE Aggregator and visualizer client",
 	Description: "tlego is a simple fast lightweight TLE aggregator and visualizer! built on GO",
 	Authors: []any{
@@ -32,12 +34,44 @@ var RootCmd = &cli.Command{
 	},
 	Commands: []*cli.Command{
 		&cli.Command{
-			Name:   "tle",
-			Action: tleGrep,
+			Name:        "tle",
+			Usage:       "tlego tle <NORAD-ID>",
+			Description: "tlego tle <norad_id> : Finds and downloads the tle for the supported norad id",
+			Action:      tleGrep,
+			Category:    "TLE",
 		},
 		&cli.Command{
-			Name:   "viz",
-			Action: satViz,
+			Name:        "viz",
+			Usage:       "tlego viz <NORAD-ID>",
+			Description: "tlego viz <norad_id> : Finds and creates a visualization for the supported norad id",
+			Action:      satViz,
+			Category:    "Visual",
+		},
+		&cli.Command{
+			Name:     "list",
+			Usage:    "tlego list --sat-group <satellite-group>",
+			Category: "TLE",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:     "sat-group",
+					Usage:    "tlego list --sat-group <sat-group>",
+					Category: "TLE",
+					Validator: func(g string) error {
+						config, err := celestrak.ReadCelestrakConfig()
+						if err != nil {
+							return err
+						}
+						for _, group := range config.SatelliteGroups {
+							if strings.ToLower(g) == strings.ToLower(group.Name) {
+								return nil
+							}
+
+						}
+						return nil
+					},
+				},
+			},
+			Action: listAction,
 		},
 	},
 }
@@ -92,4 +126,25 @@ func satViz(ctx context.Context, cmd *cli.Command) error {
 	htmlFileName := visual.CreateHTMLVisual(satData, noradId)
 	logger.Info("Created an html with orbit visualization", "filename", htmlFileName)
 	return nil
+}
+
+func listAction(ctx context.Context, cmd *cli.Command) error {
+	config, err := celestrak.ReadCelestrakConfig()
+	if err != nil {
+		return err
+	}
+	groupFlag := cmd.String("sat-group")
+	if groupFlag != "" {
+		tles, err := celestrak.GetSatelliteGroupTLEs(groupFlag, config)
+		for _, tle := range tles {
+			fmt.Println(tle)
+		}
+		return err
+	}
+	fmt.Println("Groups supported : ")
+	for _, satGroup := range config.SatelliteGroups {
+		fmt.Printf("\t%s\n", satGroup.Name)
+	}
+	return fmt.Errorf("No sat-group was provided", "--sat-group", groupFlag)
+
 }
