@@ -19,13 +19,14 @@ func CalculatePositionECI(s sat.Satellite, t time.Time) (position [3]float64, ve
 			logger.Error("Calculation panic recovered", "error", r)
 		}
 	}()
-	//get the diff between the time and the time of the tle
+
+	// Get the time difference between the input time and the TLE epoch time.
 	month, day, hour, min, sec := utils.Days2mdhms(s.EpochYr, s.EpochDays)
 	tleTime := time.Date(2000+int(s.EpochYr), time.Month(month), day, hour, min, int(sec), 0, time.UTC)
 	tUTC := t.UTC()
 	timeDiff := tUTC.Sub(tleTime)
 
-	// Don't allow calculations too far from epoch
+	// Don't allow calculations too far from epoch.
 	maxPropagationDays := 30.0 // Maximum days to propagate
 	if math.Abs(timeDiff.Hours()/24) > maxPropagationDays {
 		err = fmt.Errorf("time too far from epoch: %.2f days", timeDiff.Hours()/24)
@@ -35,9 +36,10 @@ func CalculatePositionECI(s sat.Satellite, t time.Time) (position [3]float64, ve
 		return position, velocity, err
 	}
 
-	//convert the time to minutes
+	// Convert the time difference to minutes.
 	diffInMins := timeDiff.Minutes()
 
+	// Calculate the ECI position and velocity using the SGP4 model.
 	position, velocity, err = sat.Sgp4(&s, diffInMins)
 	if err != nil {
 		logger.Error("SGP4 calculation failed", "error", err)
@@ -47,41 +49,51 @@ func CalculatePositionECI(s sat.Satellite, t time.Time) (position [3]float64, ve
 	return position, velocity, nil
 }
 
-// CalculatePositionLLA converts Earth Centered Inertial coordinated into equivalent latitude, longitude, altitude and velocity.
+// CalculatePositionLLA converts Earth Centered Inertial coordinates into equivalent latitude, longitude, and altitude.
 func CalculatePositionLLA(s sat.Satellite, time time.Time) (latitude, longitude float64, altitude float64, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("calculation error: %v", r)
+			logger.Error("LLA Calculation panic recovered", "error", r) // Log LLA specific panics
 		}
 	}()
 
+	// Calculate the ECI position.
 	position, _, err := CalculatePositionECI(s, time)
 	if err != nil {
 		return 0, 0, 0, err
 	}
+
+	// Calculate the Julian date and fraction.
 	jdate, jdFrac := sat.Jday(time.Year(),
 		int(time.Month()),
 		time.Day(),
 		time.Hour(),
 		time.Minute(),
 		float64(time.Second()))
+	if jdate == 0 && jdFrac == 0 {
+		return 0, 0, 0, fmt.Errorf("invalid date/time values")
+	}
 
-	gmst := sat.Gstime(
-		jdate + jdFrac,
-	)
+	// Calculate the Greenwich Mean Sidereal Time (GMST).
+	gmst := sat.Gstime(jdate + jdFrac)
 
+	// Convert the ECI position to LLA.
 	altitude, _, latlon := utils.ECIToLLA(position, gmst)
 	latitude = latlon[0]
 	longitude = latlon[1]
 
-	// Convert to degrees with proper normalization
-	latitude = math.Asin(math.Sin(latitude)) * 180 / math.Pi // Ensures -90 to +90
-	longitude = math.Atan2(math.Sin(longitude), math.Cos(longitude)) * 180 / math.Pi
+	// Convert latitude and longitude to degrees.
+	latitude = latitude * 180 / math.Pi
+	longitude = longitude * 180 / math.Pi
 
 	// Normalize longitude to [-180, 180]
 	longitude = math.Mod(longitude+180, 360) - 180
 
 	// Validate results
+	if math.IsNaN(latitude) || math.IsNaN(longitude) || math.IsNaN(altitude) {
+		return 0, 0, 0, fmt.Errorf("latitude, longitude, or altitude is NaN")
+	}
 
 	if latitude < -90.001 || latitude > 90.001 {
 		return 0, 0, 0, fmt.Errorf("invalid latitude: %v", latitude)

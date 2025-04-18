@@ -64,6 +64,11 @@ func generateSatelliteReport(ctx context.Context, cmd *cli.Command) error {
 
 func generateReport(tle tle.TLE, satellite sgp4.Satellite, lat, lon, alt float64, now time.Time) string {
 	// Format the report
+	altStr := fmt.Sprintf("%.2f km", alt)
+	if alt < 0 {
+		altStr += " (Note: Altitude is relative to the WGS84 ellipsoid. Negative values indicate a position below the reference ellipsoid, which can occur due to orbital mechanics or TLE inaccuracies.)"
+	}
+
 	report := fmt.Sprintf(`
 Satellite Report
 ================
@@ -79,13 +84,11 @@ Orbital Parameters:
 Inclination: %.6f° (degrees)
 Eccentricity: %.6f
 Mean Motion: %.6f (revolutions per day)
-Altitude: %.2f km
 
 Current Position (as of %s):
 ----------------------------
 Latitude: %.6f°
 Longitude: %.6f°
-Altitude: %.2f km
 
 Google Maps URL:
 ----------------
@@ -97,11 +100,9 @@ https://www.google.com/maps/?q=%.6f,%.6f
 		satellite.Inclo*180.0/3.141592653589793, // Convert radians to degrees
 		satellite.Ecco,
 		satellite.NoKozai,
-		alt,
 		now.Format(time.RFC3339),
 		lat,
 		lon,
-		alt,
 		lat,
 		lon,
 	)

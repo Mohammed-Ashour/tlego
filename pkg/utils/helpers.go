@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -104,43 +103,64 @@ func DayOfYearToMonthDay(dayOfYear int, isLeap bool) (month, day int) {
 }
 
 // Convert Earth Centered Inertial coordinated into equivalent latitude, longitude, altitude and velocity.
-// Reference: http://celestrak.com/columns/v02n03/
+// Reference: http://celestrak.com/columns/v02n03/ and Bowring's method
 func ECIToLLA(eciCoords [3]float64, gmst float64) (altitude, velocity float64, ret [2]float64) {
-	a := 6378.137     // Semi-major Axis
-	b := 6356.7523142 // Semi-minor Axis
-	f := (a - b) / a  // Flattening
-	e2 := ((2 * f) - math.Pow(f, 2))
+	a := 6378.137                    // Semi-major Axis (km) WGS84
+	b := 6356.7523142                // Semi-minor Axis (km) WGS84
+	f := (a - b) / a                 // Flattening
+	e2 := 2*f - f*f                  // Eccentricity squared (e^2)
+	ep2 := e2 / (1.0 - e2)           // Second eccentricity squared (e'^2)
 	X, Y, Z := eciCoords[0], eciCoords[1], eciCoords[2]
 
-	sqx2y2 := math.Sqrt(math.Pow(X, 2) + math.Pow(Y, 2))
-
-	// Spherical Earth Calculations
+	// Calculate longitude
 	longitude := math.Atan2(Y, X) - gmst
-	latitude := math.Atan2(Z, sqx2y2)
+	// Ensure longitude is in [-pi, pi]
+	longitude = math.Mod(longitude+math.Pi, 2*math.Pi) - math.Pi
 
-	// Oblate Earth Fix
-	C := 0.0
-	for i := 0; i < 20; i++ {
-		C = 1 / math.Sqrt(1-e2*(math.Sin(latitude)*math.Sin(latitude)))
-		latitude = math.Atan2(Z+(a*C*e2*math.Sin(latitude)), sqx2y2)
+	// Calculate latitude using Bowring's method (iterative)
+	p := math.Sqrt(X*X + Y*Y) // Radius in equatorial plane
+	latitude := math.Atan2(Z, p*(1.0-e2)) // Initial guess for latitude
+	altitude = 0.0                        // Initialize altitude
+
+	var N float64 // Radius of curvature in the prime vertical
+	const tolerance = 1e-10
+	var deltaLatitude float64 = 1.0 // Initialize delta
+
+	for deltaLatitude > tolerance {
+		sinLat := math.Sin(latitude)
+		N = a / math.Sqrt(1.0-e2*sinLat*sinLat)
+		altitude = p/math.Cos(latitude) - N
+		newLatitude := math.Atan2(Z*(1.0+ep2*N/(N+altitude)), p)
+		// Alternative Bowring update:
+		// newLatitude = math.Atan2(Z + e2*N*sinLat, p)
+
+		deltaLatitude = math.Abs(newLatitude - latitude)
+		latitude = newLatitude
 	}
 
-	// Calc Alt
-	altitude = (sqx2y2 / math.Cos(latitude)) - (a * C)
+	// Final calculation of N and altitude with converged latitude
+	sinLat := math.Sin(latitude)
+	N = a / math.Sqrt(1.0-e2*sinLat*sinLat)
+	altitude = p/math.Cos(latitude) - N
 
-	// Orbital Speed ≈ sqrt(μ / r) where μ = std. gravitaional parameter
-	velocity = math.Sqrt(398600.4418 / (altitude + 6378.137))
+	// If altitude is very close to zero, recalculate latitude using the non-iterative formula for surface points
+	if math.Abs(altitude) < 1e-6 { // Tolerance for near surface
+		latitude = math.Atan2(Z*(1.0+ep2), p)
+	}
+
+	// Velocity calculation removed as it was calculating orbital speed, not ECI velocity magnitude.
+	// Returning 0 for velocity to maintain signature.
+	velocity = 0.0
 
 	ret[0] = latitude
 	ret[1] = longitude
-
-	return
+	return altitude, velocity, ret
 }
 
 func ParseFloat(strIn string) (ret float64) {
 	ret, err := strconv.ParseFloat(strIn, 64)
 	if err != nil {
-		log.Fatal(err)
+		panic(err) // Use panic for unrecoverable errors during parsing
 	}
 	return ret
 }
@@ -149,7 +169,7 @@ func ParseFloat(strIn string) (ret float64) {
 func ParseInt(strIn string) (ret int64) {
 	ret, err := strconv.ParseInt(strIn, 10, 0)
 	if err != nil {
-		log.Fatal(err)
+		panic(err) // Use panic for unrecoverable errors during parsing
 	}
 	return ret
 }

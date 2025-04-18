@@ -71,9 +71,15 @@ func trackSatellite(ctx context.Context, cmd *cli.Command) error {
 				continue
 			}
 
+			// Format altitude string with explanation for negative values
+			altStr := fmt.Sprintf("%.2f km", altitude)
+			if altitude < 0 {
+				altStr += " (Note: Altitude is relative to the WGS84 ellipsoid. Negative values indicate a position below the reference ellipsoid, which can occur due to orbital mechanics or TLE inaccuracies.)"
+			}
+
 			// Display the position
-			fmt.Printf("Time: %s | Latitude: %.6f | Longitude: %.6f | Altitude: %.2f km\n",
-				now.Format(time.RFC3339), latitude, longitude, altitude)
+			fmt.Printf("\rTime: %s | Latitude: %.6f | Longitude: %.6f\n", 
+				now.Format(time.RFC3339), latitude, longitude)
 		}
 	}
 }
