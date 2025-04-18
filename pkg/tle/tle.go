@@ -53,6 +53,9 @@ type TLE struct {
 	Line2   TLELine2
 }
 
+func (t TLE) String() string {
+	return fmt.Sprintf("%s\n%s\n%s", t.Name, t.Line1.LineString, t.Line2.LineString)
+}
 func ReadTLELine1(line string) (TLELine1, error) {
 	if len(line) < 69 {
 		return TLELine1{}, fmt.Errorf("line 1 too short: %d chars", len(line))
