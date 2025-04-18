@@ -36,7 +36,7 @@ var RootCmd = &cli.Command{
 		&cli.Command{
 			Name:        "tle",
 			Usage:       "tlego tle <NORAD-ID>",
-			Description: "tlego tle <norad_id> : Finds and downloads the tle for the supported norad id",
+			Description: "Fetches the Two-Line Element (TLE) data for a satellite identified by its NORAD ID. The NORAD ID is a unique identifier assigned to each satellite. Example: tlego tle 25544 (for the ISS).",
 			Action:      tleGrep,
 			Category:    "TLE",
 		},
@@ -59,15 +59,14 @@ var RootCmd = &cli.Command{
 					Validator: func(g string) error {
 						config, err := celestrak.ReadCelestrakConfig()
 						if err != nil {
-							return err
+							return fmt.Errorf("failed to read Celestrak configuration: %w", err)
 						}
 						for _, group := range config.SatelliteGroups {
 							if strings.ToLower(g) == strings.ToLower(group.Name) {
 								return nil
 							}
-
 						}
-						return nil
+						return fmt.Errorf("invalid satellite group: %s. Use 'tlego list' to see available groups", g)
 					},
 				},
 			},
@@ -84,6 +83,10 @@ func tleGrep(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	noradId := args.First()
+	err := validateNoradID(noradId)
+	if err != nil {
+		return err
+	}
 	tle, err := celestrak.GetSatelliteTLEByNoradID(noradId)
 	if err != nil {
 		return err
@@ -98,17 +101,21 @@ func satViz(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("the viz (visualize) command only supports on argument mode at the moment")
 	}
 	noradId := args.First()
+	err := validateNoradID(noradId)
+	if err != nil {
+		return err
+	}
 	if _, err := strconv.Atoi(noradId); err != nil {
 		return fmt.Errorf("noradId is only digits %s was passed.\n", noradId)
 	}
 	tle, err := celestrak.GetSatelliteTLEByNoradID(noradId)
 	if err != nil {
-		return fmt.Errorf("Can't get TLEs from Celestrak, %s", err)
+		return fmt.Errorf("failed to fetch TLE for NORAD ID %s: %w", noradId, err)
 	}
 	satData := make([]visual.SatelliteData, 1)
 	points, err := visual.CreateOrbitPoints(tle, 360)
 	if err != nil {
-		return fmt.Errorf("Failed to create orbit points, %s", err)
+		return fmt.Errorf("failed to create orbit points for satellite %s: %w", tle.Name, err)
 	}
 
 	r := rand.Intn(256)
@@ -147,4 +154,13 @@ func listAction(ctx context.Context, cmd *cli.Command) error {
 	}
 	return fmt.Errorf("No sat-group was provided", "--sat-group", groupFlag)
 
+}
+func validateNoradID(noradId string) error {
+	if noradId == "" {
+		return fmt.Errorf("NORAD ID cannot be empty")
+	}
+	if _, err := strconv.Atoi(noradId); err != nil {
+		return fmt.Errorf("NORAD ID must be numeric: %s", noradId)
+	}
+	return nil
 }
