@@ -26,91 +26,135 @@ The `tlego` CLI tool provides several commands to interact with TLE data and vis
 ```bash
 go install github.com/Mohammed-Ashour/tlego
 ```
-### **1. Fetch TLE for a Satellite**
-Fetch the Two-Line Element (TLE) data for a satellite identified by its NORAD ID.
+## General Command Structure
 
-#### Command
+```bash
+tlego <command> [arguments] [flags]
+```
+
+### Commands
+
+#### 1. Fetch TLE Data for a Satellite
+
 ```bash
 tlego tle <NORAD-ID>
 ```
 
-#### Example
-```bash
-tlego tle 25544
-```
+- **Description:** Fetches the Two-Line Element (TLE) data for a satellite identified by its NORAD ID.
+- **Example:**
+  ```bash
+  tlego tle 25544
+  ```
 
-#### Output
-```plaintext
-ISS (ZARYA)
-1 25544U 98067A   23274.54791667  .00016717  00000+0  10270-3 0  9993
-2 25544  51.6442  83.5458 0008707  21.4567 338.6789 15.50000000 12345
-```
+#### 2. Visualize Satellite Orbit
 
----
-
-### **2. Visualize Satellite Orbit**
-Generate an HTML file visualizing the orbit of a satellite using its NORAD ID.
-
-#### Command
 ```bash
 tlego viz <NORAD-ID>
 ```
 
-#### Example
-```bash
-tlego viz 25544
-```
+- **Description:** Creates a 3D visualization of the satellite's orbit.
+- **Example:**
+  ```bash
+  tlego viz 25544
+  ```
 
-#### Output
-```plaintext
-Created an html with orbit visualization filename="25544_orbit.html"
-```
+#### 3. List Satellite Groups
 
-The generated HTML file (`25544_orbit.html`) will contain a visualization of the satellite's orbit.
-
----
-
-### **3. List Satellite Groups**
-List all available satellite groups or fetch TLEs for a specific satellite group from Celestrak.
-
-#### Command
 ```bash
 tlego list --sat-group <satellite-group>
 ```
 
-#### Example 1: List all available satellite groups
+- **Description:** Lists all satellites in a specific satellite group.
+- **Example:**
+  ```bash
+  tlego list --sat-group "Starlink"
+  ```
+
+#### 4. Predict Satellite Position
+
 ```bash
-tlego list
+tlego predict <NORAD-ID> --time <timestamp>
 ```
 
-#### Output
-```plaintext
-Groups supported:
-    Starlink
-    GPS
-    Weather
-    ISS
-    Iridium
-    ...
-```
+- **Description:** Predicts where a satellite will be at a specific time.
+- **Flags:**
+  - `--time`: Specify the time in ISO 8601 format (e.g., `2024-02-26T12:00:00Z`).
+- **Example:**
+  ```bash
+  tlego predict 25544 --time 2024-02-26T12:00:00Z
+  ```
 
-#### Example 2: Fetch TLEs for a specific satellite group
+#### 5. Track Real-Time Satellite Position
+
 ```bash
-tlego list --sat-group Starlink
+tlego track <NORAD-ID>
 ```
 
-#### Output
-```plaintext
-STARLINK-1
-1 44238U 19029A   23274.54791667  .00000000  00000+0  00000+0 0  9993
-2 44238  53.0000  83.0000 0000000  21.0000 338.0000 15.00000000 12345
+- **Description:** Continuously tracks the real-time position of a satellite.
+- **Example:**
+  ```bash
+  tlego track 25544
+  ```
 
-STARLINK-2
-1 44239U 19029B   23274.54791667  .00000000  00000+0  00000+0 0  9993
-2 44239  53.0000  83.0000 0000000  21.0000 338.0000 15.00000000 12345
-...
+#### 6. Search for Satellites by Name
+
+```bash
+tlego search <keyword>
 ```
 
+- **Description:** Searches for satellites by name or partial name match.
+- **Example:**
+  ```bash
+  tlego search starlink
+  ```
+
+#### 7. Generate Satellite Report
+
+```bash
+tlego report <NORAD-ID>
+```
+
+- **Description:** Generates a detailed report for a satellite, including:
+  - TLE data
+  - Orbital parameters (e.g., inclination, eccentricity, mean motion)
+  - Current position (latitude, longitude, altitude)
+  - Google Maps URL for visualization
+- **Example:**
+  ```bash
+  tlego report 25544
+  ```
+
+- **Sample Output:**
+
+  ```plaintext
+  Satellite Report
+  ================
+  Name: ISS (ZARYA)
+  NORAD ID: 25544
+
+  TLE Data:
+  ---------
+  ISS (ZARYA)
+  1 25544U 98067A   24057.91666667  .00000000  00000+0  00000+0 0    04
+  2 25544  51.6416 247.4627 0006946 130.5360 325.0288 15.49140836    00
+
+  Orbital Parameters:
+  --------------------
+  Inclination: 51.641600° (degrees)
+  Eccentricity: 0.000695
+  Mean Motion: 15.491408 (revolutions per day)
+  Altitude: 408.23 km
+
+  Current Position (as of 2024-02-26T12:00:00Z):
+  ----------------------------
+  Latitude: 37.800000°
+  Longitude: -122.400000°
+  Altitude: 408.23 km
+
+  Google Maps URL:
+  ----------------
+  https://www.google.com/maps/?q=37.800000,-122.400000
+  ```
 ---
 
 ## Library Usage
