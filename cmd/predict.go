@@ -65,10 +65,16 @@ func predictSatellitePosition(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to calculate satellite position: %w", err)
 	}
 
+	// Format altitude string with explanation for negative values
+	altStr := fmt.Sprintf("%.2f km", alt)
+	if alt < 0 {
+		altStr += " (Note: Altitude is relative to the WGS84 ellipsoid. Negative values indicate a position below the reference ellipsoid, which can occur due to orbital mechanics or TLE inaccuracies.)"
+	}
+
 	// Display the results
 	fmt.Printf("Satellite: %s (NORAD ID: %s)\n", tle.Name, noradID)
 	fmt.Printf("Prediction Time: %s\n", predictionTime.Format(time.RFC3339))
-	fmt.Printf("Satellite Position: Latitude %.6f, Longitude %.6f, Altitude %.2f km\n", lat, lon, alt)
+	fmt.Printf("Satellite Position: Latitude %.6f, Longitude %.6f\n", lat, lon)
 
 	// Generate Google Maps URL
 	googlMapsUrl, err := locate.GetGoogleMapsURL(tle, satellite, predictionTime)
