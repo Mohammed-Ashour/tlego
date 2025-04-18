@@ -152,8 +152,7 @@ func listAction(ctx context.Context, cmd *cli.Command) error {
 	for _, satGroup := range config.SatelliteGroups {
 		fmt.Printf("\t%s\n", satGroup.Name)
 	}
-	return fmt.Errorf("No sat-group was provided", "--sat-group", groupFlag)
-
+	return fmt.Errorf("No sat-group was provided: --sat-group=%s", groupFlag)
 }
 func validateNoradID(noradId string) error {
 	if noradId == "" {
