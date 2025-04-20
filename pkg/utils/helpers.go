@@ -5,6 +5,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/Mohammed-Ashour/tlego/pkg/logger"
 )
 
 // Helper function to parse scientific notation in TLE format
@@ -105,52 +107,37 @@ func DayOfYearToMonthDay(dayOfYear int, isLeap bool) (month, day int) {
 // Convert Earth Centered Inertial coordinated into equivalent latitude, longitude, altitude and velocity.
 // Reference: http://celestrak.com/columns/v02n03/ and Bowring's method
 func ECIToLLA(eciCoords [3]float64, gmst float64) (altitude, velocity float64, ret [2]float64) {
-	a := 6378.137                    // Semi-major Axis (km) WGS84
-	b := 6356.7523142                // Semi-minor Axis (km) WGS84
-	f := (a - b) / a                 // Flattening
-	e2 := 2*f - f*f                  // Eccentricity squared (e^2)
-	ep2 := e2 / (1.0 - e2)           // Second eccentricity squared (e'^2)
+	// WGS84 ellipsoid constants
+	a := 6378.137            // semi-major axis in km
+	f := 1.0 / 298.257223563 // flattening
+	b := a * (1 - f)         // semi-minor axis in km
+	e2 := 1 - (b*b)/(a*a)    // first eccentricity squared
+
 	X, Y, Z := eciCoords[0], eciCoords[1], eciCoords[2]
+	logger.Info("ECI Coordinates", "X", X, "Y", Y, "Z", Z)
+	logger.Info("GMST", "GMST", gmst)
+	//distance := math.Sqrt(X*X + Y*Y + Z*Z)
 
 	// Calculate longitude
 	longitude := math.Atan2(Y, X) - gmst
-	// Ensure longitude is in [-pi, pi]
 	longitude = math.Mod(longitude+math.Pi, 2*math.Pi) - math.Pi
 
-	// Calculate latitude using Bowring's method (iterative)
-	p := math.Sqrt(X*X + Y*Y) // Radius in equatorial plane
-	latitude := math.Atan2(Z, p*(1.0-e2)) // Initial guess for latitude
-	altitude = 0.0                        // Initialize altitude
-
-	var N float64 // Radius of curvature in the prime vertical
-	const tolerance = 1e-10
-	var deltaLatitude float64 = 1.0 // Initialize delta
-
-	for deltaLatitude > tolerance {
-		sinLat := math.Sin(latitude)
-		N = a / math.Sqrt(1.0-e2*sinLat*sinLat)
-		altitude = p/math.Cos(latitude) - N
-		newLatitude := math.Atan2(Z*(1.0+ep2*N/(N+altitude)), p)
-		// Alternative Bowring update:
-		// newLatitude = math.Atan2(Z + e2*N*sinLat, p)
-
-		deltaLatitude = math.Abs(newLatitude - latitude)
-		latitude = newLatitude
+	// Iterative computation for latitude and altitude
+	p := math.Sqrt(X*X + Y*Y)
+	lat := math.Atan2(Z, p*(1-e2))
+	var latPrev float64
+	for i := 0; i < 5; i++ {
+		N := a / math.Sqrt(1-e2*math.Sin(lat)*math.Sin(lat))
+		altitude = p/math.Cos(lat) - N
+		latPrev = lat
+		lat = math.Atan2(Z, p*(1-e2*N/(N+altitude)))
+		if math.Abs(lat-latPrev) < 1e-12 {
+			break
+		}
 	}
 
-	// Final calculation of N and altitude with converged latitude
-	sinLat := math.Sin(latitude)
-	N = a / math.Sqrt(1.0-e2*sinLat*sinLat)
-	altitude = p/math.Cos(latitude) - N
-
-	// If altitude is very close to zero, recalculate latitude using the non-iterative formula for surface points
-	if math.Abs(altitude) < 1e-6 { // Tolerance for near surface
-		latitude = math.Atan2(Z*(1.0+ep2), p)
-	}
-
-	// Velocity calculation removed as it was calculating orbital speed, not ECI velocity magnitude.
-	// Returning 0 for velocity to maintain signature.
-	velocity = 0.0
+	latitude := lat
+	velocity = 0.0 // Placeholder, actual velocity calculation not implemented
 
 	ret[0] = latitude
 	ret[1] = longitude

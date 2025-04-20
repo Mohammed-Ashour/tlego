@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
 	"github.com/Mohammed-Ashour/tlego/pkg/locate"
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	"github.com/Mohammed-Ashour/tlego/pkg/sgp4"
 	"github.com/urfave/cli/v3"
 )
 
@@ -56,31 +55,19 @@ func predictSatellitePosition(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Create a satellite object from the TLE
-	satellite := sgp4.NewSatelliteFromTLE(tle)
+	satellite := satellite.NewSatelliteFromTLE(tle, satellite.GravityWGS84)
 
 	// Calculate the satellite's position at the specified time
-	lat, lon, alt, err := locate.CalculatePositionLLA(satellite, predictionTime)
-	if err != nil {
-		logger.Error("Failed to calculate satellite position", "error", err)
-		return fmt.Errorf("failed to calculate satellite position: %w", err)
-	}
 
-	// Format altitude string with explanation for negative values
-	altStr := fmt.Sprintf("%.2f km", alt)
-	if alt < 0 {
-		altStr += " (Note: Altitude is relative to the WGS84 ellipsoid. Negative values indicate a position below the reference ellipsoid, which can occur due to orbital mechanics or TLE inaccuracies.)"
-	}
+	lat, lon, alt, _ := satellite.Locate(predictionTime)
 
 	// Display the results
 	fmt.Printf("Satellite: %s (NORAD ID: %s)\n", tle.Name, noradID)
 	fmt.Printf("Prediction Time: %s\n", predictionTime.Format(time.RFC3339))
-	fmt.Printf("Satellite Position: Latitude %.6f, Longitude %.6f\n", lat, lon)
+	fmt.Printf("Satellite Position: Latitude %.6f, Longitude %.6f, Altitude %.6f\n", lat, lon, alt)
 
 	// Generate Google Maps URL
-	googlMapsUrl, err := locate.GetGoogleMapsURL(tle, satellite, predictionTime)
-	if err != nil {
-		return err
-	}
+	googlMapsUrl := locate.GetGoogleMapsURL(lat, lon)
 	fmt.Printf("Google Maps URL: %s\n", googlMapsUrl)
 
 	return nil
