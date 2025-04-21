@@ -40,24 +40,20 @@ func main() {
 	s := satellite.NewSatelliteFromTLE(t, satellite.GravityWGS84)
 
 	// Use epoch time instead of current time
-	epochTime := t.Time()
-
-	lat, long, alt, _ := s.Locate(epochTime)
-
+	epochTime, err := t.Time()
 	if err != nil {
-		logger.Error("Failed to calculate position", "error", err)
+		logger.Error("Failed to get epoch time", "error", err)
 		return
 	}
+
+	lat, long, alt, _ := s.Locate(epochTime)
 	logger.Info("Satellite position calculated",
 		"latitude", lat,
 		"longitude", long,
 		"altitude", alt)
 
 	googleMapsURL := viz.GetGoogleMapsURL(lat, long)
-	if err != nil {
-		logger.Error("Error:", err)
-		return
-	}
+
 	logger.Info("Google Maps:", "URL", googleMapsURL)
 
 }
