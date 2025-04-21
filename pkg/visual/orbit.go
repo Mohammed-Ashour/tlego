@@ -8,6 +8,7 @@ import (
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
+	"github.com/Mohammed-Ashour/tlego/pkg/templates"
 )
 
 // Point represents a satellite position with an associated timestamp.
@@ -41,7 +42,6 @@ func CreateOrbitPoints(t tle.TLE, numPoints int) ([]Point, error) {
 	for i := 0; i < numPoints; i++ {
 		// Calculate time offset for this point
 		timeOffset := (float64(i) * minutesPerOrbit) / float64(numPoints)
-		fmt.Println(timeOffset)
 		epoch := epochTime.Add(time.Duration(timeOffset * float64(time.Minute)))
 		position, _ := satellite.Propagate(sat, epoch.Year(), int(epoch.Month()), epoch.Day(),
 			epoch.Hour(), epoch.Minute(), int(epoch.Second()))
@@ -55,7 +55,6 @@ func CreateOrbitPoints(t tle.TLE, numPoints int) ([]Point, error) {
 			Time: epoch,
 		})
 	}
-	fmt.Println("points", points)
 	return points, nil
 }
 
@@ -82,23 +81,23 @@ func CreateHTMLVisual(satellites []SatelliteData, htmlFileName string) string {
 		SatellitesJS: satellitesJS,
 	}
 
-	// Parse and execute template
-	tmpl, err := template.ParseFiles("templates/orbit.html")
+	// Parse embedded template
+	tmpl, err := template.ParseFS(templates.FS, templates.OrbitTemplate)
 	if err != nil {
-		fmt.Println("Error parsing template:", err)
+		fmt.Printf("Error parsing template: %v\n", err)
 		return ""
 	}
 
 	htmlFileName = htmlFileName + ".html"
 	file, err := os.Create(htmlFileName)
 	if err != nil {
-		fmt.Println("Error creating file:", err)
+		fmt.Printf("Error creating file: %v\n", err)
 		return ""
 	}
 	defer file.Close()
 
 	if err := tmpl.Execute(file, data); err != nil {
-		fmt.Println("Error executing template:", err)
+		fmt.Printf("Error executing template: %v\n", err)
 		return ""
 	}
 
