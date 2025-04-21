@@ -19,33 +19,35 @@ type SatelliteData struct {
 	Color  string // Hex color code
 }
 
-func GetTLETime(t tle.TLE) time.Time {
-	epochYear := tle.ParseInt(t.Line1.EpochYear)
-	year := 2000 + epochYear
-	day := tle.ParseFloat(t.Line1.EpochDay)
-	month, d, hour, min, sec := tle.Days2mdhms(year, day)
-	return time.Date(int(year), time.Month(month), d, hour, min, int(sec), 0, time.UTC)
-}
+func CreateOrbitPoints(t tle.TLE, numPoints int) ([]Point, error) {
+	sat := satellite.NewSatelliteFromTLE(t, satellite.GravityWGS84)
 
-func CreateOrbitPoints(tle tle.TLE, numPoints int) ([]Point, error) {
-	sat := satellite.NewSatelliteFromTLE(tle, satellite.GravityWGS84)
+	// Calculate orbital period from mean motion (revs per day)
+	meanMotion := tle.ParseFloat(t.Line2.MeanMotion)
+	if meanMotion <= 0 {
+		return nil, fmt.Errorf("invalid mean motion: %v", meanMotion)
+	}
 
-	// Calculate orbital period (in minutes).
-	// Sample points for one complete orbit (uniformly).
+	// Convert to minutes per orbit
+	minutesPerOrbit := 24.0 * 60.0 / meanMotion
+
 	points := make([]Point, 0, numPoints)
-	epochTime := GetTLETime(tle)
-	for i := 0; i < numPoints; i++ {
-		// Uniformly distribute points across the entire orbital period.
-		timeOffset := float64(i) * (1440.0 / float64(numPoints))
-		// Calculate the epoch time for the satellite.
+	epochTime, err := t.Time()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get epoch time: %v", err)
+	}
 
+	// Distribute points evenly across one complete orbit
+	for i := 0; i < numPoints; i++ {
+		// Calculate time offset for this point
+		timeOffset := (float64(i) * minutesPerOrbit) / float64(numPoints)
+		fmt.Println(timeOffset)
 		epoch := epochTime.Add(time.Duration(timeOffset * float64(time.Minute)))
 		position, _ := satellite.Propagate(sat, epoch.Year(), int(epoch.Month()), epoch.Day(),
 			epoch.Hour(), epoch.Minute(), int(epoch.Second()))
 
-		// Scale position relative to Earth's radius (6371 km),
-		// so Earth is drawn as a sphere of radius 1 in Three.js.
-		scaleFactor := 1.0 / 6371.0
+		// Scale position relative to Earth's radius (6371 km)
+		scaleFactor := 0.05 / 6371.0 // Updated scale factor to use actual Earth radius
 		points = append(points, Point{
 			X:    position.X * scaleFactor,
 			Y:    position.Y * scaleFactor,
@@ -53,6 +55,7 @@ func CreateOrbitPoints(tle tle.TLE, numPoints int) ([]Point, error) {
 			Time: epoch,
 		})
 	}
+	fmt.Println("points", points)
 	return points, nil
 }
 

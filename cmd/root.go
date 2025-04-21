@@ -113,7 +113,7 @@ func satViz(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("failed to fetch TLE for NORAD ID %s: %w", noradId, err)
 	}
 	satData := make([]visual.SatelliteData, 1)
-	points, err := visual.CreateOrbitPoints(tle, 360)
+	points, err := visual.CreateOrbitPoints(tle, 36)
 	if err != nil {
 		return fmt.Errorf("failed to create orbit points for satellite %s: %w", tle.Name, err)
 	}

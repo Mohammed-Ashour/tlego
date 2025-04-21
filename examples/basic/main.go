@@ -3,10 +3,10 @@ package main
 import (
 	"os"
 
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 	viz "github.com/Mohammed-Ashour/tlego/pkg/locate"
 	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	sat "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
-	tle "github.com/Mohammed-Ashour/tlego/pkg/tle"
 	visual "github.com/Mohammed-Ashour/tlego/pkg/visual"
 )
 
@@ -37,12 +37,12 @@ func main() {
 	logger.Info("Processing TLE",
 		"classification", t.Line1.Classification,
 		"satellite_id", t.Line1.SataliteID)
-	s := sat.NewSatelliteFromTLE(t)
+	s := satellite.NewSatelliteFromTLE(t, satellite.GravityWGS84)
 
 	// Use epoch time instead of current time
-	epochTime := t.GetTLETime()
+	epochTime := t.Time()
 
-	lat, long, alt, err := viz.CalculatePositionLLA(s, epochTime)
+	lat, long, alt, _ := s.Locate(epochTime)
 
 	if err != nil {
 		logger.Error("Failed to calculate position", "error", err)
@@ -53,7 +53,7 @@ func main() {
 		"longitude", long,
 		"altitude", alt)
 
-	googleMapsURL, err := viz.GetGoogleMapsURL(t, s, epochTime)
+	googleMapsURL := viz.GetGoogleMapsURL(lat, long)
 	if err != nil {
 		logger.Error("Error:", err)
 		return
