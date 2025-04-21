@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
 	"github.com/Mohammed-Ashour/tlego/pkg/locate"
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	"github.com/Mohammed-Ashour/tlego/pkg/sgp4"
-	"github.com/Mohammed-Ashour/tlego/pkg/tle"
 	"github.com/urfave/cli/v3"
 )
 
@@ -43,18 +42,16 @@ func generateSatelliteReport(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Create a satellite object from the TLE
-	satellite := sgp4.NewSatelliteFromTLE(tle)
+	sat := satellite.NewSatelliteFromTLE(tle, satellite.GravityWGS84)
 
 	// Calculate the satellite's current position
 	now := time.Now()
-	lat, lon, alt, err := locate.CalculatePositionLLA(satellite, now)
-	if err != nil {
-		logger.Error("Failed to calculate satellite position", "error", err)
-		return fmt.Errorf("failed to calculate satellite position: %w", err)
-	}
+	lat, lon, alt, _ := sat.Locate(now)
+	fmt.Println(alt)
+	fmt.Println("------")
 
 	// Generate the report
-	report := generateReport(tle, satellite, lat, lon, alt, now)
+	report := generateReport(tle, lat, lon, alt, now)
 
 	// Display the report
 	fmt.Println(report)
@@ -62,12 +59,8 @@ func generateSatelliteReport(ctx context.Context, cmd *cli.Command) error {
 	return nil
 }
 
-func generateReport(tle tle.TLE, satellite sgp4.Satellite, lat, lon, alt float64, now time.Time) string {
+func generateReport(tle tle.TLE, lat, lon, alt float64, now time.Time) string {
 	// Format the report
-	altStr := fmt.Sprintf("%.2f km", alt)
-	if alt < 0 {
-		altStr += " (Note: Altitude is relative to the WGS84 ellipsoid. Negative values indicate a position below the reference ellipsoid, which can occur due to orbital mechanics or TLE inaccuracies.)"
-	}
 
 	report := fmt.Sprintf(`
 Satellite Report
@@ -79,32 +72,26 @@ TLE Data:
 ---------
 %s
 
-Orbital Parameters:
---------------------
-Inclination: %.6f° (degrees)
-Eccentricity: %.6f
-Mean Motion: %.6f (revolutions per day)
 
 Current Position (as of %s):
 ----------------------------
 Latitude: %.6f°
 Longitude: %.6f°
+Altitude: %.6f
 
 Google Maps URL:
 ----------------
-https://www.google.com/maps/?q=%.6f,%.6f
+%s
 `,
 		tle.Name,
 		tle.NoradID,
 		tle.String(),
-		satellite.Inclo*180.0/3.141592653589793, // Convert radians to degrees
-		satellite.Ecco,
-		satellite.NoKozai,
 		now.Format(time.RFC3339),
 		lat,
 		lon,
-		lat,
-		lon,
+		alt,
+
+		locate.GetGoogleMapsURL(lat, lon),
 	)
 
 	return report

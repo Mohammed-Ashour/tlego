@@ -8,10 +8,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
-	"github.com/Mohammed-Ashour/tlego/pkg/locate"
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	"github.com/Mohammed-Ashour/tlego/pkg/sgp4"
 	"github.com/urfave/cli/v3"
 )
 
@@ -44,7 +42,7 @@ func trackSatellite(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Create a satellite object from the TLE
-	satellite := sgp4.NewSatelliteFromTLE(tle)
+	sat := satellite.NewSatelliteFromTLE(tle, satellite.GravityWGS84)
 
 	// Set up signal handling for graceful exit
 	signalChan := make(chan os.Signal, 1)
@@ -65,21 +63,13 @@ func trackSatellite(ctx context.Context, cmd *cli.Command) error {
 		case <-ticker.C:
 			// Calculate the satellite's real-time position
 			now := time.Now()
-			latitude, longitude, altitude, err := locate.CalculatePositionLLA(satellite, now)
-			if err != nil {
-				logger.Error("Failed to calculate satellite position", "error", err)
-				continue
-			}
+			latitude, longitude, altitude, _ := sat.Locate(now)
 
 			// Format altitude string with explanation for negative values
-			altStr := fmt.Sprintf("%.2f km", altitude)
-			if altitude < 0 {
-				altStr += " (Note: Altitude is relative to the WGS84 ellipsoid. Negative values indicate a position below the reference ellipsoid, which can occur due to orbital mechanics or TLE inaccuracies.)"
-			}
 
 			// Display the position
-			fmt.Printf("\rTime: %s | Latitude: %.6f | Longitude: %.6f\n", 
-				now.Format(time.RFC3339), latitude, longitude)
+			fmt.Printf("\rTime: %s | Latitude: %.6f | Longitude: %.6f | Altitude: %.6f\n",
+				now.Format(time.RFC3339), latitude, longitude, altitude)
 		}
 	}
 }

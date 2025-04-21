@@ -2,14 +2,12 @@ package visual
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"text/template"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/locate"
-	"github.com/Mohammed-Ashour/tlego/pkg/sgp4"
-	"github.com/Mohammed-Ashour/tlego/pkg/tle"
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 )
 
 // Point represents a satellite position with an associated timestamp.
@@ -21,82 +19,90 @@ type SatelliteData struct {
 	Color  string // Hex color code
 }
 
-func CreateOrbitPoints(tle tle.TLE, numPoints int) ([]Point, error) {
-	sat := sgp4.NewSatelliteFromTLE(tle)
-	epochTime := tle.GetTLETime()
+func CreateOrbitPoints(t tle.TLE, numPoints int) ([]Point, error) {
+	sat := satellite.NewSatelliteFromTLE(t, satellite.GravityWGS84)
 
-	// Calculate orbital period (in minutes).
-	orbitalPeriod := 2 * math.Pi / sat.NoUnkozai
+	// Calculate orbital period from mean motion (revs per day)
+	meanMotion := tle.ParseFloat(t.Line2.MeanMotion)
+	if meanMotion <= 0 {
+		return nil, fmt.Errorf("invalid mean motion: %v", meanMotion)
+	}
 
-	// Sample points for one complete orbit (uniformly).
+	// Convert to minutes per orbit
+	minutesPerOrbit := 24.0 * 60.0 / meanMotion
+
 	points := make([]Point, 0, numPoints)
+	epochTime, err := t.Time()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get epoch time: %v", err)
+	}
+
+	// Distribute points evenly across one complete orbit
 	for i := 0; i < numPoints; i++ {
-		// Uniformly distribute points across the entire orbital period.
-		timeOffset := (float64(i) / float64(numPoints)) * orbitalPeriod
-
+		// Calculate time offset for this point
+		timeOffset := (float64(i) * minutesPerOrbit) / float64(numPoints)
+		fmt.Println(timeOffset)
 		epoch := epochTime.Add(time.Duration(timeOffset * float64(time.Minute)))
-		position, _, err := locate.CalculatePositionECI(sat, epoch)
-		if err != nil {
-			return nil, err
-		}
+		position, _ := satellite.Propagate(sat, epoch.Year(), int(epoch.Month()), epoch.Day(),
+			epoch.Hour(), epoch.Minute(), int(epoch.Second()))
 
-		// Scale position relative to Earth's radius (6371 km),
-		// so Earth is drawn as a sphere of radius 1 in Three.js.
-		scaleFactor := 1.0 / 6371.0
+		// Scale position relative to Earth's radius (6371 km)
+		scaleFactor := 0.05 / 6371.0 // Updated scale factor to use actual Earth radius
 		points = append(points, Point{
-			X:    position[0] * scaleFactor,
-			Y:    position[1] * scaleFactor,
-			Z:    position[2] * scaleFactor,
+			X:    position.X * scaleFactor,
+			Y:    position.Y * scaleFactor,
+			Z:    position.Z * scaleFactor,
 			Time: epoch,
 		})
 	}
+	fmt.Println("points", points)
 	return points, nil
 }
 
 // Modified CreateHTMLVisual to accept multiple satellites
 func CreateHTMLVisual(satellites []SatelliteData, htmlFileName string) string {
-    // Convert satellites data to JS array
-    satellitesJS := "["
-    for i, sat := range satellites {
-        if i > 0 {
-            satellitesJS += ","
-        }
-        satellitesJS += fmt.Sprintf(`{
+	// Convert satellites data to JS array
+	satellitesJS := "["
+	for i, sat := range satellites {
+		if i > 0 {
+			satellitesJS += ","
+		}
+		satellitesJS += fmt.Sprintf(`{
             name: %q,
             color: %q,
             points: %s
         }`, sat.Name, sat.Color, pointsToJSArray(sat.Points))
-    }
-    satellitesJS += "]"
+	}
+	satellitesJS += "]"
 
-    // Create template data
-    data := struct {
-        SatellitesJS string
-    }{
-        SatellitesJS: satellitesJS,
-    }
+	// Create template data
+	data := struct {
+		SatellitesJS string
+	}{
+		SatellitesJS: satellitesJS,
+	}
 
-    // Parse and execute template
-    tmpl, err := template.ParseFiles("templates/orbit.html")
-    if err != nil {
-        fmt.Println("Error parsing template:", err)
-        return ""
-    }
+	// Parse and execute template
+	tmpl, err := template.ParseFiles("templates/orbit.html")
+	if err != nil {
+		fmt.Println("Error parsing template:", err)
+		return ""
+	}
 
-    htmlFileName = htmlFileName + ".html"
-    file, err := os.Create(htmlFileName)
-    if err != nil {
-        fmt.Println("Error creating file:", err)
-        return ""
-    }
-    defer file.Close()
+	htmlFileName = htmlFileName + ".html"
+	file, err := os.Create(htmlFileName)
+	if err != nil {
+		fmt.Println("Error creating file:", err)
+		return ""
+	}
+	defer file.Close()
 
-    if err := tmpl.Execute(file, data); err != nil {
-        fmt.Println("Error executing template:", err)
-        return ""
-    }
+	if err := tmpl.Execute(file, data); err != nil {
+		fmt.Println("Error executing template:", err)
+		return ""
+	}
 
-    return htmlFileName
+	return htmlFileName
 }
 
 // pointsToJSArray formats the orbit points into a valid JavaScript array literal.

@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	"github.com/Mohammed-Ashour/tlego/pkg/tle"
 	"gopkg.in/yaml.v3"
 )
 
