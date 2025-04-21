@@ -1,17 +1,19 @@
 # TLEGO (Two Line Elements)
 
-A Go library and CLI tool for parsing and processing Two Line Elements (TLE) data, calculating satellite positions using the SGP4 propagation model, and visualizing satellite orbits.
+A Go CLI tool for interacting with Two Line Elements (TLE) data and satellite tracking, with powerful visualization capabilities.
+
+<img src="assets/visual.png">
 
 ## Overview
 
-This library and CLI tool provides functionalities to:
-- Parse TLE (Two Line Elements) data
-- Calculate satellite positions using the SGP4 propagation model
-- Track satellite positions in semi real-time
-- Convert coordinates between different reference frames
-- Generate Google Maps and Open Street Maps URLs for the satellite location
-- Fetch TLE for specific satellites or satellite groups from Celestrak
-- Visualize satellite orbits in an HTML file
+This CLI tool provides functionalities to:
+- Fetch and manage TLE (Two Line Elements) data
+- Track satellite positions in real-time
+- Generate satellite position reports
+- Create 3D visualizations of satellite orbits
+- Generate map links for satellite ground tracks
+- Access Celestrak's satellite catalog
+- Compare and analyze multiple satellite orbits
 
 ## Installation
 
@@ -159,119 +161,29 @@ tlego report <NORAD-ID>
 
 ## Library Usage
 
-The `tlego` library can also be used programmatically in Go projects. Below are some examples of how to use the library.
+The tlego CLI is built on top of go-satellite-v2 for all orbital calculations. Here's how to use the CLI programmatically:
 
-### **1. Reading TLE from a File**
-```go
-// Parse TLE file
-tles, err := tle.ReadTLEFile(filepath)
-
-// Get TLE epoch time
-epochTime := tle.GetTLETime()
-
-// TLE struct fields
-type TLE struct {
-    Name  string
-    Line1 TLELine1
-    Line2 TLELine2
-}
-```
-
----
-
-### **2. Simple Usage**
 ```go
 package main
 
 import (
     "fmt"
     "time"
-    "github.com/Mohammed-Ashour/tlego/pkg/tle"
-    "github.com/Mohammed-Ashour/tlego/pkg/sgp4"
-    "github.com/Mohammed-Ashour/tlego/pkg/locate"
-)
-
-func main() {
-    // Read TLE file
-    tles, _ := tle.ReadTLEFile("tle_sample.txt")
-
-    // Create satellite
-    satellite := sgp4.NewSatelliteFromTLE(tles[0])
-
-    // Get position at epoch
-    epochTime := tles[0].GetTLETime()
-    lat, long, alt, _ := locate.CalculatePositionLLA(satellite, epochTime)
-
-    fmt.Printf("Position: %.6f, %.6f, %.6f\n", lat, long, alt)
-}
-```
-
----
-
-### **3. Fetching TLEs from Celestrak**
-```go
-package main
-
-import (
+    "github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
     "github.com/Mohammed-Ashour/tlego/pkg/celestrak"
-    "github.com/Mohammed-Ashour/tlego/pkg/logger"
 )
 
 func main() {
-    // Get TLEs for entire satellite group
-    satelliteGroup := "Starlink"
-	config, err := celestrak.ReadCelestrakConfig()
-	if err != nil {
-		logger.Error("Can't get the Celestrak config", "Error", err)
-		return
-	}
-	tles, err := celestrak.GetSatelliteGroupTLEs(satelliteGroup, config)
-    if err != nil {
-        logger.Error("Failed to get Starlink TLEs", "error", err)
-        return
-    }
+    // Fetch TLE from Celestrak
+    tle, _ := celestrak.GetSatelliteTLEByNoradID("25544")
 
-    // Get TLE for specific satellite by NORAD ID
-    noradID := "25544" // ISS
-    tle, err := celestrak.GetSatelliteTLEByNoradID(noradID)
-    if err != nil {
-        logger.Error("Failed to get ISS TLE", "error", err)
-        return
-    }
-}
-```
+    // Create satellite using go-satellite-v2
+    sat := satellite.NewSatelliteFromTLE(tle, satellite.GravityWGS84)
 
----
-
-### **4. Create a Visualization of the Satellite Orbit**
-```go
-package main
-
-import (
-	"os"
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	tle "github.com/Mohammed-Ashour/tlego/pkg/tle"
-	visual "github.com/Mohammed-Ashour/tlego/pkg/visual"
-)
-
-func main() {
-
-	// example
-	filePath := os.Args[1]
-	tles, err := tle.ReadTLEFile(filePath)
-	if err != nil {
-		logger.Error("Failed to read TLE file", "error", err)
-		return
-	}
-	t := tles[0]
-	points, err := visual.CreateOrbitPoints(t, 360)
-	if err != nil {
-		logger.Error("Failed to create orbit points", "err", err)
-		return
-	}
-
-	htmlFileName := visual.CreateHTMLVisual(points, t.Name)
-	logger.Info("Created an html with orbit visualization", "filename", htmlFileName)
+    // Get current position
+    lat, lon, alt, _ := sat.Locate(time.Now())
+    
+    fmt.Printf("Position: %.6f°, %.6f°, %.6f km\n", lat, lon, alt)
 }
 ```
 
@@ -279,20 +191,20 @@ func main() {
 
 ## Features
 
-- Full SGP4 implementation in pure Go
-- High precision satellite position calculation
-- Support for multiple time formats
-- Thread-safe operations
-- Extensible coordinate system transformations
-- Satellite Position on GoogleMaps and OpenStreetMaps
-- Create an HTML visualization of the Satellite orbit using the TLE
-- CLI commands for fetching TLEs, listing satellite groups, and visualizing orbits
+- Seamless integration with go-satellite-v2 for high-precision orbit propagation
+- Robust CLI interface for satellite tracking and visualization
+- Real-time position tracking and orbit prediction
+- Support for multiple mapping services (Google Maps, OpenStreetMap)
+- Interactive 3D orbit visualization
+- Comprehensive satellite group management
+- Efficient TLE data fetching and caching
 
 ---
 
 ## Dependencies
 - Go 1.22 or later
-- gopkg.in/yaml.v3
+- github.com/Mohammed-Ashour/go-satellite-v2 (SGP4 propagation engine)
+- gopkg.in/yaml.v3 (Configuration handling)
 
 ---
 
@@ -307,15 +219,9 @@ func main() {
 
 ## References & Credits
 
-This project is a Go implementation of the SGP4 satellite propagation algorithm, adapted from the [Multi-Language SGP4 Implementation](https://github.com/aholinch/sgp4) by Aaron Holinch. The original repository provides implementations in multiple languages (Java, Python, C++), but did not include a Go version.
-
-Key adaptations:
-- Converted Java classes to Go structs
-- Implemented Go-specific error handling
-- Added Go-idiomatic features
-- Maintained algorithm accuracy and precision
-
-Please refer to the original repository for detailed algorithm documentation and mathematical background.
+This project uses [go-satellite-v2](https://github.com/Mohammed-Ashour/go-satellite-v2) for SGP4 orbit propagation. 
+The visualization and CLI components are original work built to provide an accessible interface for satellite tracking 
+and analysis.
 
 ---
 
