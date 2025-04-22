@@ -12,7 +12,7 @@ type Author struct {
 
 var RootCmd = &cli.Command{
 	Name:        "tlego",
-	Version:     "v0.2.2",
+	Version:     "v1.1",
 	Usage:       "A TLE client",
 	UsageText:   "TLE Aggregator and visualizer client",
 	Description: "tlego is a simple fast lightweight TLE aggregator and visualizer! built on GO",
