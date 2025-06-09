@@ -12,6 +12,18 @@
             font-family: monospace;
             padding: 10px;
             background: rgba(0,0,0,0.7);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+            max-width: 260px;
+        }
+        #satelliteList {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding-right: 8px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: rgba(20,20,20,0.6);
         }
     </style>
 </head>
@@ -38,11 +50,19 @@
         const earthGroup = new THREE.Group();
         const textureLoader = new THREE.TextureLoader();
 
+        // Adjusted Earth radius for better scale
+        const EARTH_RADIUS = 2.5;
+        // Adjusted satellite size for better scale
+        const SAT_RADIUS = 0.018;
+        const SAT_GLOW_RADIUS = 0.028;
+        // Adjusted orbit magnification factor
+        const MAG_FACTOR = 60;
+
         Promise.all([
             textureLoader.load('https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg'),
             textureLoader.load('https://threejs.org/examples/textures/planets/earth_normal_2048.jpg')
         ]).then(([map, normalMap]) => {
-            const geometry = new THREE.SphereGeometry(1, 64, 64);
+            const geometry = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
             const material = new THREE.MeshPhongMaterial({
                 map: map,
                 normalMap: normalMap,
@@ -55,14 +75,13 @@
         // Create orbit visualizations for each satellite
         satellites.forEach(sat => {
             const orbitGroup = new THREE.Group();
-            const mag_factor = 25;
 
             const vertices = [];
             sat.points.forEach(p => {
                 vertices.push(
-                    p.X * mag_factor, 
-                    p.Y * mag_factor, 
-                    p.Z * mag_factor
+                    p.X * MAG_FACTOR, 
+                    p.Y * MAG_FACTOR, 
+                    p.Z * MAG_FACTOR
                 );
             });
             
@@ -75,16 +94,16 @@
             const color = new THREE.Color(sat.color);
             const orbitMaterial = new THREE.LineBasicMaterial({
                 color: color,
-                linewidth: 3,
+                linewidth: 2,
                 transparent: true,
                 opacity: 0.8
             });
             
             const glowMaterial = new THREE.LineBasicMaterial({
                 color: color,
-                linewidth: 6,
+                linewidth: 5,
                 transparent: true,
-                opacity: 0.3
+                opacity: 0.2
             });
             
             orbitGroup.add(new THREE.Line(orbitGeometry, orbitMaterial));
@@ -93,7 +112,7 @@
             // Create satellite
             const satellite = new THREE.Group();
             const satelliteBody = new THREE.Mesh(
-                new THREE.SphereGeometry(0.05, 16, 16),
+                new THREE.SphereGeometry(SAT_RADIUS, 16, 16),
                 new THREE.MeshPhongMaterial({ 
                     color: color,
                     emissive: color,
@@ -101,11 +120,11 @@
                 })
             );
             const satelliteGlow = new THREE.Mesh(
-                new THREE.SphereGeometry(0.07, 16, 16),
+                new THREE.SphereGeometry(SAT_GLOW_RADIUS, 16, 16),
                 new THREE.MeshBasicMaterial({
                     color: color,
                     transparent: true,
-                    opacity: 0.3
+                    opacity: 0.25
                 })
             );
             satellite.add(satelliteBody);
@@ -135,15 +154,16 @@
         sunLight.position.set(10, 10, 10);
         scene.add(sunLight);
 
-        camera.position.set(3, 3, 3);
+        // Camera and controls setup for new scale
+        camera.position.set(0, 0, EARTH_RADIUS + MAG_FACTOR * 2.2);
+        camera.lookAt(0, 0, 0);
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.minDistance = 1.5;
-        controls.maxDistance = 10;
+        controls.minDistance = EARTH_RADIUS * 1.2;
+        controls.maxDistance = EARTH_RADIUS + MAG_FACTOR * 4;
 
         const timeStep = 0.001;
-        const mag_factor = 25;
         
         function animate() {
             requestAnimationFrame(animate);
@@ -170,9 +190,9 @@
                 const fraction = obj.time - Math.floor(obj.time);
                 
                 obj.satellite.position.set(
-                    (currentPoint.X + (nextPoint.X - currentPoint.X) * fraction) * mag_factor,
-                    (currentPoint.Y + (nextPoint.Y - currentPoint.Y) * fraction) * mag_factor,
-                    (currentPoint.Z + (nextPoint.Z - currentPoint.Z) * fraction) * mag_factor
+                    (currentPoint.X + (nextPoint.X - currentPoint.X) * fraction) * MAG_FACTOR,
+                    (currentPoint.Y + (nextPoint.Y - currentPoint.Y) * fraction) * MAG_FACTOR,
+                    (currentPoint.Z + (nextPoint.Z - currentPoint.Z) * fraction) * MAG_FACTOR
                 );
             });
             
