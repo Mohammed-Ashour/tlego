@@ -1,16 +1,22 @@
 package cmd
 
 import (
-	"github.com/urfave/cli/v3"
+	"context"
+
 	"github.com/Mohammed-Ashour/tlego/pkg/server"
+	"github.com/urfave/cli/v3"
 )
 
-var ServerCmd = &cli.Command{
-	Name:    "server",
-	Usage:   "Launch the satellite visualization web server",
-	Aliases: []string{"serve"},
-	Action: func(ctx *cli.Context) error {
-		server.StartServer()
-		return nil
-	},
+func init() {
+	RootCmd.Commands = append(RootCmd.Commands, &cli.Command{
+		Name:    "server",
+		Usage:   "Launch the satellite visualization web server. Example: tlego server",
+		Aliases: []string{"serve"},
+		Action:  startServer,
+	})
+}
+
+func startServer(ctx context.Context, cmd *cli.Command) error {
+	server.StartServer()
+	return nil
 }

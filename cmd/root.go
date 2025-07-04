@@ -23,7 +23,4 @@ var RootCmd = &cli.Command{
 			Website: "blog.m-ashour.space",
 		},
 	},
-	Commands: []*cli.Command{
-		ServerCmd,
-	},
 }
