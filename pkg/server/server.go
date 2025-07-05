@@ -8,6 +8,7 @@ import (
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
+	"github.com/Mohammed-Ashour/tlego/pkg/logger"
 )
 
 // Satellite represents a simple satellite model
@@ -87,10 +88,10 @@ func locationHandler(w http.ResponseWriter, r *http.Request) {
 
 	lat, lon, alt, _ := sat.Locate(now)
 
-	fmt.Printf("[locationHandler] NORAD: %s\n", noradID)
-	fmt.Printf("[locationHandler] Name: %s\n", tleData.Name)
-	fmt.Printf("[locationHandler] Position ECI (X,Y,Z): %v, %v, %v\n", pos.X, pos.Y, pos.Z)
-	fmt.Printf("[locationHandler] LatLon: %v, %v, Alt: %v\n", lat, lon, alt)
+	logger.Info("[locationHandler] NORAD: %s\n", "norad_id", noradID)
+	logger.Info("[locationHandler] Name: %s\n", "name", tleData.Name)
+	logger.Info("[locationHandler] Position ECI (X,Y,Z): %v, %v, %v\n", "eci", pos.X, pos.Y, pos.Z)
+	logger.Info("[locationHandler] LatLon: %v, %v, Alt: %v\n", "info", lat, lon, alt)
 
 	response := map[string]interface{}{
 		"name": tleData.Name,
