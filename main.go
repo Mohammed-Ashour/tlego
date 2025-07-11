@@ -9,5 +9,4 @@ import (
 
 func main() {
 	cmd.RootCmd.Run(context.Background(), os.Args)
-
 }

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satellite 3D Visualization</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/"
+        }
+      }
+    </script>
+    <style>
+        body { margin: 0; }
+        .controls {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        #info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            max-height: calc(100vh - 30px);
+            width: 300px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre;
+            z-index: 1000;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, 0.5) rgba(255, 255, 255, 0.1);
+        }
+        #info::-webkit-scrollbar {
+            width: 8px;
+        }
+        #info::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        #info::-webkit-scrollbar-thumb {
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+        }
+        select {
+            margin: 5px;
+            padding: 5px;
+            width: 300px;
+        }
+        #container { 
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <div>
+            <label for="group">Satellite group:</label>
+            <select id="group" onchange="onGroupChange()"></select>
+        </div>
+        <div>
+            <label for="satellite">Satellites (hold Ctrl/Cmd to select multiple):</label>
+            <select id="satellite" onchange="onSatelliteChange()" multiple size="5"></select>
+        </div>
+    </div>
+    <div id="info"></div>
+    <div id="container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        
+        const apiBase = '/api';
+        const EARTH_RADIUS = 6371; // km
+        const SCALE = 1/6371; // Scale everything relative to Earth radius
+
+        // Three.js setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+        camera.position.set(0, -4, 2);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // Orbit controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Earth
+        const earthGeometry = new THREE.SphereGeometry(1, 64, 64);
+        const earthMaterial = new THREE.MeshPhongMaterial({
+            map: new THREE.TextureLoader().load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg'),
+            bumpMap: new THREE.TextureLoader().load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_normal_2048.jpg'),
+            bumpScale: 0.05,
+            specularMap: new THREE.TextureLoader().load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg'),
+            specular: new THREE.Color('grey')
+        });
+        const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+        scene.add(earth);
+
+        // Atmosphere glow
+        const atmosphereGeometry = new THREE.SphereGeometry(1.01, 64, 64);
+        const atmosphereMaterial = new THREE.MeshPhongMaterial({
+            color: 0x0077ff,
+            transparent: true,
+            opacity: 0.2,
+            side: THREE.BackSide
+        });
+        const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
+        scene.add(atmosphere);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+        sunLight.position.set(5, 3, 5);
+        scene.add(sunLight);
+
+        // Satellite visualization
+        let satellites = new Map(); // Map of noradId -> THREE.Mesh
+        let satPaths = new Map();
+
+        // Star field
+        const starGeometry = new THREE.BufferGeometry();
+        const starVertices = [];
+        for(let i = 0; i < 5000; i++) {
+            const x = THREE.MathUtils.randFloatSpread(100);
+            const y = THREE.MathUtils.randFloatSpread(100);
+            const z = THREE.MathUtils.randFloatSpread(100);
+            starVertices.push(x, y, z);
+        }
+        starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+        const starMaterial = new THREE.PointsMaterial({color: 0xffffff, size: 0.05});
+        const starField = new THREE.Points(starGeometry, starMaterial);
+        scene.add(starField);
+
+        async function fetchGroups() {
+            const res = await fetch(`${apiBase}/satellite-groups`);
+            const groups = await res.json();
+            const groupDropdown = document.getElementById('group');
+            groupDropdown.innerHTML = '';
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group;
+                option.textContent = group;
+                groupDropdown.appendChild(option);
+            });
+            if (groups.length > 0) {
+                groupDropdown.selectedIndex = 0;
+                await fetchSatellites(groups[0]);
+            }
+        }
+
+        async function fetchSatellites(group) {
+            const response = await fetch(`${apiBase}/satellites?group=${encodeURIComponent(group)}`);
+            const satellites = await response.json();
+            const satDropdown = document.getElementById('satellite');
+            satDropdown.innerHTML = '';
+            satellites.forEach(sat => {
+                const option = document.createElement('option');
+                option.value = sat.norad_id;
+                option.textContent = `${sat.name} (${sat.norad_id})`;
+                satDropdown.appendChild(option);
+            });
+            if (satellites.length > 0) {
+                satDropdown.selectedIndex = 0;
+                await updateSatellitePositions();
+            }
+        }
+
+        async function updateSatellitePositions() {
+            const satDropdown = document.getElementById('satellite');
+            const selectedNoradIDs = Array.from(satDropdown.selectedOptions).map(opt => opt.value);
+            
+            // Remove satellites that are no longer selected
+            for (const [noradId, sat] of satellites.entries()) {
+                if (!selectedNoradIDs.includes(noradId)) {
+                    scene.remove(sat);
+                    satellites.delete(noradId);
+                    if (satPaths.has(noradId)) {
+                        scene.remove(satPaths.get(noradId));
+                        satPaths.delete(noradId);
+                    }
+                }
+            }
+
+            // Update or add selected satellites
+            const infoTexts = [];
+            for (const noradID of selectedNoradIDs) {
+                if (!noradID) continue;
+
+                const response = await fetch(`${apiBase}/location?norad_id=${noradID}`);
+                const data = await response.json();
+                
+                // Add to info panel
+                infoTexts.push(
+`Satellite: ${data.name}
+ECI Position (km):
+  X: ${data.eci.x.toFixed(2)}
+  Y: ${data.eci.y.toFixed(2)}
+  Z: ${data.eci.z.toFixed(2)}
+Geographic:
+  Lat: ${data.info.latitude.toFixed(2)}°
+  Lon: ${data.info.longitude.toFixed(2)}°
+  Alt: ${data.info.altitude.toFixed(2)} km`);
+
+                // Create or update satellite
+                let satellite = satellites.get(noradID);
+                if (!satellite) {
+                    // Create satellite group to hold both sphere and label
+                    satellite = new THREE.Group();
+                    
+                    // Create satellite sphere
+                    const satGeometry = new THREE.SphereGeometry(0.02, 8, 8);
+                    const satMaterial = new THREE.MeshPhongMaterial({
+                        color: 0xff0000,
+                        emissive: 0xff0000,
+                        emissiveIntensity: 0.5
+                    });
+                    const satSphere = new THREE.Mesh(satGeometry, satMaterial);
+                    satellite.add(satSphere);
+                    
+                    // Create text label
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.width = 256;
+                    canvas.height = 64;
+                    context.fillStyle = '#ffffff';
+                    context.font = 'bold 24px Arial';
+                    context.textAlign = 'center';
+                    context.fillText(data.name, 128, 32);
+                    
+                    const texture = new THREE.CanvasTexture(canvas);
+                    const labelGeometry = new THREE.PlaneGeometry(0.3, 0.075);
+                    const labelMaterial = new THREE.MeshBasicMaterial({
+                        map: texture,
+                        transparent: true,
+                        depthTest: false
+                    });
+                    const label = new THREE.Mesh(labelGeometry, labelMaterial);
+                    label.position.set(0.2, 0, 0); // Offset label to the right of satellite
+                    
+                    satellite.add(label);
+                    satellites.set(noradID, satellite);
+                    scene.add(satellite);
+                }
+
+                // Update position
+                const pos = data.eci;
+                satellite.position.set(
+                    pos.x * SCALE,
+                    pos.y * SCALE,
+                    pos.z * SCALE
+                );
+            }
+            
+            // Update info panel
+            document.getElementById('info').textContent = infoTexts.join('\n\n');
+        }
+
+        window.onGroupChange = async function() {
+            const group = document.getElementById('group').value;
+            await fetchSatellites(group);
+        };
+
+        window.onSatelliteChange = updateSatellitePositions;
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            earth.rotation.y += 0.001;
+            controls.update();
+            // Update label orientations to face camera
+            satellites.forEach(sat => {
+                const label = sat.children[1];
+                if (label) {
+                    label.quaternion.copy(camera.quaternion);
+                }
+            });
+            
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start everything
+        fetchGroups();
+        animate();
+    </script>
+</body>
+</html>
