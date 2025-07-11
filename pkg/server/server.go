@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
@@ -29,6 +30,7 @@ func listGroupsHandler(w http.ResponseWriter, r *http.Request) {
 	for _, group := range config.SatelliteGroups {
 		groups = append(groups, group.Name)
 	}
+	sort.Strings(groups)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(groups)
 }
@@ -57,6 +59,9 @@ func listSatellitesHandler(w http.ResponseWriter, r *http.Request) {
 			NORADID: t.NoradID,
 		})
 	}
+	sort.Slice(satellites, func(i, j int) bool {
+		return satellites[i].Name < satellites[j].Name
+	})
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(satellites)
 }
@@ -119,7 +124,7 @@ func StartServer() {
 	http.HandleFunc("/api/satellite-groups", listGroupsHandler)
 	http.HandleFunc("/api/satellites", listSatellitesHandler)
 	http.HandleFunc("/api/location", locationHandler)
-
+	logger.Info("Starting server on :8080")
 	http.Handle("/", http.FileServer(http.Dir("public")))
 	http.ListenAndServe(":8080", nil)
 }
