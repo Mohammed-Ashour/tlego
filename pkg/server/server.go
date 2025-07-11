@@ -119,7 +119,7 @@ func StartServer() {
 	http.HandleFunc("/api/satellite-groups", listGroupsHandler)
 	http.HandleFunc("/api/satellites", listSatellitesHandler)
 	http.HandleFunc("/api/location", locationHandler)
-
+	logger.Info("Starting server on :8080")
 	http.Handle("/", http.FileServer(http.Dir("public")))
 	http.ListenAndServe(":8080", nil)
 }
