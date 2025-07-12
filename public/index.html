@@ -215,11 +215,7 @@
 ECI Position (km):
   X: ${data.eci.x.toFixed(2)}
   Y: ${data.eci.y.toFixed(2)}
-  Z: ${data.eci.z.toFixed(2)}
-Geographic:
-  Lat: ${data.info.latitude.toFixed(2)}°
-  Lon: ${data.info.longitude.toFixed(2)}°
-  Alt: ${data.info.altitude.toFixed(2)} km`);
+  Z: ${data.eci.z.toFixed(2)}`);
 
                 // Create or update satellite
                 let satellite = satellites.get(noradID);
