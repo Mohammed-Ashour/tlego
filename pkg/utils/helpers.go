@@ -104,9 +104,9 @@ func DayOfYearToMonthDay(dayOfYear int, isLeap bool) (month, day int) {
 	return month, day
 }
 
-// Convert Earth Centered Inertial coordinated into equivalent latitude, longitude, altitude and velocity.
+// ECIToLLA converts Earth-Centered Inertial (ECI) coordinates into equivalent latitude, longitude, and altitude.
 // Reference: http://celestrak.com/columns/v02n03/ and Bowring's method
-func ECIToLLA(eciCoords [3]float64, gmst float64) (altitude, velocity float64, ret [2]float64) {
+func ECIToLLA(eciCoords [3]float64, gmst float64) (latitude, longitude, altitude float64) {
 	// WGS84 ellipsoid constants
 	a := 6378.137            // semi-major axis in km
 	f := 1.0 / 298.257223563 // flattening
@@ -116,32 +116,30 @@ func ECIToLLA(eciCoords [3]float64, gmst float64) (altitude, velocity float64, r
 	X, Y, Z := eciCoords[0], eciCoords[1], eciCoords[2]
 	logger.Info("ECI Coordinates", "X", X, "Y", Y, "Z", Z)
 	logger.Info("GMST", "GMST", gmst)
-	//distance := math.Sqrt(X*X + Y*Y + Z*Z)
 
-	// Calculate longitude
-	longitude := math.Atan2(Y, X) - gmst
-	longitude = math.Mod(longitude+math.Pi, 2*math.Pi) - math.Pi
+	// Calculate longitude in radians, accounting for Earth's rotation via GMST
+	lonRad := math.Atan2(Y, X) - gmst
+	lonRad = math.Mod(lonRad+math.Pi, 2*math.Pi) - math.Pi
 
-	// Iterative computation for latitude and altitude
+	// Iterative computation for latitude and altitude (Bowring's method)
 	p := math.Sqrt(X*X + Y*Y)
-	lat := math.Atan2(Z, p*(1-e2))
+	latRad := math.Atan2(Z, p*(1-e2))
 	var latPrev float64
-	for i := 0; i < 5; i++ {
-		N := a / math.Sqrt(1-e2*math.Sin(lat)*math.Sin(lat))
-		altitude = p/math.Cos(lat) - N
-		latPrev = lat
-		lat = math.Atan2(Z, p*(1-e2*N/(N+altitude)))
-		if math.Abs(lat-latPrev) < 1e-12 {
+	for i := 0; i < 5; i++ { // 5 iterations is generally sufficient for convergence
+		N := a / math.Sqrt(1-e2*math.Sin(latRad)*math.Sin(latRad))
+		altitude = p/math.Cos(latRad) - N
+		latPrev = latRad
+		latRad = math.Atan2(Z, p*(1-e2*N/(N+altitude)))
+		if math.Abs(latRad-latPrev) < 1e-12 {
 			break
 		}
 	}
 
-	latitude := lat
-	velocity = 0.0 // Placeholder, actual velocity calculation not implemented
+	// Convert final latitude and longitude from radians to degrees
+	latitude = latRad * (180 / math.Pi)
+	longitude = lonRad * (180 / math.Pi)
 
-	ret[0] = latitude
-	ret[1] = longitude
-	return altitude, velocity, ret
+	return latitude, longitude, altitude
 }
 
 func ParseFloat(strIn string) (ret float64) {
