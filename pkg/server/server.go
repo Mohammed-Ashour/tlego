@@ -10,6 +10,7 @@ import (
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
 	"github.com/Mohammed-Ashour/tlego/pkg/logger"
+	"github.com/Mohammed-Ashour/tlego/pkg/utils"
 )
 
 // Satellite represents a simple satellite model
@@ -91,7 +92,12 @@ func locationHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Get lat/lon/alt for display info
 
-	lat, lon, alt, _ := sat.Locate(now)
+	// Calculate GMST
+	gmst := satellite.GSTimeFromDate(now.Year(), int(now.Month()), now.Day(), now.Hour(), now.Minute(), int(now.Second()))
+
+	// Convert ECI to LLA using our helper
+	eciCoords := [3]float64{pos.X, pos.Y, pos.Z}
+	lat, lon, alt := utils.ECIToLLA(eciCoords, gmst)
 
 	logger.Info("[locationHandler] NORAD: %s\n", "norad_id", noradID)
 	logger.Info("[locationHandler] Name: %s\n", "name", tleData.Name)
