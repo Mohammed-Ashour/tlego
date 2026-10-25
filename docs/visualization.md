@@ -45,8 +45,8 @@ CreateOrbitPoints still starts at the element epoch. CreateOrbitPointsAt accepts
 
 The embedded JSON's version is scoped to this viewer. It is not the planned general extension schema.
 
-## Development, review and recording
+## Development and recording
 
-[The deep review](reviews/orbit-visualization.md) lists observed problems and their fixes. [Viewer build instructions](../pkg/templates/README.md) describe pinned dependencies, licensing and bundle verification. JavaScript changes must include an updated bundle; CI rebuilds and compares it.
+[Viewer build instructions](../pkg/templates/README.md) describe pinned dependencies, licensing and bundle verification. JavaScript changes must include an updated bundle; CI rebuilds and compares it.
 
 The README walkthrough was captured from the actual generated viewer at 1280x720, then encoded as an H.264 MP4 and GIF preview. It demonstrates camera rotation, 300x playback, zoom and keyboard timeline scrubbing. Recreate iss.html with the bundled fixture, serve only its output directory for recording if file previews are unavailable, and capture those controls. No external provider data is needed for the recording.

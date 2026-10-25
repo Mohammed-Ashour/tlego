@@ -68,7 +68,7 @@ Legacy CLI/server retrieval calls pkg/celestrak, downloads into a file and parse
 
 TUI retrieval calls pkg/tui/data.Store, validates IDs and TLE records, checks cache timestamps, validates temporary downloads before replacement and can fall back to validated stale files. pkg/tui/derive.go normalizes UTC, converts positions and uses the propagated velocity vector; pkg/tui/passes.go samples horizon events with clipping flags; pkg/tui/report.go formats report records. Observer and recent-history state persist atomically in the user configuration directory. Request generations reject superseded results, and text fields own their printable input.
 
-The viz command accepts a live catalog ID or validated local TLE file. It samples all records from one UTC start through pkg/visual, then writes JSON data plus embedded renderer/CSS through an error-returning atomic writer. Points are physical TEME kilometres with UTC times and derived metadata. The frontend maps axes into Three.js, rotates the globe using sampled GMST, and interpolates only within the common sample interval. Its committed bundle is rebuilt and checked in a separate Node CI job; Go consumers do not need Node.
+The viz command accepts a live catalog ID or validated local TLE file. It samples all records from one UTC start through pkg/visual, then writes JSON data plus embedded renderer/CSS through an error-returning atomic writer. Points are physical TEME kilometres with UTC times and derived metadata. The frontend maps axes into Three.js, rotates the globe using UTC-derived GMST, and interpolates only within the common sample interval. Its committed bundle is rebuilt and checked in a separate Node CI job; Go consumers do not need Node.
 
 ## Module Ownership Boundaries
 
@@ -79,7 +79,7 @@ The viz command accepts a live catalog ID or validated local TLE file. It sample
 
 ## Architecture Change Protocol
 
-1. Record behavior and compatibility changes in the relevant review or pull request.
+1. Record behavior and compatibility changes in the pull request.
 2. Keep current state in this document and proposals in [GitHub issue #29](https://github.com/Mohammed-Ashour/tlego/issues/29).
 3. Correct units, UTC and failure contracts with regression tests before migrating callers.
 4. Migrate one frontend at a time. Preserve exported APIs with deprecation wrappers where needed; do not silently change existing JSON contracts.
