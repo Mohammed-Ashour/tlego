@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
 	"github.com/Mohammed-Ashour/tlego/pkg/locate"
@@ -27,15 +28,30 @@ func TestPredictUsesDegreeCoordinatesAndUTC(t *testing.T) {
 	originalTransport, originalDir := http.DefaultTransport, celestrak.DOWNLOAD_DIR
 	t.Cleanup(func() { http.DefaultTransport, celestrak.DOWNLOAD_DIR = originalTransport, originalDir })
 	celestrak.DOWNLOAD_DIR = t.TempDir()
-	http.DefaultTransport = fixtureTransport(func(*http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("ISS (ZARYA)\n" + line1 + "\n" + line2 + "\n")), Header: make(http.Header)}, nil
-	})
 	parsed, err := tle.ParseTLE(line1, line2, "ISS (ZARYA)")
 	if err != nil {
 		t.Fatal(err)
 	}
+	record, err := elements.FromTLE(parsed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gpBytes, err := json.Marshal(map[string]any{"OBJECT_NAME": record.Name, "NORAD_CAT_ID": 25544, "EPOCH": record.Epoch.Format(time.RFC3339Nano), "MEAN_MOTION": record.MeanMotionRevDay, "ECCENTRICITY": record.Eccentricity, "INCLINATION": record.InclinationDeg, "RA_OF_ASC_NODE": record.RAANDeg, "ARG_OF_PERICENTER": record.ArgumentOfPerigeeDeg, "MEAN_ANOMALY": record.MeanAnomalyDeg, "BSTAR": record.BStar, "MEAN_MOTION_DOT": record.MeanMotionDot, "MEAN_MOTION_DDOT": record.MeanMotionDDot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	http.DefaultTransport = fixtureTransport(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(gpBytes)), Header: make(http.Header)}, nil
+	})
 	instant := time.Date(2008, 9, 21, 0, 13, 14, 0, time.UTC)
-	want := orbit.At(satellite.NewSatelliteFromTLE(parsed, satellite.GravityWGS84), instant)
+	prop, err := orbit.New(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := prop.At(instant)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var previous string
 	for _, timestamp := range []string{"2008-09-21T00:13:14Z", "2008-09-21T02:13:14+02:00", "2008-09-20T19:13:14-05:00"} {
 		var output bytes.Buffer

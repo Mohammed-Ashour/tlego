@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/Mohammed-Ashour/tlego/internal/output"
@@ -31,16 +30,22 @@ func generateSatelliteReport(ctx context.Context, c *cli.Command) error {
 	if err != nil {
 		return commandError(c, err)
 	}
-	sat := satellite.NewSatelliteFromTLE(record, satellite.GravityWGS84)
-	state := orbit.At(sat, instant)
-	if err := orbit.ValidateState(state); err != nil {
-		return commandError(c, err)
-	}
-	info, err := orbit.OrbitInfoFromTLE(record)
+	sat, err := orbit.New(record)
 	if err != nil {
 		return commandError(c, err)
 	}
-	report, err := output.BuildReportAt(record, orbit.PositionFromSatellite(sat, instant), info, locate.GetGoogleMapsURL(state.LatDeg, state.LonDeg), time.Now())
+	state, err := sat.At(instant)
+	if err != nil {
+		return commandError(c, err)
+	}
+	if err := orbit.ValidateState(state); err != nil {
+		return commandError(c, err)
+	}
+	info, err := orbit.OrbitInfoFromElements(record)
+	if err != nil {
+		return commandError(c, err)
+	}
+	report, err := output.BuildElementReportAt(record, orbit.Position{Time: state.Time, LatDeg: state.LatDeg, LonDeg: state.LonDeg, AltKm: state.AltKm, VelocityKm: state.SpeedKmS}, info, locate.GetGoogleMapsURL(state.LatDeg, state.LonDeg), time.Now())
 	if err != nil {
 		return commandError(c, err)
 	}

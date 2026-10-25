@@ -57,7 +57,7 @@ flowchart TD
 | Want to… | Start here |
 |---|---|
 | Find a satellite | Explore, then `/` to search by name or catalog ID |
-| Inspect its orbit | Detail, with tabs for summary, TLE, orbit, ground track and passes |
+| Inspect its orbit | Detail, with tabs for summary, elements, orbit, ground track and passes |
 | Follow its position | Track, then Space to start or stop updates |
 | Look ahead | Predict, then enter `+2h`, `+0.5d` or an RFC3339 timestamp |
 | Save a report | Reports, choose a format, generate, then save |
@@ -83,6 +83,18 @@ On Reports, f changes format, r generates, Tab edits the save path, and s saves 
 CLI, TUI and HTTP retrieval share validated elements in the platform user cache directory under `tlego`. If a refresh fails, it can use a valid stale cache and displays a warning. r reloads through the cache and respects its TTL; it does not force a provider download.
 
 Settings and recent satellites live in the platform user configuration directory under `tlego/tui.yaml`. An absolute `XDG_CONFIG_HOME` overrides the settings directory. [TUI implementation notes](docs/tui-spec.md) cover paths, startup options and behavior in detail.
+
+## Satellite element formats
+
+Live commands request CelesTrak GP JSON and retain catalog IDs up to nine digits. Local files accept legacy TLE or GP JSON, including a single OMM object or a one-object array:
+
+```bash
+tlego predict --file satellite.json --time 2026-10-24T05:01:11Z --format json
+tlego report --file satellite.json --format json
+tlego list --sat-group "Space Stations" > stations.json
+```
+
+Existing TLE files and caches still work. `tlego tle` exports original legacy TLE text and cannot represent larger IDs. [Supported fields, compatibility and numerical checks](docs/gp-elements.md) explain the GP JSON contract.
 
 ## CLI commands
 

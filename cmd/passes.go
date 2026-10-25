@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/Mohammed-Ashour/tlego/internal/output"
 	"github.com/urfave/cli/v3"
@@ -34,17 +33,21 @@ func planPasses(ctx context.Context, c *cli.Command) error {
 		return commandError(c, err)
 	}
 	duration, step := c.Duration("duration"), c.Duration("step")
-	passes, err := orbit.PlanPasses(satellite.NewSatelliteFromTLE(record, satellite.GravityWGS84), obs, instant, duration, step)
+	sat, err := orbit.New(record)
 	if err != nil {
 		return commandError(c, err)
 	}
-	result := output.PassPlanV1(record.NoradID, obs, instant, duration, step, passes)
+	passes, err := orbit.PlanPassesElements(sat, obs, instant, duration, step)
+	if err != nil {
+		return commandError(c, err)
+	}
+	result := output.PassPlanV1(record.CatalogID, obs, instant, duration, step, passes)
 	warnings = append(warnings, output.Warning{Code: "sampled_passes", Message: "Pass events are sampled estimates; optical visibility is not calculated."})
 	if c.String("format") == "json" {
 		return emitResult(c, "passes", result, p, warnings)
 	}
 	printWarnings(c, warnings)
-	fmt.Fprintf(c.Writer, "Pass estimates for %s (%s), %s through %s\n", record.Name, record.NoradID, result.WindowStart.Format(time.RFC3339), result.WindowEnd.Format(time.RFC3339))
+	fmt.Fprintf(c.Writer, "Pass estimates for %s (%s), %s through %s\n", record.Name, record.CatalogID, result.WindowStart.Format(time.RFC3339), result.WindowEnd.Format(time.RFC3339))
 	for _, pass := range result.Passes {
 		fmt.Fprintf(c.Writer, "%s to %s | max %.2f° at %s | clipped start=%t end=%t\n", pass.Start.Format(time.RFC3339), pass.End.Format(time.RFC3339), pass.MaximumElevationDeg, pass.MaximumAt.Format(time.RFC3339), pass.StartClipped, pass.EndClipped)
 	}

@@ -5,17 +5,20 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 )
 
-func buildTrail(sat satellite.Satellite, now time.Time, duration, step time.Duration) []Position {
+func buildTrail(sat *orbit.Propagator, now time.Time, duration, step time.Duration) []Position {
 	if step <= 0 {
 		step = 5 * time.Minute
 	}
 	start := now.Add(-duration)
 	var points []Position
 	for t := start; !t.After(now); t = t.Add(step) {
-		points = append(points, PositionFromSatellite(sat, t))
+		state, err := sat.At(t)
+		if err == nil {
+			points = append(points, positionFromState(state))
+		}
 	}
 	return points
 }

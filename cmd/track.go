@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/urfave/cli/v3"
 )
@@ -32,14 +31,17 @@ func trackSatellite(ctx context.Context, cmd *cli.Command) error {
 	printWarnings(cmd, warnings)
 
 	// Create a satellite object from the TLE
-	sat := satellite.NewSatelliteFromTLE(record, satellite.GravityWGS84)
+	sat, err := orbit.New(record)
+	if err != nil {
+		return commandError(cmd, err)
+	}
 
 	// Set up signal handling for graceful exit
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(signalChan)
 
-	fmt.Fprintf(cmd.Writer, "Tracking satellite: %s (NORAD ID: %s)\n", record.Name, record.NoradID)
+	fmt.Fprintf(cmd.Writer, "Tracking satellite: %s (NORAD ID: %s)\n", record.Name, record.CatalogID)
 	fmt.Fprintln(cmd.Writer, "Press Ctrl+C to stop tracking.")
 
 	// Start tracking loop
@@ -55,7 +57,10 @@ func trackSatellite(ctx context.Context, cmd *cli.Command) error {
 			return nil
 		case <-ticker.C:
 			// Calculate the satellite's real-time position
-			position := orbit.At(sat, time.Now())
+			position, err := sat.At(time.Now())
+			if err != nil {
+				return err
+			}
 			if err := orbit.ValidateState(position); err != nil {
 				return err
 			}

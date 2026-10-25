@@ -18,7 +18,7 @@ func searchSatellites(ctx context.Context, c *cli.Command) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	result, err := commandStore(c).Search(ctx, c.Args().First())
+	result, err := commandStore(c).SearchElements(ctx, c.Args().First())
 	if err != nil {
 		return err
 	}
@@ -28,12 +28,12 @@ func searchSatellites(ctx context.Context, c *cli.Command) error {
 			fmt.Fprintln(c.ErrWriter, warning)
 		}
 	}
-	if len(result.TLEs) == 0 {
+	if len(result.Records) == 0 {
 		fmt.Fprintf(c.Writer, "No satellites found matching keyword: %q\n", c.Args().First())
 		return nil
 	}
-	for _, record := range result.TLEs {
-		fmt.Fprintf(c.Writer, "Name: %s | NORAD ID: %s\n", record.Name, record.NoradID)
+	for _, record := range result.Records {
+		fmt.Fprintf(c.Writer, "Name: %s | NORAD ID: %s\n", record.Name, record.CatalogID)
 	}
 	return nil
 }

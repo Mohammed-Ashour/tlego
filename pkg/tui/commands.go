@@ -6,9 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/Mohammed-Ashour/tlego/internal/output"
 	tea "github.com/charmbracelet/bubbletea"
@@ -20,22 +19,22 @@ type groupsLoadedMsg struct {
 }
 
 type groupTLEsLoadedMsg struct {
-	query string
-	group string
-	tles  []tle.TLE
-	meta  catalog.FetchMeta
-	err   error
+	query   string
+	group   string
+	records []elements.Record
+	meta    catalog.FetchMeta
+	err     error
 }
 
 type noradLoadedMsg struct {
 	noradID string
-	tle     tle.TLE
+	record  elements.Record
 	meta    catalog.FetchMeta
 	err     error
 }
 
 type searchResultsMsg struct {
-	tles    []tle.TLE
+	records []elements.Record
 	warning string
 	results []TLESummary
 	err     error
@@ -70,8 +69,8 @@ func fetchGroupTLEsCmd(store *catalog.Store, group string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		tles, meta, err := store.FetchGroupTLEs(ctx, group)
-		return groupTLEsLoadedMsg{group: group, tles: tles, meta: meta, err: err}
+		records, meta, err := store.FetchGroupElements(ctx, group)
+		return groupTLEsLoadedMsg{group: group, records: records, meta: meta, err: err}
 	}
 }
 
@@ -88,8 +87,8 @@ func fetchNoradCmd(store *catalog.Store, noradID string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		tleData, meta, err := store.FetchTLEByNorad(ctx, noradID)
-		return noradLoadedMsg{noradID: noradID, tle: tleData, meta: meta, err: err}
+		record, meta, err := store.FetchElementByNorad(ctx, noradID)
+		return noradLoadedMsg{noradID: noradID, record: record, meta: meta, err: err}
 	}
 }
 
@@ -97,19 +96,19 @@ func searchAllGroupsCmd(store *catalog.Store, query string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
-		result, err := store.Search(ctx, query)
+		result, err := store.SearchElements(ctx, query)
 		if err != nil {
 			return searchResultsMsg{err: err}
 		}
-		results := make([]TLESummary, 0, len(result.TLEs))
-		for _, item := range result.TLEs {
-			results = append(results, summaryFromTLE(item))
+		results := make([]TLESummary, 0, len(result.Records))
+		for _, item := range result.Records {
+			results = append(results, summaryFromElement(item))
 		}
 		warning := ""
 		if len(result.Warnings) > 0 {
 			warning = fmt.Sprintf("Search coverage: %d/%d groups loaded. %s", result.GroupsCovered, result.GroupsTotal, strings.Join(result.Warnings, "; "))
 		}
-		return searchResultsMsg{results: results, tles: result.TLEs, warning: warning}
+		return searchResultsMsg{results: results, records: result.Records, warning: warning}
 	}
 }
 
@@ -119,9 +118,13 @@ func trackTickCmd(interval time.Duration) tea.Cmd {
 	})
 }
 
-func predictCmd(sat satellite.Satellite, t time.Time, provider string) tea.Cmd {
+func predictCmd(sat *orbit.Propagator, t time.Time, provider string) tea.Cmd {
 	return func() tea.Msg {
-		pos := PositionFromSatellite(sat, t)
+		state, err := sat.At(t)
+		if err != nil {
+			return predictDoneMsg{err: err}
+		}
+		pos := positionFromState(state)
 		result := PredictResult{
 			Time:   pos.Time,
 			LatDeg: pos.LatDeg,
@@ -133,25 +136,32 @@ func predictCmd(sat satellite.Satellite, t time.Time, provider string) tea.Cmd {
 	}
 }
 
-func passesCmd(sat satellite.Satellite, obs Observer, start time.Time, duration, step time.Duration) tea.Cmd {
+func passesCmd(sat *orbit.Propagator, obs Observer, start time.Time, duration, step time.Duration) tea.Cmd {
 	return func() tea.Msg {
-		passes, err := orbit.PlanPasses(sat, obs, start, duration, step)
+		passes, err := orbit.PlanPassesElements(sat, obs, start, duration, step)
 		return passesLoadedMsg{passes: passes, err: err}
 	}
 }
 
-func reportCmd(tleData tle.TLE, sat satellite.Satellite, orbit OrbitInfo, provider, format string, meta catalog.FetchMeta) tea.Cmd {
+func elementReportCmd(record elements.Record, sat *orbit.Propagator, orb OrbitInfo, provider, format string, meta catalog.FetchMeta) tea.Cmd {
 	return func() tea.Msg {
-		pos := PositionFromSatellite(sat, time.Now())
+		state, err := sat.At(time.Now())
+		if err != nil {
+			return reportBuiltMsg{err: err}
+		}
+		pos := positionFromState(state)
 		mapURL := MapURL(provider, pos.LatDeg, pos.LonDeg)
-		report, err := BuildReport(tleData, pos, orbit, mapURL)
+		report, err := output.BuildElementReportAt(record, pos, orb, mapURL, time.Now())
 		if err != nil {
 			return reportBuiltMsg{err: err}
 		}
 		encoded, err := formatReport(report, format)
+		if err != nil {
+			return reportBuiltMsg{err: err}
+		}
 		if format == "json-v1" {
 			fetched := meta.FetchedAt.UTC()
-			provenance := output.Provenance{Source: "celestrak", SourceFormat: "tle", ElementEpoch: report.Epoch, CacheStatus: "fetched"}
+			provenance := output.Provenance{Source: "celestrak", SourceFormat: record.SourceFormat, ElementEpoch: report.Epoch, CacheStatus: "fetched"}
 			if !meta.FetchedAt.IsZero() {
 				provenance.FetchedAt = &fetched
 			} else {
@@ -168,9 +178,9 @@ func reportCmd(tleData tle.TLE, sat satellite.Satellite, orbit OrbitInfo, provid
 			if meta.Warning != "" {
 				warnings = append(warnings, output.Warning{Code: "stale_elements", Message: meta.Warning})
 			}
-			var bytes []byte
-			bytes, err = output.MarshalResult("report", output.ReportV1(report), provenance, warnings)
-			encoded = string(bytes)
+			var b []byte
+			b, err = output.MarshalResult("report", output.ReportV1(report), provenance, warnings)
+			encoded = string(b)
 		}
 		if err != nil {
 			return reportBuiltMsg{err: err}

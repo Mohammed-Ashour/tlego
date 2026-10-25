@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -84,12 +84,12 @@ type Model struct {
 	results    []TLESummary
 	resultList list.Model
 
-	groupCache map[string][]tle.TLE
-	tleCache   map[string]tle.TLE
+	groupCache map[string][]elements.Record
+	tleCache   map[string]elements.Record
 
-	currentTLE  *tle.TLE
+	currentTLE  *elements.Record
 	currentMeta catalog.FetchMeta
-	currentSat  *satellite.Satellite
+	currentSat  *orbit.Propagator
 	currentPos  Position
 	currentOrb  OrbitInfo
 
@@ -107,6 +107,7 @@ type Model struct {
 
 	passes        []Pass
 	passesLoading bool
+	passesErr     error
 
 	requestID    uint64
 	scrollOffset int
@@ -173,8 +174,8 @@ func NewModel(opts Options, settings Settings, store *catalog.Store, settingsErr
 		reportPath:     reportPath,
 		settingsInputs: settingsInputs,
 		settingsIndex:  0,
-		groupCache:     make(map[string][]tle.TLE),
-		tleCache:       make(map[string]tle.TLE),
+		groupCache:     make(map[string][]elements.Record),
+		tleCache:       make(map[string]elements.Record),
 		reportFormat:   "text",
 		detailTab:      0,
 	}
@@ -253,12 +254,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.currentMeta = msg.meta
 		m.warning = msg.meta.Warning
-		m.groupCache[msg.group] = msg.tles
+		m.groupCache[msg.group] = msg.records
 		m.selectedGroup = msg.group
-		m.results = buildSummaries(msg.tles)
+		m.results = buildElementSummaries(msg.records)
 		m.resultList.SetItems(tleSummariesToItems(m.results))
-		for _, item := range msg.tles {
-			m.tleCache[item.NoradID] = item
+		for _, item := range msg.records {
+			m.tleCache[item.CatalogID] = item
 		}
 		if msg.query != "" {
 			m.applySearch(msg.group, msg.query)
@@ -272,7 +273,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.warning = msg.meta.Warning
 		m.currentMeta = msg.meta
-		m.setCurrentTLE(msg.tle)
+		m.setCurrentElement(msg.record)
 	case searchResultsMsg:
 		m.loading = false
 		if msg.err != nil {
@@ -280,8 +281,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			break
 		}
-		for _, item := range msg.tles {
-			m.tleCache[item.NoradID] = item
+		for _, item := range msg.records {
+			m.tleCache[item.CatalogID] = item
 		}
 		m.results = msg.results
 		m.resultList.SetItems(tleSummariesToItems(m.results))
@@ -303,6 +304,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = "Prediction ready"
 	case passesLoadedMsg:
 		m.passesLoading = false
+		m.passesErr = msg.err
 		if msg.err != nil {
 			m.status = "Pass prediction failed"
 			m.err = msg.err
@@ -437,28 +439,45 @@ func previousScreen(current screen) screen {
 	return screen((int(current) - 1 + len(screenNames)) % len(screenNames))
 }
 
-func (m *Model) setCurrentTLE(tle tle.TLE) {
+func (m *Model) setCurrentElement(record elements.Record) {
 	m.requestID++
 	m.loading = false
 	m.predictResult = nil
 	m.passes = nil
 	m.passesLoading = false
+	m.passesErr = nil
 	m.trackTrail = nil
 	m.reportData = nil
 	m.reportOutput = ""
 	m.reportSaved = ""
 	m.err = nil
-	m.currentTLE = &tle
-	m.tleCache[tle.NoradID] = tle
-	sat := satellite.NewSatelliteFromTLE(tle, satellite.GravityWGS84)
-	m.currentSat = &sat
-	m.currentPos = PositionFromSatellite(sat, time.Now())
-	orbit, err := OrbitInfoFromTLE(tle)
-	if err == nil {
-		m.currentOrb = orbit
+	m.currentTLE = &record
+	m.tleCache[record.CatalogID] = record
+	propagator, err := orbit.New(record)
+	if err != nil {
+		m.currentSat = nil
+		m.err = err
+		m.status = fmt.Sprintf("Failed to initialize %s (%s)", record.Name, record.CatalogID)
+		return
 	}
-	m.appendRecent(tle.NoradID)
-	m.status = fmt.Sprintf("Loaded %s (%s)", tle.Name, tle.NoradID)
+	m.currentSat = propagator
+	if state, err := propagator.At(time.Now()); err != nil {
+		m.currentSat = nil
+		m.err = err
+		m.status = "Propagation failed"
+		return
+	} else {
+		m.currentPos = positionFromState(state)
+	}
+	if info, err := orbit.OrbitInfoFromElements(record); err == nil {
+		m.currentOrb = info
+	} else {
+		m.err = err
+		m.status = "Invalid orbital elements"
+		return
+	}
+	m.appendRecent(record.CatalogID)
+	m.status = fmt.Sprintf("Loaded %s (%s)", record.Name, record.CatalogID)
 }
 
 func (m *Model) appendRecent(noradID string) {
@@ -485,7 +504,13 @@ func (m *Model) updateTrackPosition(now time.Time) {
 	if m.currentSat == nil {
 		return
 	}
-	m.currentPos = PositionFromSatellite(*m.currentSat, now)
+	state, err := m.currentSat.At(now)
+	if err != nil {
+		m.err = err
+		m.status = "Propagation failed"
+		return
+	}
+	m.currentPos = positionFromState(state)
 	m.trackTrail = append(m.trackTrail, m.currentPos)
 	if len(m.trackTrail) > 40 {
 		m.trackTrail = m.trackTrail[len(m.trackTrail)-40:]
@@ -519,7 +544,7 @@ func (m *Model) refreshCurrentView() tea.Cmd {
 			m.loadingReason = "Refreshing NORAD"
 			m.status = "Refreshing satellite data"
 			m.beginRequest()
-			return m.wrapRequest(fetchNoradCmd(m.store, m.currentTLE.NoradID))
+			return m.wrapRequest(fetchNoradCmd(m.store, m.currentTLE.CatalogID))
 		}
 	}
 	return nil
@@ -736,7 +761,7 @@ func (m Model) updateExplore(msg tea.Msg) (Model, tea.Cmd) {
 					return m, nil
 				}
 				if cached, ok := m.tleCache[item.summary.NoradID]; ok {
-					m.setCurrentTLE(cached)
+					m.setCurrentElement(cached)
 					m.setScreen(screenDetail)
 					return m, nil
 				}
@@ -797,8 +822,9 @@ func (m Model) updateDetail(msg tea.Msg) (Model, tea.Cmd) {
 		case "p":
 			if m.detailTab == 4 && m.currentSat != nil {
 				m.passesLoading = true
+				m.passesErr = nil
 				m.status = "Calculating passes"
-				return m.startRequest(passesCmd(*m.currentSat, m.settings.Observer, time.Now(), 24*time.Hour, time.Minute))
+				return m.startRequest(passesCmd(m.currentSat, m.settings.Observer, time.Now(), 24*time.Hour, time.Minute))
 			}
 		case "t":
 			if m.currentTLE != nil {
@@ -856,7 +882,7 @@ func (m Model) updatePredict(msg tea.Msg) (Model, tea.Cmd) {
 			}
 			m.loading = true
 			m.status = "Predicting position"
-			return m.startRequest(predictCmd(*m.currentSat, parsed, m.settings.MapProvider))
+			return m.startRequest(predictCmd(m.currentSat, parsed, m.settings.MapProvider))
 		}
 	}
 	return m, cmd
@@ -888,7 +914,7 @@ func (m Model) updateReports(msg tea.Msg) (Model, tea.Cmd) {
 			}
 			m.loading = true
 			m.status = "Generating report"
-			return m.startRequest(reportCmd(*m.currentTLE, *m.currentSat, m.currentOrb, m.settings.MapProvider, m.reportFormat, m.currentMeta))
+			return m.startRequest(elementReportCmd(*m.currentTLE, m.currentSat, m.currentOrb, m.settings.MapProvider, m.reportFormat, m.currentMeta))
 		case "s":
 			if m.reportOutput == "" {
 				m.status = "Generate a report first"
@@ -896,7 +922,7 @@ func (m Model) updateReports(msg tea.Msg) (Model, tea.Cmd) {
 			}
 			path := strings.TrimSpace(m.reportPath.Value())
 			if path == "" && m.currentTLE != nil {
-				path = defaultReportPath(m.currentTLE.NoradID, m.reportFormat)
+				path = defaultReportPath(m.currentTLE.CatalogID, m.reportFormat)
 			}
 			if path == "" {
 				m.status = "Provide a save path"
@@ -962,8 +988,8 @@ func (m *Model) applySearch(group, query string) {
 	source := m.groupCache[group]
 	var summaries []TLESummary
 	for _, item := range source {
-		if strings.Contains(strings.ToLower(item.Name), query) || strings.Contains(item.NoradID, query) {
-			summaries = append(summaries, summaryFromTLE(item))
+		if strings.Contains(strings.ToLower(item.Name), query) || strings.Contains(item.CatalogID, query) {
+			summaries = append(summaries, summaryFromElement(item))
 		}
 	}
 	m.results = summaries
@@ -971,27 +997,22 @@ func (m *Model) applySearch(group, query string) {
 	m.status = fmt.Sprintf("Found %d matches", len(summaries))
 }
 
-func summaryFromTLE(tle tle.TLE) TLESummary {
+func summaryFromElement(record elements.Record) TLESummary {
 	age := time.Duration(0)
-	if epoch, err := tle.Time(); err == nil {
+	if epoch, err := record.Time(); err == nil {
 		age = time.Since(epoch)
 	}
 	orbitClass := ""
-	if info, err := OrbitInfoFromTLE(tle); err == nil {
+	if info, err := orbit.OrbitInfoFromElements(record); err == nil {
 		orbitClass = info.OrbitClass
 	}
-	return TLESummary{
-		Name:       tle.Name,
-		NoradID:    tle.NoradID,
-		Age:        age,
-		OrbitClass: orbitClass,
-	}
+	return TLESummary{Name: record.Name, NoradID: record.CatalogID, Age: age, OrbitClass: orbitClass}
 }
 
-func buildSummaries(tles []tle.TLE) []TLESummary {
-	summaries := make([]TLESummary, 0, len(tles))
-	for _, item := range tles {
-		summaries = append(summaries, summaryFromTLE(item))
+func buildElementSummaries(records []elements.Record) []TLESummary {
+	summaries := make([]TLESummary, 0, len(records))
+	for _, record := range records {
+		summaries = append(summaries, summaryFromElement(record))
 	}
 	return summaries
 }

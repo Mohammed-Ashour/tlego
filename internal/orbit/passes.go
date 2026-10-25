@@ -42,6 +42,15 @@ func (o Observer) Validate() error {
 
 // PlanPasses estimates passes by sampling elevation at step intervals.
 func PlanPasses(sat satellite.Satellite, obs Observer, start time.Time, duration, step time.Duration) ([]Pass, error) {
+	return planPasses(func(t time.Time) (State, error) { state := At(sat, t); return state, ValidateState(state) }, obs, start, duration, step)
+}
+
+// PlanPassesElements estimates passes from directly initialized mean elements.
+func PlanPassesElements(prop *Propagator, obs Observer, start time.Time, duration, step time.Duration) ([]Pass, error) {
+	return planPasses(prop.At, obs, start, duration, step)
+}
+
+func planPasses(at func(time.Time) (State, error), obs Observer, start time.Time, duration, step time.Duration) ([]Pass, error) {
 	if err := obs.Validate(); err != nil {
 		return nil, err
 	}
@@ -67,8 +76,8 @@ func PlanPasses(sat satellite.Satellite, obs Observer, start time.Time, duration
 	var cur Pass
 	maxEl := -90.0
 	for t := start; ; {
-		state := At(sat, t)
-		if err := ValidateState(state); err != nil {
+		state, err := at(t)
+		if err != nil {
 			return nil, fmt.Errorf("invalid propagated state at %s: %w", t.Format(time.RFC3339), err)
 		}
 		jd := satellite.JDay(t.Year(), int(t.Month()), t.Day(), t.Hour(), t.Minute(), t.Second())

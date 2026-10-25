@@ -7,12 +7,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	satelliteTLE "github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/Mohammed-Ashour/tlego/internal/output"
 )
@@ -22,11 +24,11 @@ func TestVersionedPositionAndInvalidIDWithoutNetwork(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(cache, "norad"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	elements, err := os.ReadFile("../../examples/tui-demo/iss.tle")
+	payload, err := os.ReadFile("../../examples/tui-demo/iss.tle")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(cache, "norad", "25544.tle"), elements, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cache, "norad", "25544.tle"), payload, 0644); err != nil {
 		t.Fatal(err)
 	}
 	handler := newHandler(catalog.NewStore(cache, 0))
@@ -44,12 +46,24 @@ func TestVersionedPositionAndInvalidIDWithoutNetwork(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	records, err := catalog.ParseTLE(elements)
+	records, err := catalog.ParseTLE(payload)
 	if err != nil {
 		t.Fatal(err)
 	}
 	instant := time.Date(2026, 10, 24, 5, 1, 11, 0, time.UTC)
-	want := output.PositionV1("25544", orbit.At(satellite.NewSatelliteFromTLE(records[0], satellite.GravityWGS84), instant))
+	element, err := elements.FromTLE(records[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	prop, err := orbit.New(element)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := prop.At(instant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := output.PositionV1("25544", state)
 	if result.Data != want || result.SchemaVersion != "1.0" || result.Kind != "position" || result.Provenance.CacheStatus != "fresh" {
 		t.Fatalf("unexpected response: %+v", result)
 	}
@@ -148,5 +162,40 @@ func assertClose(t *testing.T, label string, got, want float64) {
 	t.Helper()
 	if math.IsNaN(got) || math.IsInf(got, 0) || math.Abs(got-want) > 1e-9 {
 		t.Errorf("%s = %.12f, want %.12f", label, got, want)
+	}
+}
+
+func TestGPJSONHTTPPreservesNineDigitID(t *testing.T) {
+	cache := t.TempDir()
+	dir := filepath.Join(cache, "elements", "norad")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile("../../internal/elements/testdata/799500001.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "799500001.json"), b, 0644); err != nil {
+		t.Fatal(err)
+	}
+	h := newHandler(catalog.NewStore(cache, 0))
+	for _, route := range []string{"/api/location", "/api/v1/position"} {
+		r := httptest.NewRecorder()
+		h.ServeHTTP(r, httptest.NewRequest("GET", route+"?norad_id=799500001&time=2026-10-24T05:01:11Z", nil))
+		if r.Code != 200 || !json.Valid(r.Body.Bytes()) || !strings.Contains(r.Body.String(), "799500001") || !strings.Contains(r.Body.String(), "gp-json") {
+			t.Fatalf("%s: %d %s", route, r.Code, r.Body.String())
+		}
+		if route == "/api/location" {
+			var doc struct {
+				TLE         map[string]string
+				ElementData json.RawMessage `json:"element_data"`
+			}
+			if err := json.Unmarshal(r.Body.Bytes(), &doc); err != nil {
+				t.Fatal(err)
+			}
+			if doc.TLE["line1"] != "" || doc.TLE["line2"] != "" || !json.Valid(doc.ElementData) {
+				t.Fatalf("fabricated or lost elements: %s", r.Body.String())
+			}
+		}
 	}
 }

@@ -138,7 +138,11 @@ func (m Model) detailView() string {
 	if m.currentTLE == nil {
 		return "No satellite loaded. Use Explore or :norad <id>."
 	}
-	tabs := []string{"Summary", "TLE", "Orbit", "Ground Track", "Passes"}
+	elementLabel := "TLE"
+	if m.currentTLE.SourceFormat == "gp-json" {
+		elementLabel = "GP JSON"
+	}
+	tabs := []string{"Summary", elementLabel, "Orbit", "Ground Track", "Passes"}
 	tabLine := tabLine(tabs, m.detailTab)
 	var b strings.Builder
 	b.WriteString(tabLine + "\n")
@@ -148,6 +152,9 @@ func (m Model) detailView() string {
 	case 0:
 		b.WriteString(m.detailSummaryView())
 	case 1:
+		if m.currentTLE.SourceFormat == "gp-json" {
+			b.WriteString("GP JSON element data\n\n")
+		}
 		b.WriteString(m.currentTLE.String())
 	case 2:
 		b.WriteString(m.detailOrbitView())
@@ -174,7 +181,7 @@ func (m Model) detailSummaryView() string {
 	return fmt.Sprintf(
 		"Name: %s\nNORAD ID: %s\nEpoch: %s (age %s)\n\nPosition:\n  Time: %s\n  Lat: %.6f°\n  Lon: %.6f°\n  Alt: %.2f km\n  Velocity: %.3f km/s\n\nOrbit class: %s\nMap: %s\n",
 		m.currentTLE.Name,
-		m.currentTLE.NoradID,
+		m.currentTLE.CatalogID,
 		epochStr,
 		age,
 		m.currentPos.Time.Format(time.RFC3339),
@@ -207,7 +214,7 @@ func (m Model) detailGroundTrackView() string {
 	height := minInt(maxInt(m.height-12, 12), 22)
 	points := m.trackTrail
 	if len(points) == 0 {
-		points = buildTrail(*m.currentSat, time.Now(), 90*time.Minute, 5*time.Minute)
+		points = buildTrail(m.currentSat, time.Now(), 90*time.Minute, 5*time.Minute)
 	}
 	return renderWorldMap(points, width, height)
 }
@@ -218,6 +225,9 @@ func (m Model) detailPassesView() string {
 	}
 	if m.passesLoading {
 		return "Calculating passes..."
+	}
+	if m.passesErr != nil {
+		return "Pass prediction failed: " + m.passesErr.Error()
 	}
 	if len(m.passes) == 0 {
 		return "No passes found. Press p to calculate."
@@ -252,7 +262,7 @@ func (m Model) trackView() string {
 		state = "running"
 	}
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Tracking %s (%s) [%s]\n", m.currentTLE.Name, m.currentTLE.NoradID, state))
+	b.WriteString(fmt.Sprintf("Tracking %s (%s) [%s]\n", m.currentTLE.Name, m.currentTLE.CatalogID, state))
 	b.WriteString(fmt.Sprintf("Refresh: %s\n", m.settings.RefreshInterval()))
 	b.WriteString("Keys: space toggle, s snapshot, r reload cached data\n\n")
 	b.WriteString(fmt.Sprintf(

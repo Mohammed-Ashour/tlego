@@ -24,7 +24,7 @@ Use a catalog ID instead of `--file` for live retrieval. `--file -` reads a sing
 
 [JSON Schema](schema-v1.json) defines the transport records. [Fixtures](fixtures/) include position, report, pass and error documents plus an intentionally invalid position. The schema permits unknown fields for compatible additions. Consumers must ignore unknown fields and warning codes. Breaking changes require a different major version and explicit selection. This host currently accepts exactly `1.0`.
 
-- Catalog IDs are decimal strings. The current element reader supports legacy TLEs; this refactor does not add GP JSON/OMM or larger-ID propagation.
+- Catalog IDs are decimal strings with one to nine digits. The element reader accepts legacy TLE and GP JSON. GP reports preserve the original object in `element_data`, leave `tle` empty and identify `source_format: "gp-json"`. See [GP JSON support](gp-elements.md).
 - Timestamps are RFC3339 UTC with `Z`. Propagation uses whole seconds; `evaluated_at` identifies the instant actually calculated.
 - Geographic positions use degrees, longitude in `[-180, 180)`, altitude in km and vector speed in km/s. Cartesian calculations use TEME. Orbit classes and apogee/perigee values in reports are estimates.
 - Provenance identifies source, input format, element epoch, retrieval time and cache status. File/stdin input has a null retrieval time and no cache. Cache paths are not exported. TUI records with unavailable retrieval metadata use `unknown` explicitly.
