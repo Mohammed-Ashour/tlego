@@ -451,31 +451,33 @@ func (m *Model) setCurrentElement(record elements.Record) {
 	m.reportOutput = ""
 	m.reportSaved = ""
 	m.err = nil
-	m.currentTLE = &record
-	m.tleCache[record.CatalogID] = record
+	m.currentTLE = nil
+	m.currentSat = nil
+	m.currentPos = Position{}
+	m.currentOrb = OrbitInfo{}
 	propagator, err := orbit.New(record)
 	if err != nil {
-		m.currentSat = nil
 		m.err = err
 		m.status = fmt.Sprintf("Failed to initialize %s (%s)", record.Name, record.CatalogID)
 		return
 	}
-	m.currentSat = propagator
-	if state, err := propagator.At(time.Now()); err != nil {
-		m.currentSat = nil
+	state, err := propagator.At(time.Now())
+	if err != nil {
 		m.err = err
 		m.status = "Propagation failed"
 		return
-	} else {
-		m.currentPos = positionFromState(state)
 	}
-	if info, err := orbit.OrbitInfoFromElements(record); err == nil {
-		m.currentOrb = info
-	} else {
+	info, err := orbit.OrbitInfoFromElements(record)
+	if err != nil {
 		m.err = err
 		m.status = "Invalid orbital elements"
 		return
 	}
+	m.currentTLE = &record
+	m.currentSat = propagator
+	m.currentPos = positionFromState(state)
+	m.currentOrb = info
+	m.tleCache[record.CatalogID] = record
 	m.appendRecent(record.CatalogID)
 	m.status = fmt.Sprintf("Loaded %s (%s)", record.Name, record.CatalogID)
 }

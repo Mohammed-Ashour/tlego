@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	"github.com/Mohammed-Ashour/tlego/internal/orbit"
@@ -271,5 +272,42 @@ func TestEscapeKeepsInputBlurredAcrossBackgroundMessages(t *testing.T) {
 		if m.active != screenHome {
 			t.Fatalf("%s cannot navigate after Escape", screenNames[screen])
 		}
+	}
+}
+
+func TestFailedElementLoadClearsPreviousSatelliteState(t *testing.T) {
+	good := elements.Record{Name: "Previous satellite", CatalogID: "25544", Epoch: time.Now().UTC(), SourceFormat: "gp-json", MeanMotionRevDay: 15.5, Eccentricity: .001, InclinationDeg: 51.6, RAANDeg: 20, ArgumentOfPerigeeDeg: 30, MeanAnomalyDeg: 40, BStar: .001}
+	for _, failure := range []string{"initialization", "propagation"} {
+		t.Run(failure, func(t *testing.T) {
+			m := testModel(t)
+			m.setCurrentElement(good)
+			if m.err != nil || m.currentSat == nil {
+				t.Fatalf("load good record: %v", m.err)
+			}
+			bad := good
+			bad.Name, bad.CatalogID = "Failed satellite", "999999999"
+			if failure == "initialization" {
+				bad.InclinationDeg = 181
+			} else {
+				bad.Epoch = good.Epoch.AddDate(0, 0, -1000)
+				prop, err := orbit.New(bad)
+				if err != nil {
+					t.Fatalf("expected successful initialization: %v", err)
+				}
+				if _, err := prop.At(time.Now()); err == nil {
+					t.Fatal("expected decayed-orbit propagation error")
+				}
+			}
+			m.setCurrentElement(bad)
+			if m.err == nil {
+				t.Fatal("failed load did not report an error")
+			}
+			if m.currentTLE != nil || m.currentSat != nil || m.currentPos != (Position{}) || m.currentOrb != (OrbitInfo{}) {
+				t.Fatal("failed load retained a satellite or derived state")
+			}
+			if !strings.Contains(m.detailView(), "No satellite loaded") {
+				t.Fatalf("misleading detail view: %s", m.detailView())
+			}
+		})
 	}
 }
