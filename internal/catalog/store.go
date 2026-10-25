@@ -22,6 +22,7 @@ type Store struct {
 	cacheDir string
 	cacheTTL time.Duration
 	client   *http.Client
+	cacheErr error
 }
 
 const maxTLEPayloadSize = 32 << 20
@@ -66,11 +67,13 @@ func DefaultCacheDir() (string, error) {
 }
 
 func NewStore(cacheDir string, cacheTTL time.Duration) *Store {
+	var cacheErr error
 	if cacheDir == "" {
-		cacheDir, _ = DefaultCacheDir()
+		cacheDir, cacheErr = DefaultCacheDir()
 	}
 	return &Store{
 		cacheDir: cacheDir,
+		cacheErr: cacheErr,
 		cacheTTL: cacheTTL,
 		client:   &http.Client{Timeout: 30 * time.Second},
 	}
@@ -215,6 +218,12 @@ func (s *Store) SetHTTPClient(client *http.Client) {
 
 func (s *Store) fetchURL(ctx context.Context, url, path, expectedNoradID string) ([]tle.TLE, FetchMeta, error) {
 	meta := FetchMeta{Path: path, Source: url, Format: "tle"}
+	if err := ctx.Err(); err != nil {
+		return nil, meta, err
+	}
+	if s.cacheErr != nil {
+		return nil, meta, fmt.Errorf("resolve cache directory: %w", s.cacheErr)
+	}
 	info, err := os.Stat(path)
 	var cached []tle.TLE
 	if err == nil {
@@ -347,21 +356,17 @@ func validateNoradID(id string) error { return ValidateNoradID(id) }
 
 // readValidatedTLE validates parser-sensitive structure before handing a file
 // to the pinned parser, which assumes well-formed line pairs in a few places.
-func readValidatedTLE(path, expectedNoradID string) (result []tle.TLE, err error) {
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			result = nil
-			err = fmt.Errorf("invalid TLE data: parser rejected malformed input")
-		}
-	}()
-	contents, err := os.ReadFile(path)
+func readValidatedTLE(path, expectedNoradID string) ([]tle.TLE, error) {
+	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateTLEPayload(contents, expectedNoradID); err != nil {
+	defer file.Close()
+	contents, err := io.ReadAll(io.LimitReader(file, maxTLEPayloadSize+1))
+	if err != nil {
 		return nil, err
 	}
-	return tle.ReadTLEFile(path)
+	return parseTLE(contents, expectedNoradID)
 }
 
 func validateTLEPayload(contents []byte, expectedNoradID string) error {
@@ -426,16 +431,7 @@ func validateTLEPayload(contents []byte, expectedNoradID string) error {
 }
 
 func decimalTLEID(field string) bool {
-	id := strings.TrimSpace(field)
-	if id == "" {
-		return false
-	}
-	for _, r := range id {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
+	return ValidateNoradID(strings.TrimSpace(field)) == nil
 }
 
 func canonicalNoradID(id string) string {
@@ -549,11 +545,15 @@ func ReadLocalTLE(path string) ([]tle.TLE, error) {
 func ReadTLEFile(path string) ([]tle.TLE, error) { return ReadLocalTLE(path) }
 
 // ParseTLE parses bounded local TLE content without creating a temporary file.
-func ParseTLE(contents []byte) (result []tle.TLE, err error) {
+func ParseTLE(contents []byte) ([]tle.TLE, error) {
+	return parseTLE(contents, "")
+}
+
+func parseTLE(contents []byte, expectedNoradID string) (result []tle.TLE, err error) {
 	if len(contents) > maxTLEPayloadSize {
 		return nil, fmt.Errorf("TLE input exceeds %d bytes", maxTLEPayloadSize)
 	}
-	if err := validateTLEPayload(contents, ""); err != nil {
+	if err := validateTLEPayload(contents, expectedNoradID); err != nil {
 		return nil, err
 	}
 	defer func() {

@@ -18,6 +18,9 @@ func configureCommand(cmd *exec.Cmd, interactive bool) {
 }
 
 func runCommand(ctx context.Context, cmd *exec.Cmd, interactive bool) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := cmd.Start(); err != nil {
 		return err
 	}

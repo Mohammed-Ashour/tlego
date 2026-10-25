@@ -3,6 +3,8 @@
 package extensions
 
 import (
+	"context"
+	"errors"
 	"os/exec"
 	"testing"
 )
@@ -19,5 +21,19 @@ func TestConfigureCommandSeparatesOnlyNonInteractiveExtensions(t *testing.T) {
 	attrs := batch.SysProcAttr
 	if attrs == nil || !attrs.Setpgid {
 		t.Fatalf("non-interactive SysProcAttr = %#v, want Setpgid", batch.SysProcAttr)
+	}
+}
+
+func TestCanceledCommandDoesNotStart(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	command := exec.Command("/bin/sh", "-c", "exit 0")
+	configureCommand(command, false)
+	err := runCommand(ctx, command, false)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled command error = %v", err)
+	}
+	if command.Process != nil {
+		t.Fatal("already-canceled command still started a process")
 	}
 }

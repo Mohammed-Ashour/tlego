@@ -27,6 +27,9 @@ func TestDiscoverSelectsAccordingToPATHEXTWithoutRunningCandidates(t *testing.T)
 	if !filepath.IsAbs(got[0].Executable) || !samePath(got[0].Executable, exe) {
 		t.Fatalf("selected path = %q, want %q", got[0].Executable, exe)
 	}
+	if len(got[0].Candidates) == 2 && (!samePath(got[0].Candidates[0], exe) || !samePath(got[0].Candidates[1], com)) {
+		t.Fatalf("candidate order must start with selected executable and retain COM collision: %#v", got[0].Candidates)
+	}
 	if len(got[0].Candidates) != 2 {
 		t.Fatalf("candidates = %#v", got[0].Candidates)
 	}

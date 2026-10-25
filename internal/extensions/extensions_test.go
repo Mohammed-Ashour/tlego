@@ -205,3 +205,14 @@ func TestInteractiveInputDoesNotTreatPipesAsTerminals(t *testing.T) {
 		t.Fatal("pipe file is not a terminal")
 	}
 }
+
+func TestCanceledInvocationDoesNotResolveOrLaunchExtension(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := Run(ctx, []string{"missing"}, "v", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) || exitErr.Code != 130 || !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled invocation = %#v", err)
+	}
+}

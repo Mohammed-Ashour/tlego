@@ -22,7 +22,7 @@ const Version = "1"
 type Command struct {
 	Name       string
 	Executable string
-	Candidates []string
+	Candidates []string // Selected executable first, followed by collisions.
 }
 
 // ValidName reports whether name is an ASCII command extension name.
@@ -138,7 +138,17 @@ func Discover() []Command {
 		if err != nil {
 			continue
 		}
-		out = append(out, Command{Name: n, Executable: selected, Candidates: append([]string(nil), all[n]...)})
+		candidates := []string{selected}
+		for _, candidate := range all[n] {
+			equal := candidate == selected
+			if runtime.GOOS == "windows" {
+				equal = strings.EqualFold(candidate, selected)
+			}
+			if !equal {
+				candidates = append(candidates, candidate)
+			}
+		}
+		out = append(out, Command{Name: n, Executable: selected, Candidates: candidates})
 	}
 	return out
 }
@@ -176,6 +186,9 @@ func (e *ExitError) Reported() bool { return e.Suppress }
 func Run(ctx context.Context, argv []string, hostVersion string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(argv) == 0 {
 		return fmt.Errorf("missing extension command")
+	}
+	if err := ctx.Err(); err != nil {
+		return &ExitError{Code: 130, Err: err, Suppress: true}
 	}
 	path, err := Find(argv[0])
 	if err != nil {
