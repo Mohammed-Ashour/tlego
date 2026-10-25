@@ -36,6 +36,10 @@ tlego <command> [arguments] [flags]
 
 ### Terminal UI
 
+[![ISS walkthrough showing TUI browsing, tracking, prediction and JSON reporting](assets/tui-demo.gif)](https://github.com/Mohammed-Ashour/tlego/raw/refs/heads/main/assets/tui-demo.mp4)
+
+[Watch the full MP4](https://github.com/Mohammed-Ashour/tlego/raw/refs/heads/main/assets/tui-demo.mp4). This walkthrough uses an offline ISS snapshot from 2026-10-24. [Run or re-record the example](docs/demos/README.md).
+
 ```bash
 tlego tui
 tlego tui --norad 25544
