@@ -18,7 +18,7 @@ This CLI tool provides functionalities to:
 ## Installation
 
 ```bash
-go get github.com/Mohammed-Ashour/tlego
+go install github.com/Mohammed-Ashour/tlego@latest
 ```
 
 ## CLI Usage
@@ -26,13 +26,37 @@ go get github.com/Mohammed-Ashour/tlego
 The `tlego` CLI tool provides several commands to interact with TLE data and visualize satellite orbits.
 ### Installation
 ```bash
-go install github.com/Mohammed-Ashour/tlego
+go install github.com/Mohammed-Ashour/tlego@latest
 ```
 ## General Command Structure
 
 ```bash
 tlego <command> [arguments] [flags]
 ```
+
+### Terminal UI
+
+```bash
+tlego tui
+tlego tui --norad 25544
+tlego tui --group "Space Stations"
+tlego tui --track 25544
+```
+
+The terminal UI provides catalog browsing, cached name/ID searches, satellite details, live position updates, point-in-time predictions, report exports and observer settings. `--track` opens the tracking screen; Space starts or stops updates. Use `--screen Settings` to configure an observer.
+
+- Left/Right or h/l switch screens. Escape leaves a text field; q returns Home and exits from Home.
+- `/` focuses search. Enter searches the selected group or all groups if none is selected. Escape, then a searches all groups. Tab cycles lists and inputs; Enter opens a selection.
+- On Track, Space toggles updates. On Predict, enter an RFC3339 timestamp, `now` or an offset such as `+2h` or `+0.5d`.
+- On Reports, r generates, f selects text/JSON/CSV, Tab edits the save path and s saves after Escape.
+- In Settings, Tab moves fields and Ctrl+S saves. Altitude is in km. Set your observer location before calculating passes.
+- `?` shows help. Page Up/Page Down scroll long content. Ctrl+C exits from any field.
+
+Cache and settings use the platform user directories. `XDG_CONFIG_HOME`, when set to an absolute path, overrides the settings directory. A failed refresh can use a validated stale cache and displays a warning. r reloads data while respecting the configured cache TTL.
+
+Passes are sampled estimates at one-minute intervals, with clipped window boundaries marked. This initial TUI does not establish precision tracking, optical visibility, or complete coverage of modern six-digit catalog objects. Data retrieval still uses TLE input; GP/OMM support and shared-core work are tracked separately. The TUI report JSON is an unversioned export, not the planned extension contract.
+
+See [TUI implementation notes](docs/tui-spec.md) and [the architecture](ARCHITECTURE.md). Existing CLI commands remain available below.
 
 ### Commands
 
