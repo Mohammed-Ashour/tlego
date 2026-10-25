@@ -10,7 +10,7 @@ The saved snapshot makes the example usable offline. Position and tracking times
 go run ./examples/tui-demo
 ```
 
-The example creates temporary cache/settings directories and removes them when it exits. It does not load or overwrite your settings, contacts no provider during this walkthrough, and uses Greenwich as its sample observer.
+The example creates temporary cache/settings directories and removes them when it exits. It does not load or overwrite your settings, blocks HTTP requests even when you navigate to an uncached object or group, and uses Greenwich as its sample observer. Only the embedded ISS records are available. The first `go run` may download build dependencies; provider access is blocked inside the running example.
 
 ## Re-record
 
@@ -23,7 +23,7 @@ vhs docs/demos/tui.tape
 
 This produces:
 
-- `assets/tui-demo.mp4`, the full H.264 video.
+- `assets/tui-demo.mp4`, the full H.264 video download.
 - `assets/tui-demo.gif`, the animated README preview.
 
 The tape builds the example before showing it and records the TUI's real terminal output. It does not mock screenshots or alter application time. Keep both outputs together when updating the walkthrough, and inspect key screens before committing them.

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,7 +26,18 @@ func main() {
 	}
 }
 
+// offlineTransport also blocks accidental requests when exploring beyond the fixture.
+type offlineTransport struct{}
+
+func (offlineTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("offline demo: this object or group is not included; use tlego tui for live data")
+}
+
 func run() error {
+	previousTransport := http.DefaultTransport
+	http.DefaultTransport = offlineTransport{}
+	defer func() { http.DefaultTransport = previousTransport }()
+
 	dir, err := os.MkdirTemp("", "tlego-demo-")
 	if err != nil {
 		return err

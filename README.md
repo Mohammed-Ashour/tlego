@@ -1,277 +1,135 @@
-# TLEGO (Two Line Elements)
+# TLEGO
 
-A Go CLI tool for interacting with Two Line Elements (TLE) data and satellite tracking, with powerful visualization capabilities.
+Browse satellites, inspect their orbits, and track their positions from your terminal. TLEGO is a Go CLI with a keyboard-driven terminal UI, CelesTrak data access, and HTML orbit exports.
 
-<img src="assets/visual.png">
+[![A 30-second ISS walkthrough: browse, track, predict and export a report](assets/tui-demo.gif)](assets/tui-demo.mp4)
 
-## Overview
+*An offline ISS walkthrough using a saved 2026-10-24 element set.* [Download the MP4](https://github.com/Mohammed-Ashour/tlego/raw/refs/heads/main/assets/tui-demo.mp4) · [Run or record the demo](docs/demos/README.md)
 
-This CLI tool provides functionalities to:
-- Fetch and manage TLE (Two Line Elements) data
-- Track satellite positions in real-time
-- Generate satellite position reports
-- Create 3D visualizations of satellite orbits
-- Generate map links for satellite ground tracks
-- Access Celestrak's satellite catalog
-- Compare and analyze multiple satellite orbits
+[Get started](#get-started) · [Try it offline](#try-it-offline) · [Use the TUI](#use-the-tui) · [CLI commands](#cli-commands) · [Development](#development)
 
-## Installation
+## Get started
+
+Install [Go](https://go.dev/doc/install) 1.23.1 or newer, then install the current main branch:
 
 ```bash
-go install github.com/Mohammed-Ashour/tlego@latest
-```
-
-## CLI Usage
-
-The `tlego` CLI tool provides several commands to interact with TLE data and visualize satellite orbits.
-### Installation
-```bash
-go install github.com/Mohammed-Ashour/tlego@latest
-```
-## General Command Structure
-
-```bash
-tlego <command> [arguments] [flags]
-```
-
-### Terminal UI
-
-[![ISS walkthrough showing TUI browsing, tracking, prediction and JSON reporting](assets/tui-demo.gif)](https://github.com/Mohammed-Ashour/tlego/raw/refs/heads/main/assets/tui-demo.mp4)
-
-[Watch the full MP4](https://github.com/Mohammed-Ashour/tlego/raw/refs/heads/main/assets/tui-demo.mp4). This walkthrough uses an offline ISS snapshot from 2026-10-24. [Run or re-record the example](docs/demos/README.md).
-
-```bash
+go install github.com/Mohammed-Ashour/tlego@main
 tlego tui
+```
+
+The TUI is on `main`. Older tagged releases selected by `@latest` do not include it yet. If your shell cannot find `tlego`, add Go's binary installation directory to `PATH`. By default, this is the `bin` directory under `go env GOPATH`, unless you set `GOBIN`.
+
+Open the ISS directly or choose a satellite group:
+
+```bash
 tlego tui --norad 25544
 tlego tui --group "Space Stations"
-tlego tui --track 25544
 ```
 
-The terminal UI provides catalog browsing, cached name/ID searches, satellite details, live position updates, point-in-time predictions, report exports and observer settings. `--track` opens the tracking screen; Space starts or stops updates. Use `--screen Settings` to configure an observer.
+These commands fetch live data when a usable cache is unavailable. To see the interface without provider access, use the offline example below.
 
-- Left/Right or h/l switch screens. Escape leaves a text field; q returns Home and exits from Home.
-- `/` focuses search. Enter searches the selected group or all groups if none is selected. Escape, then a searches all groups. Tab cycles lists and inputs; Enter opens a selection.
-- On Track, Space toggles updates. On Predict, enter an RFC3339 timestamp, `now` or an offset such as `+2h` or `+0.5d`.
-- On Reports, r generates, f selects text/JSON/CSV, Tab edits the save path and s saves after Escape.
-- In Settings, Tab moves fields and Ctrl+S saves. Altitude is in km. Set your observer location before calculating passes.
-- `?` shows help. Page Up/Page Down scroll long content. Ctrl+C exits from any field.
-
-Cache and settings use the platform user directories. `XDG_CONFIG_HOME`, when set to an absolute path, overrides the settings directory. A failed refresh can use a validated stale cache and displays a warning. r reloads data while respecting the configured cache TTL.
-
-Passes are sampled estimates at one-minute intervals, with clipped window boundaries marked. This initial TUI does not establish precision tracking, optical visibility, or complete coverage of modern six-digit catalog objects. Data retrieval still uses TLE input; GP/OMM support and shared-core work are tracked separately. The TUI report JSON is an unversioned export, not the planned extension contract.
-
-See [TUI implementation notes](docs/tui-spec.md) and [the architecture](ARCHITECTURE.md). Existing CLI commands remain available below.
-
-### Commands
-
-#### 1. Fetch TLE Data for a Satellite
+## Try it offline
 
 ```bash
-tlego tle <NORAD-ID>
+git clone https://github.com/Mohammed-Ashour/tlego.git
+cd tlego
+go run ./examples/tui-demo
 ```
 
-- **Description:** Fetches the Two-Line Element (TLE) data for a satellite identified by its NORAD ID.
-- **Example:**
-  ```bash
-  tlego tle 25544
-  ```
+This runs the same TUI shown in the animation. It uses an embedded ISS snapshot, a Greenwich observer, and temporary cache/settings directories. Network requests are blocked. Your regular configuration stays untouched.
 
-#### 2. Visualize Satellite Orbit
+The snapshot is archived; displayed positions use your machine's current clock. Use it to explore the interface, then run `tlego tui` for current data. The first `go run` may download Go dependencies even though the example itself makes no provider requests.
+
+<a id="terminal-ui"></a>
+
+## Use the TUI
+
+Start in Explore, choose a satellite, then follow the workflow you need:
+
+```mermaid
+flowchart TD
+    Explore["Explore: choose a satellite"] --> Detail["Detail: inspect its elements and orbit"]
+    Detail --> Track["Track: follow its position"]
+    Detail --> Predict["Predict: choose a time"]
+    Detail --> Reports["Reports: export text, JSON or CSV"]
+```
+
+| Want to… | Start here |
+|---|---|
+| Find a satellite | Explore, then `/` to search by name or catalog ID |
+| Inspect its orbit | Detail, with tabs for summary, TLE, orbit, ground track and passes |
+| Follow its position | Track, then Space to start or stop updates |
+| Look ahead | Predict, then enter `+2h`, `+0.5d` or an RFC3339 timestamp |
+| Save a report | Reports, choose a format, generate, then save |
+| Estimate local passes | Settings to set your observer, then Detail → Passes and p |
+
+### Keyboard essentials
+
+| Keys | Action |
+|---|---|
+| Left/Right or h/l | Switch screens outside text fields |
+| Tab / Shift+Tab | Move between lists, fields and inputs |
+| Enter | Search, open a selection, or submit a prediction |
+| Escape | Leave a text field so navigation keys work again |
+| q / Ctrl+C | q returns Home, then exits; Ctrl+C exits anywhere |
+| ? / Page Up / Page Down | Show help / scroll long content |
+
+On Reports, f changes format, r generates, Tab edits the save path, and s saves after you leave the field. In Settings, Ctrl+S saves. Observer altitude is in km.
+
+`tlego tui --track 25544` opens Track; Space starts updates. `tlego tui --screen Settings` opens observer settings directly. The default observer is 0° latitude, 0° longitude, so configure a location before using passes.
+
+### Cache and settings
+
+The TUI stores validated elements in the platform user cache directory under `tlego`. If a refresh fails, it can use a valid stale cache and displays a warning. r reloads through the cache and respects its TTL; it does not force a provider download.
+
+Settings and recent satellites live in the platform user configuration directory under `tlego/tui.yaml`. An absolute `XDG_CONFIG_HOME` overrides the settings directory. [TUI implementation notes](docs/tui-spec.md) cover paths, startup options and behavior in detail.
+
+## CLI commands
+
+The terminal UI is the recommended route for position calculations. The older `predict`, `track` and `report` commands still have tracked [coordinate-unit](https://github.com/Mohammed-Ashour/tlego/issues/16) and [UTC-handling](https://github.com/Mohammed-Ashour/tlego/issues/17) bugs.
+
+| Command | What it does |
+|---|---|
+| `tlego tle 25544` | Fetch the ISS element set |
+| `tlego list --sat-group "Space Stations"` | Fetch a configured group's elements; use the catalog's exact spelling |
+| `tlego search starlink` | Search names across configured groups |
+| `tlego viz 25544` | Write a single-satellite orbit preview to `25544.html` |
+| `tlego server` | Start the experimental web UI/API on port 8080 from the checkout |
+| `tlego --help` | List all commands; add `--help` to a command for its options |
+
+CLI retrieval currently uses a separate download path from the TUI. Its caching and failure behavior are being consolidated. The experimental server binds all interfaces and serves the checkout's `public/` directory; see [the input/binding issue](https://github.com/Mohammed-Ashour/tlego/issues/22) before exposing it to a network.
+
+### Orbit preview
+
+Run `tlego viz 25544`, then open the generated HTML file in a browser. The CLI currently exports one satellite at a time.
+
+![Example HTML orbit visualization](assets/visual.png)
+
+## Current limits and next steps
+
+- Retrieval uses TLE data. Full coverage of newer catalog objects needs [GP/OMM support](https://github.com/Mohammed-Ashour/tlego/issues/18).
+- Pass events and maxima are sampled at one-minute steps. Clipped forecast boundaries are marked. Optical visibility and precision antenna control are not calculated.
+- Orbit classes use altitude-based heuristics; apogee and perigee are estimates. Independent scientific validation is [tracked separately](https://github.com/Mohammed-Ashour/tlego/issues/27).
+- TUI JSON reports are unversioned exports. The [shared core and extension contract](https://github.com/Mohammed-Ashour/tlego/issues/29) are planned work; executable plugins are not implemented yet.
+
+[Browse the backlog](https://github.com/Mohammed-Ashour/tlego/issues) for the current priorities and acceptance criteria.
+
+## Development
+
+From a checkout:
 
 ```bash
-tlego viz <NORAD-ID>
+go build -o bin/tlego .
+go test ./...
+go vet ./...
 ```
 
-- **Description:** Creates a 3D visualization of the satellite's orbit.
-- **Example:**
-  ```bash
-  tlego viz 25544
-  ```
+CI builds and tests on Linux, macOS and Windows. Use `go test -race ./...` when changing concurrent behavior on a supported platform.
 
-#### 3. List Satellite Groups
+Read [ARCHITECTURE.md](ARCHITECTURE.md) for the current package boundaries, [the TUI notes](docs/tui-spec.md) for interaction behavior, and [the recording guide](docs/demos/README.md) to update the walkthrough. Keep pull requests focused and include the relevant checks. For new behavior, start from a tracked issue or describe the proposed change in the PR.
 
-```bash
-tlego list --sat-group <satellite-group>
-```
+## Data, dependencies and license
 
-- **Description:** Lists all satellites in a specific satellite group.
-- **Example:**
-  ```bash
-  tlego list --sat-group "Starlink"
-  ```
+Satellite elements come from [CelesTrak](https://celestrak.org/). Propagation uses [go-satellite-v2](https://github.com/Mohammed-Ashour/go-satellite-v2); the TUI uses [Bubble Tea](https://github.com/charmbracelet/bubbletea), and commands use [urfave/cli](https://github.com/urfave/cli).
 
-#### 4. Predict Satellite Position
-
-```bash
-tlego predict <NORAD-ID> --time <timestamp>
-```
-
-- **Description:** Predicts where a satellite will be at a specific time.
-- **Flags:**
-  - `--time`: Specify the time in ISO 8601 format (e.g., `2024-02-26T12:00:00Z`).
-- **Example:**
-  ```bash
-  tlego predict 25544 --time 2024-02-26T12:00:00Z
-  ```
-
-#### 5. Track Real-Time Satellite Position
-
-```bash
-tlego track <NORAD-ID>
-```
-
-- **Description:** Continuously tracks the real-time position of a satellite.
-- **Example:**
-  ```bash
-  tlego track 25544
-  ```
-
-#### 6. Search for Satellites by Name
-
-```bash
-tlego search <keyword>
-```
-
-- **Description:** Searches for satellites by name or partial name match.
-- **Example:**
-  ```bash
-  tlego search starlink
-  ```
-
-#### 7. Generate Satellite Report
-
-```bash
-tlego report <NORAD-ID>
-```
-
-- **Description:** Generates a detailed report for a satellite, including:
-  - TLE data
-  - Orbital parameters (e.g., inclination, eccentricity, mean motion)
-  - Current position (latitude, longitude, altitude)
-  - Google Maps URL for visualization
-- **Example:**
-  ```bash
-  tlego report 25544
-  ```
-
-- **Sample Output:**
-
-  ```plaintext
-  Satellite Report
-  ================
-  Name: ISS (ZARYA)
-  NORAD ID: 25544
-
-  TLE Data:
-  ---------
-  ISS (ZARYA)
-  1 25544U 98067A   24057.91666667  .00000000  00000+0  00000+0 0    04
-  2 25544  51.6416 247.4627 0006946 130.5360 325.0288 15.49140836    00
-
-  Orbital Parameters:
-  --------------------
-  Inclination: 51.641600° (degrees)
-  Eccentricity: 0.000695
-  Mean Motion: 15.491408 (revolutions per day)
-  Altitude: 408.23 km
-
-  Current Position (as of 2024-02-26T12:00:00Z):
-  ----------------------------
-  Latitude: 37.800000°
-  Longitude: -122.400000°
-  Altitude: 408.23 km
-
-  Google Maps URL:
-  ----------------
-  https://www.google.com/maps/?q=37.800000,-122.400000
-  ```
----
-
-## Library Usage
-
-The tlego CLI is built on top of go-satellite-v2 for all orbital calculations. Here's how to use the CLI programmatically:
-
-```go
-package main
-
-import (
-    "fmt"
-    "time"
-    "github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
-    "github.com/Mohammed-Ashour/tlego/pkg/celestrak"
-)
-
-func main() {
-    // Fetch TLE from Celestrak
-    tle, _ := celestrak.GetSatelliteTLEByNoradID("25544")
-
-    // Create satellite using go-satellite-v2
-    sat := satellite.NewSatelliteFromTLE(tle, satellite.GravityWGS84)
-
-    // Get current position
-    lat, lon, alt, _ := sat.Locate(time.Now())
-    
-    fmt.Printf("Position: %.6f°, %.6f°, %.6f km\n", lat, lon, alt)
-}
-```
-
----
-
-## Features
-
-- Seamless integration with go-satellite-v2 for high-precision orbit propagation
-- Robust CLI interface for satellite tracking and visualization
-- Real-time position tracking and orbit prediction
-- Support for multiple mapping services (Google Maps, OpenStreetMap)
-- Interactive 3D orbit visualization
-- Comprehensive satellite group management
-- Efficient TLE data fetching and caching
-
----
-
-## Dependencies
-- Go 1.22 or later
-- github.com/Mohammed-Ashour/go-satellite-v2 (SGP4 propagation engine)
-- gopkg.in/yaml.v3 (Configuration handling)
-
----
-
-## Contributing
-- Fork the repository
-- Create your feature branch (`git checkout -b feature/amazing-feature`)
-- Commit your changes (`git commit -m 'Add amazing feature'`)
-- Push to the branch (`git push origin feature/amazing-feature`)
-- Open a Pull Request
-
----
-
-## References & Credits
-
-This project uses [go-satellite-v2](https://github.com/Mohammed-Ashour/go-satellite-v2) for SGP4 orbit propagation. 
-The visualization and CLI components are original work built to provide an accessible interface for satellite tracking 
-and analysis.
-
----
-
-## License
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-MIT License
-
-Copyright (c) 2024 Mohammed Ashour
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+TLEGO is available under the [MIT license](LICENSE.md).
