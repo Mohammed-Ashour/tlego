@@ -5,6 +5,7 @@ package extensions
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -78,4 +79,4 @@ func TestFindIgnoresImplicitWindowsCurrentDirectory(t *testing.T) {
 	}
 }
 
-func samePath(a, b string) bool { return filepath.Clean(a) == filepath.Clean(b) }
+func samePath(a, b string) bool { return strings.EqualFold(filepath.Clean(a), filepath.Clean(b)) }

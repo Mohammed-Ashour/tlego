@@ -67,7 +67,12 @@ func TestRunMapsSignalExitToShellStatus(t *testing.T) {
 
 func TestRunCancellationStopsExtensionTree(t *testing.T) {
 	dir := t.TempDir()
-	makeExec(t, dir, "tlego-wait", "sleep 30 & wait")
+	sleep, err := exec.LookPath("sleep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TLEGO_TEST_SLEEP", sleep)
+	makeExec(t, dir, "tlego-wait", `"$TLEGO_TEST_SLEEP" 30 & wait`)
 	t.Setenv("PATH", dir)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -103,7 +108,12 @@ func TestRunMissingAndUnlaunchable(t *testing.T) {
 	if !errors.As(err, &exitErr) || exitErr.Code != 127 {
 		t.Fatalf("non-executable error = %#v", err)
 	}
-	if err := os.Chmod(filepath.Join(dir, "tlego-bad"), 0755); err != nil {
+	if runtime.GOOS == "windows" {
+		// Windows discovers native executable suffixes, not Unix permission bits.
+		if err := os.Rename(filepath.Join(dir, "tlego-bad"), filepath.Join(dir, "tlego-bad.exe")); err != nil {
+			t.Fatal(err)
+		}
+	} else if err := os.Chmod(filepath.Join(dir, "tlego-bad"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	err = Run(context.Background(), []string{"bad"}, "v", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
