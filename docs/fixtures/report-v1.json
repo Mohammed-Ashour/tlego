@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "kind": "report",
+  "data": {
+    "name": "ISS (ZARYA)",
+    "catalog_id": "25544",
+    "position": {
+      "catalog_id": "25544",
+      "evaluated_at": "2026-10-24T05:01:11Z",
+      "latitude_deg": 0.0002303629778299866,
+      "longitude_deg": -86.29138573084563,
+      "altitude_km": 417.76279311541754,
+      "speed_km_s": 7.663192886134344
+    },
+    "orbit": {
+      "inclination_deg": 51.6335,
+      "eccentricity": 0.0006884,
+      "mean_motion_rev_day": 15.49030149,
+      "period_minutes": 92.9613927094714,
+      "apogee_km": 424.24149457785285,
+      "perigee_km": 414.88242265163166,
+      "orbit_class_estimate": "LEO"
+    },
+    "tle": "ISS (ZARYA)\n1 25544U 98067A   26297.20915682  .00007800  00000+0  14938-3 0  9991\n2 25544  51.6335  21.6229 0006884 302.9098  57.1228 15.49030149591752",
+    "map_url": "https://www.google.com/maps/?q=0.000230,-86.291386"
+  },
+  "provenance": {
+    "source": "file",
+    "source_format": "tle",
+    "element_epoch": "2026-10-24T05:01:11.149248Z",
+    "fetched_at": null,
+    "cache_status": "none"
+  },
+  "warnings": []
+}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
+	"github.com/Mohammed-Ashour/tlego/internal/catalog"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -54,7 +54,7 @@ type Model struct {
 	options     Options
 	settings    Settings
 	settingsErr error
-	store       *data.Store
+	store       *catalog.Store
 	cacheDir    string
 
 	width  int
@@ -77,7 +77,7 @@ type Model struct {
 	settingsIndex  int
 	settingsDirty  bool
 
-	groups        []data.Group
+	groups        []catalog.Group
 	groupList     list.Model
 	selectedGroup string
 
@@ -88,7 +88,7 @@ type Model struct {
 	tleCache   map[string]tle.TLE
 
 	currentTLE  *tle.TLE
-	currentMeta data.FetchMeta
+	currentMeta catalog.FetchMeta
 	currentSat  *satellite.Satellite
 	currentPos  Position
 	currentOrb  OrbitInfo
@@ -116,8 +116,8 @@ type Model struct {
 	err           error
 }
 
-func NewModel(opts Options, settings Settings, store *data.Store, settingsErr error) Model {
-	cacheDir, _ := data.DefaultCacheDir()
+func NewModel(opts Options, settings Settings, store *catalog.Store, settingsErr error) Model {
+	cacheDir, _ := catalog.DefaultCacheDir()
 	groupList := list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0)
 	groupList.Title = "Groups"
 	groupList.SetShowHelp(false)
@@ -888,7 +888,7 @@ func (m Model) updateReports(msg tea.Msg) (Model, tea.Cmd) {
 			}
 			m.loading = true
 			m.status = "Generating report"
-			return m.startRequest(reportCmd(*m.currentTLE, *m.currentSat, m.currentOrb, m.settings.MapProvider, m.reportFormat))
+			return m.startRequest(reportCmd(*m.currentTLE, *m.currentSat, m.currentOrb, m.settings.MapProvider, m.reportFormat, m.currentMeta))
 		case "s":
 			if m.reportOutput == "" {
 				m.status = "Generate a report first"
@@ -940,7 +940,7 @@ func (m Model) updateSettings(msg tea.Msg) (Model, tea.Cmd) {
 			}
 			m.settings = settings
 			m.settingsErr = nil
-			m.store = data.NewStore(m.cacheDir, settings.CacheTTL())
+			m.store = catalog.NewStore(m.cacheDir, settings.CacheTTL())
 			m.status = "Settings saved"
 			return m, nil
 		default:
@@ -1001,7 +1001,7 @@ func defaultReportPath(noradID, format string) string {
 		return ""
 	}
 	switch format {
-	case "json":
+	case "json", "json-v1":
 		return fmt.Sprintf("tlego-report-%s.json", noradID)
 	case "csv":
 		return fmt.Sprintf("tlego-report-%s.csv", noradID)
@@ -1016,6 +1016,8 @@ func nextReportFormat(current string) string {
 		return "json"
 	case "json":
 		return "csv"
+	case "csv":
+		return "json-v1"
 	default:
 		return "text"
 	}

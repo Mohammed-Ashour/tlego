@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "kind": "passes",
+  "data": {
+    "catalog_id": "25544",
+    "observer": {
+      "latitude_deg": 51.48,
+      "longitude_deg": 0,
+      "altitude_km": 0
+    },
+    "window_start": "2026-10-24T05:01:11Z",
+    "window_end": "2026-10-25T05:01:11Z",
+    "minimum_elevation_deg": 0,
+    "sample_step_seconds": 60,
+    "passes": [
+      {
+        "start": "2026-10-24T05:20:11Z",
+        "end": "2026-10-24T05:31:11Z",
+        "rise_at": "2026-10-24T05:20:11Z",
+        "set_at": "2026-10-24T05:31:11Z",
+        "maximum_at": "2026-10-24T05:25:11Z",
+        "maximum_elevation_deg": 65.43937440642742,
+        "start_clipped": false,
+        "end_clipped": false
+      },
+      {
+        "start": "2026-10-24T06:56:11Z",
+        "end": "2026-10-24T07:07:11Z",
+        "rise_at": "2026-10-24T06:56:11Z",
+        "set_at": "2026-10-24T07:07:11Z",
+        "maximum_at": "2026-10-24T07:01:11Z",
+        "maximum_elevation_deg": 47.75996130300659,
+        "start_clipped": false,
+        "end_clipped": false
+      },
+      {
+        "start": "2026-10-24T08:33:11Z",
+        "end": "2026-10-24T08:43:11Z",
+        "rise_at": "2026-10-24T08:33:11Z",
+        "set_at": "2026-10-24T08:43:11Z",
+        "maximum_at": "2026-10-24T08:38:11Z",
+        "maximum_elevation_deg": 13.735833707618355,
+        "start_clipped": false,
+        "end_clipped": false
+      },
+      {
+        "start": "2026-10-25T01:20:11Z",
+        "end": "2026-10-25T01:29:11Z",
+        "rise_at": "2026-10-25T01:20:11Z",
+        "set_at": "2026-10-25T01:29:11Z",
+        "maximum_at": "2026-10-25T01:24:11Z",
+        "maximum_elevation_deg": 12.55813252669169,
+        "start_clipped": false,
+        "end_clipped": false
+      },
+      {
+        "start": "2026-10-25T02:56:11Z",
+        "end": "2026-10-25T03:06:11Z",
+        "rise_at": "2026-10-25T02:56:11Z",
+        "set_at": "2026-10-25T03:06:11Z",
+        "maximum_at": "2026-10-25T03:00:11Z",
+        "maximum_elevation_deg": 44.14933064803699,
+        "start_clipped": false,
+        "end_clipped": false
+      },
+      {
+        "start": "2026-10-25T04:32:11Z",
+        "end": "2026-10-25T04:43:11Z",
+        "rise_at": "2026-10-25T04:32:11Z",
+        "set_at": "2026-10-25T04:43:11Z",
+        "maximum_at": "2026-10-25T04:37:11Z",
+        "maximum_elevation_deg": 85.10791416087642,
+        "start_clipped": false,
+        "end_clipped": false
+      }
+    ]
+  },
+  "provenance": {
+    "source": "file",
+    "source_format": "tle",
+    "element_epoch": "2026-10-24T05:01:11.149248Z",
+    "fetched_at": null,
+    "cache_status": "none"
+  },
+  "warnings": [
+    {
+      "code": "sampled_passes",
+      "message": "Pass events are sampled estimates; optical visibility is not calculated."
+    }
+  ]
+}

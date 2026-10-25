@@ -1,136 +1,198 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
-	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
+	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/tlego/internal/output"
 	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	"github.com/Mohammed-Ashour/tlego/pkg/utils"
 )
 
-// Satellite represents a simple satellite model
 type Satellite struct {
 	Name    string `json:"name"`
 	NORADID string `json:"norad_id"`
 }
 
-// listSatellitesHandler provides a list of satellites
-// /api/satellite-groups returns a list of group names
-func listGroupsHandler(w http.ResponseWriter, r *http.Request) {
-	config, err := celestrak.ReadCelestrakConfig()
-	if err != nil {
-		http.Error(w, "Unable to load celestrak config", http.StatusInternalServerError)
-		return
-	}
-	groups := make([]string, 0, len(config.SatelliteGroups))
-	for _, group := range config.SatelliteGroups {
-		groups = append(groups, group.Name)
-	}
-	sort.Strings(groups)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(groups)
-}
+type api struct{ store *catalog.Store }
 
-// /api/satellites?group=GROUP_NAME returns satellites for a specific group
-func listSatellitesHandler(w http.ResponseWriter, r *http.Request) {
-	config, err := celestrak.ReadCelestrakConfig()
+// NewHandler uses the shared catalog/cache and retains the legacy API routes.
+func NewHandler() http.Handler { return newHandler(catalog.NewStore("", 12*time.Hour)) }
+func newHandler(store *catalog.Store) http.Handler {
+	a := api{store}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/satellite-groups", a.listGroups)
+	mux.HandleFunc("/api/satellites", a.listSatellites)
+	mux.HandleFunc("/api/location", a.location)
+	mux.HandleFunc("/api/v1/position", a.positionV1)
+	return mux
+}
+func (a api) listGroups(w http.ResponseWriter, r *http.Request) {
+	groups, err := a.store.FetchGroups()
 	if err != nil {
-		http.Error(w, "Unable to load celestrak config", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	groupName := r.URL.Query().Get("group")
-	if groupName == "" {
+	names := make([]string, 0, len(groups))
+	for _, g := range groups {
+		names = append(names, g.Name)
+	}
+	sort.Strings(names)
+	writeJSON(w, names)
+}
+func (a api) listSatellites(w http.ResponseWriter, r *http.Request) {
+	group := r.URL.Query().Get("group")
+	if group == "" {
 		http.Error(w, "Missing group parameter", http.StatusBadRequest)
 		return
 	}
-	tles, err := celestrak.GetSatelliteGroupTLEs(groupName, config)
+	records, meta, err := a.store.FetchGroupTLEs(r.Context(), group)
 	if err != nil {
-		http.Error(w, "Unable to load satellites", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
-	satellites := make([]Satellite, 0, len(tles))
-	for _, t := range tles {
-		satellites = append(satellites, Satellite{
-			Name:    t.Name,
-			NORADID: t.NoradID,
-		})
+	if meta.Stale {
+		w.Header().Set("Warning", `110 tlego "Response is stale"`)
 	}
-	sort.Slice(satellites, func(i, j int) bool {
-		return satellites[i].Name < satellites[j].Name
-	})
+	satellites := make([]Satellite, 0, len(records))
+	for _, record := range records {
+		satellites = append(satellites, Satellite{record.Name, record.NoradID})
+	}
+	sort.Slice(satellites, func(i, j int) bool { return satellites[i].Name < satellites[j].Name })
+	writeJSON(w, satellites)
+}
+func (a api) location(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("norad_id")
+	if err := catalog.ValidateNoradID(id); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	record, meta, err := a.store.FetchTLEByNorad(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Unable to fetch TLE data", http.StatusBadGateway)
+		return
+	}
+	state := orbit.At(satellite.NewSatelliteFromTLE(record, satellite.GravityWGS84), time.Now())
+	if err := orbit.ValidateState(state); err != nil {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	if meta.Stale {
+		w.Header().Set("Warning", `110 tlego "Response is stale"`)
+	}
+	writeJSON(w, legacyLocation(record, state))
+}
+func locationResponse(record tle.TLE, now time.Time) map[string]interface{} {
+	return legacyLocation(record, orbit.At(satellite.NewSatelliteFromTLE(record, satellite.GravityWGS84), now))
+}
+func legacyLocation(record tle.TLE, state orbit.State) map[string]interface{} {
+	pos := state.PositionTEMEKm
+	return map[string]interface{}{"name": record.Name, "eci": map[string]float64{"x": pos.X, "y": pos.Y, "z": pos.Z}, "info": map[string]float64{"latitude": state.LatDeg, "longitude": state.LonDeg, "altitude": state.AltKm}, "tle": map[string]string{"line1": record.Line1.LineString, "line2": record.Line2.LineString}}
+}
+func (a api) positionV1(w http.ResponseWriter, r *http.Request) {
+	fail := func(status int, err error) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		fmt.Fprintln(w, string(output.MarshalError("request_failed", err)))
+	}
+	id := r.URL.Query().Get("norad_id")
+	if err := catalog.ValidateNoradID(id); err != nil {
+		fail(http.StatusBadRequest, err)
+		return
+	}
+	instant := time.Now()
+	if value := r.URL.Query().Get("time"); value != "" {
+		var err error
+		instant, err = time.Parse(time.RFC3339, value)
+		if err != nil {
+			fail(http.StatusBadRequest, err)
+			return
+		}
+	}
+	record, meta, err := a.store.FetchTLEByNorad(r.Context(), id)
+	if err != nil {
+		fail(http.StatusBadGateway, err)
+		return
+	}
+	state := orbit.At(satellite.NewSatelliteFromTLE(record, satellite.GravityWGS84), instant)
+	if err := orbit.ValidateState(state); err != nil {
+		fail(http.StatusUnprocessableEntity, err)
+		return
+	}
+	epoch, err := record.Time()
+	if err != nil {
+		fail(http.StatusUnprocessableEntity, err)
+		return
+	}
+	fetched := meta.FetchedAt.UTC()
+	p := output.Provenance{Source: "celestrak", SourceFormat: "tle", ElementEpoch: epoch.UTC(), FetchedAt: &fetched, CacheStatus: "fetched"}
+	if meta.FromCache {
+		p.CacheStatus = "fresh"
+	}
+	if meta.Stale {
+		p.CacheStatus = "stale"
+	}
+	var warnings []output.Warning
+	if meta.Warning != "" {
+		warnings = append(warnings, output.Warning{Code: "stale_elements", Message: meta.Warning})
+	}
+	body, err := output.MarshalResult("position", output.PositionV1(record.NoradID, state), p, warnings)
+	if err != nil {
+		fail(http.StatusUnprocessableEntity, err)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(satellites)
+	fmt.Fprintln(w, string(body))
+}
+func writeJSON(w http.ResponseWriter, value any) {
+	bytes, err := json.Marshal(value)
+	if err != nil {
+		http.Error(w, "Invalid response data", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintln(w, string(bytes))
 }
 
-// locationHandler provides the location of a satellite
-func locationHandler(w http.ResponseWriter, r *http.Request) {
-	noradID := r.URL.Query().Get("norad_id")
-	fmt.Println("Received NORAD ID:", noradID)
-	if noradID == "" {
-		http.Error(w, "Missing NORAD ID", http.StatusBadRequest)
-		return
+// Serve owns its mux and stops when ctx is canceled. An empty staticDir disables
+// the experimental checkout-based UI without affecting the JSON API.
+func Serve(ctx context.Context, addr, staticDir string) error {
+	mux := http.NewServeMux()
+	mux.Handle("/api/", NewHandler())
+	if staticDir != "" {
+		mux.Handle("/", http.FileServer(http.Dir(staticDir)))
 	}
-
-	tleData, err := celestrak.GetSatelliteTLEByNoradID(noradID)
-	if err != nil {
-		http.Error(w, "Unable to fetch TLE data", http.StatusInternalServerError)
-		return
+	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-ctx.Done():
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = srv.Shutdown(shutdownCtx)
+		case <-done:
+		}
+	}()
+	err := srv.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
 	}
-
-	// Initialize satellite
-	now := time.Now()
-	sat := satellite.TLEToSat(tleData.Line1.LineString, tleData.Line2.LineString, satellite.GravityWGS84)
-
-	// Get position in ECI coordinates
-	pos, _ := satellite.Propagate(sat, now.Year(), int(now.Month()), now.Day(),
-		now.Hour(), now.Minute(), int(now.Second()))
-
-	// Get lat/lon/alt for display info
-
-	// Calculate GMST
-	gmst := satellite.GSTimeFromDate(now.Year(), int(now.Month()), now.Day(), now.Hour(), now.Minute(), int(now.Second()))
-
-	// Convert ECI to LLA using our helper
-	eciCoords := [3]float64{pos.X, pos.Y, pos.Z}
-	lat, lon, alt := utils.ECIToLLA(eciCoords, gmst)
-
-	logger.Info("[locationHandler] NORAD: %s\n", "norad_id", noradID)
-	logger.Info("[locationHandler] Name: %s\n", "name", tleData.Name)
-	logger.Info("[locationHandler] Position ECI (X,Y,Z): %v, %v, %v\n", "eci", pos.X, pos.Y, pos.Z)
-	logger.Info("[locationHandler] LatLon: %v, %v, Alt: %v\n", "info", lat, lon, alt)
-
-	response := map[string]interface{}{
-		"name": tleData.Name,
-		"eci": map[string]float64{
-			"x": pos.X,
-			"y": pos.Y,
-			"z": pos.Z,
-		},
-		"info": map[string]float64{
-			"latitude":  lat,
-			"longitude": lon,
-			"altitude":  alt,
-		},
-		"tle": map[string]string{
-			"line1": tleData.Line1.LineString,
-			"line2": tleData.Line2.LineString,
-		},
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	return err
 }
 
-// StartServer initializes and starts the API server
+// StartServer retains the historical entry point. CLI callers use Serve to
+// receive bind errors and control shutdown.
 func StartServer() {
-	http.HandleFunc("/api/satellite-groups", listGroupsHandler)
-	http.HandleFunc("/api/satellites", listSatellitesHandler)
-	http.HandleFunc("/api/location", locationHandler)
-	logger.Info("Starting server on :8080")
-	http.Handle("/", http.FileServer(http.Dir("public")))
-	http.ListenAndServe(":8080", nil)
+	if err := Serve(context.Background(), ":8080", "public"); err != nil {
+		logger.Error("HTTP server failed", "error", err)
+	}
 }

@@ -11,3 +11,6 @@
 # Intentional offline documentation fixture
 !examples/tui-demo/iss.tle
 /pkg/templates/node_modules/
+/examples/calendar/build/
+/examples/calendar/*.egg-info/
+/examples/calendar/__pycache__/

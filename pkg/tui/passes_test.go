@@ -1,9 +1,28 @@
 package tui
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
+
+func TestComputePassesEquivalentTimezones(t *testing.T) {
+	sat := testSatellite(t)
+	start := time.Date(2008, 9, 20, 10, 25, 0, 0, time.UTC)
+	position := PositionFromSatellite(sat, start)
+	observer := Observer{Lat: position.LatDeg, Lon: position.LonDeg}
+	want := ComputePasses(sat, observer, start, 2*time.Hour, time.Minute)
+	if len(want) == 0 {
+		t.Fatal("fixture must contain a pass")
+	}
+	for _, offset := range []int{-12, 2, 14} {
+		local := start.In(time.FixedZone("offset", offset*60*60))
+		got := ComputePasses(sat, observer, local, 2*time.Hour, time.Minute)
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("pass events differ at UTC offset %d: got %+v, want %+v", offset, got, want)
+		}
+	}
+}
 
 func TestComputePassesReturnsUTCClippedPassEstimate(t *testing.T) {
 	sat := testSatellite(t)

@@ -1,4 +1,4 @@
-package data
+package catalog
 
 import (
 	"context"
@@ -201,4 +201,62 @@ func TestFetchURLCancellationAndHTTPStatusError(t *testing.T) {
 			t.Fatalf("status error = %v", err)
 		}
 	})
+}
+
+func TestRejectZeroCatalogIDInFileAndStdin(t *testing.T) {
+	payload := strings.ReplaceAll(validTLE, "25544", "00000")
+	path := filepath.Join(t.TempDir(), "zero.tle")
+	if err := os.WriteFile(path, []byte(payload), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseTLE([]byte(payload)); err == nil {
+		t.Fatal("stdin parser accepted catalog ID zero")
+	}
+	if _, err := ReadLocalTLE(path); err == nil {
+		t.Fatal("file parser accepted catalog ID zero")
+	}
+}
+
+func TestFileAndStdinPreserveSameRecordsWithBlankLines(t *testing.T) {
+	payload := strings.Replace(validTLE, "ISS (ZARYA)\n", "ISS (ZARYA)\n\n", 1)
+	path := filepath.Join(t.TempDir(), "satellite.tle")
+	if err := os.WriteFile(path, []byte(payload), 0600); err != nil {
+		t.Fatal(err)
+	}
+	fromFile, err := ReadLocalTLE(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fromStdin, err := ParseTLE([]byte(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fromFile) != 1 || len(fromStdin) != 1 || fromFile[0].String() != fromStdin[0].String() {
+		t.Fatalf("file and stdin differ: %+v vs %+v", fromFile, fromStdin)
+	}
+}
+
+func TestCanceledFetchDoesNotReturnFreshCache(t *testing.T) {
+	store := NewStore(t.TempDir(), time.Hour)
+	path := filepath.Join(store.cacheDir, "record.tle")
+	if err := os.WriteFile(path, []byte(validTLE), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	records, _, err := store.fetchURL(ctx, "http://invalid.invalid", path, "25544")
+	if !errors.Is(err, context.Canceled) || len(records) != 0 {
+		t.Fatalf("canceled fetch returned records=%v error=%v", records, err)
+	}
+}
+
+func TestUnavailableDefaultCacheFailsWithoutRelativeFallback(t *testing.T) {
+	for _, key := range []string{"HOME", "XDG_CACHE_HOME", "LOCALAPPDATA", "USERPROFILE"} {
+		t.Setenv(key, "")
+	}
+	store := NewStore("", time.Hour)
+	_, _, err := store.FetchTLEByNorad(context.Background(), "25544")
+	if err == nil || !strings.Contains(err.Error(), "cache directory") {
+		t.Fatalf("missing default cache did not fail explicitly: %v", err)
+	}
 }

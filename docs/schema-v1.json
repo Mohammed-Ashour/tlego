@@ -1,0 +1,430 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TLEGO JSON output v1.0",
+  "oneOf": [
+    {
+      "allOf": [
+        {
+          "$ref": "#/$defs/success"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "position"
+            },
+            "data": {
+              "$ref": "#/$defs/position"
+            }
+          },
+          "required": [
+            "kind",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "#/$defs/success"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "report"
+            },
+            "data": {
+              "$ref": "#/$defs/report"
+            }
+          },
+          "required": [
+            "kind",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
+      "allOf": [
+        {
+          "$ref": "#/$defs/success"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "passes"
+            },
+            "data": {
+              "$ref": "#/$defs/passes"
+            }
+          },
+          "required": [
+            "kind",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
+      "$ref": "#/$defs/error"
+    }
+  ],
+  "$defs": {
+    "success": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "kind": {
+          "enum": [
+            "position",
+            "report",
+            "passes"
+          ]
+        },
+        "data": {},
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "kind",
+        "data",
+        "provenance",
+        "warnings"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "enum": [
+            "celestrak",
+            "file",
+            "stdin",
+            "unknown"
+          ]
+        },
+        "source_format": {
+          "const": "tle"
+        },
+        "element_epoch": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "fetched_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cache_status": {
+          "enum": [
+            "fetched",
+            "fresh",
+            "stale",
+            "none",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "source",
+        "source_format",
+        "element_epoch",
+        "fetched_at",
+        "cache_status"
+      ]
+    },
+    "position": {
+      "type": "object",
+      "properties": {
+        "catalog_id": {
+          "type": "string",
+          "pattern": "^0*[1-9][0-9]*$"
+        },
+        "evaluated_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude_deg": {
+          "type": "number",
+          "minimum": -180,
+          "exclusiveMaximum": 180
+        },
+        "altitude_km": {
+          "type": "number"
+        },
+        "speed_km_s": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "catalog_id",
+        "evaluated_at",
+        "latitude_deg",
+        "longitude_deg",
+        "altitude_km",
+        "speed_km_s"
+      ]
+    },
+    "report": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "catalog_id": {
+          "type": "string",
+          "pattern": "^0*[1-9][0-9]*$"
+        },
+        "position": {
+          "$ref": "#/$defs/position"
+        },
+        "orbit": {
+          "type": "object",
+          "properties": {
+            "inclination_deg": {
+              "type": "number"
+            },
+            "eccentricity": {
+              "type": "number"
+            },
+            "mean_motion_rev_day": {
+              "type": "number"
+            },
+            "period_minutes": {
+              "type": "number"
+            },
+            "apogee_km": {
+              "type": "number"
+            },
+            "perigee_km": {
+              "type": "number"
+            },
+            "orbit_class_estimate": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "inclination_deg",
+            "eccentricity",
+            "mean_motion_rev_day",
+            "period_minutes",
+            "apogee_km",
+            "perigee_km",
+            "orbit_class_estimate"
+          ]
+        },
+        "tle": {
+          "type": "string"
+        },
+        "map_url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "catalog_id",
+        "position",
+        "orbit",
+        "tle",
+        "map_url"
+      ]
+    },
+    "passes": {
+      "type": "object",
+      "properties": {
+        "catalog_id": {
+          "type": "string",
+          "pattern": "^0*[1-9][0-9]*$"
+        },
+        "observer": {
+          "type": "object",
+          "properties": {
+            "latitude_deg": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "longitude_deg": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "altitude_km": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "latitude_deg",
+            "longitude_deg",
+            "altitude_km"
+          ]
+        },
+        "window_start": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "window_end": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "minimum_elevation_deg": {
+          "const": 0
+        },
+        "sample_step_seconds": {
+          "type": "number",
+          "minimum": 1
+        },
+        "passes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "rise_at": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "Z$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "set_at": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "Z$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "maximum_at": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "Z$"
+              },
+              "maximum_elevation_deg": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 90
+              },
+              "start_clipped": {
+                "type": "boolean"
+              },
+              "end_clipped": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "start",
+              "end",
+              "rise_at",
+              "set_at",
+              "maximum_at",
+              "maximum_elevation_deg",
+              "start_clipped",
+              "end_clipped"
+            ]
+          }
+        }
+      },
+      "required": [
+        "catalog_id",
+        "observer",
+        "window_start",
+        "window_end",
+        "minimum_elevation_deg",
+        "sample_step_seconds",
+        "passes"
+      ]
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "kind": {
+          "const": "error"
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "kind",
+        "error"
+      ]
+    }
+  }
+}

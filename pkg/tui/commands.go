@@ -8,12 +8,14 @@ import (
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
+	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/tlego/internal/output"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 type groupsLoadedMsg struct {
-	groups []data.Group
+	groups []catalog.Group
 	err    error
 }
 
@@ -21,14 +23,14 @@ type groupTLEsLoadedMsg struct {
 	query string
 	group string
 	tles  []tle.TLE
-	meta  data.FetchMeta
+	meta  catalog.FetchMeta
 	err   error
 }
 
 type noradLoadedMsg struct {
 	noradID string
 	tle     tle.TLE
-	meta    data.FetchMeta
+	meta    catalog.FetchMeta
 	err     error
 }
 
@@ -57,14 +59,14 @@ type reportBuiltMsg struct {
 	err    error
 }
 
-func fetchGroupsCmd(store *data.Store) tea.Cmd {
+func fetchGroupsCmd(store *catalog.Store) tea.Cmd {
 	return func() tea.Msg {
 		groups, err := store.FetchGroups()
 		return groupsLoadedMsg{groups: groups, err: err}
 	}
 }
 
-func fetchGroupTLEsCmd(store *data.Store, group string) tea.Cmd {
+func fetchGroupTLEsCmd(store *catalog.Store, group string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -73,7 +75,7 @@ func fetchGroupTLEsCmd(store *data.Store, group string) tea.Cmd {
 	}
 }
 
-func fetchGroupSearchCmd(store *data.Store, group, query string) tea.Cmd {
+func fetchGroupSearchCmd(store *catalog.Store, group, query string) tea.Cmd {
 	cmd := fetchGroupTLEsCmd(store, group)
 	return func() tea.Msg {
 		msg := cmd().(groupTLEsLoadedMsg)
@@ -82,7 +84,7 @@ func fetchGroupSearchCmd(store *data.Store, group, query string) tea.Cmd {
 	}
 }
 
-func fetchNoradCmd(store *data.Store, noradID string) tea.Cmd {
+func fetchNoradCmd(store *catalog.Store, noradID string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -91,50 +93,23 @@ func fetchNoradCmd(store *data.Store, noradID string) tea.Cmd {
 	}
 }
 
-func searchAllGroupsCmd(store *data.Store, query string) tea.Cmd {
+func searchAllGroupsCmd(store *catalog.Store, query string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
-		groups, err := store.FetchGroups()
+		result, err := store.Search(ctx, query)
 		if err != nil {
 			return searchResultsMsg{err: err}
 		}
-		query = strings.ToLower(strings.TrimSpace(query))
-		if query == "" {
-			return searchResultsMsg{results: nil, err: nil}
-		}
-		var results []TLESummary
-		var matched []tle.TLE
-		seen := make(map[string]bool)
-		failed, stale := 0, 0
-		for _, group := range groups {
-			tles, meta, err := store.FetchGroupTLEs(ctx, group.Name)
-			if err != nil {
-				if ctx.Err() != nil {
-					return searchResultsMsg{err: ctx.Err()}
-				}
-				failed++
-				continue
-			}
-			if meta.Stale {
-				stale++
-			}
-			for _, item := range tles {
-				if strings.Contains(strings.ToLower(item.Name), query) || strings.Contains(item.NoradID, query) {
-					if seen[item.NoradID] {
-						continue
-					}
-					seen[item.NoradID] = true
-					matched = append(matched, item)
-					results = append(results, summaryFromTLE(item))
-				}
-			}
+		results := make([]TLESummary, 0, len(result.TLEs))
+		for _, item := range result.TLEs {
+			results = append(results, summaryFromTLE(item))
 		}
 		warning := ""
-		if failed > 0 || stale > 0 {
-			warning = fmt.Sprintf("Search coverage: %d/%d groups loaded, %d using stale data", len(groups)-failed, len(groups), stale)
+		if len(result.Warnings) > 0 {
+			warning = fmt.Sprintf("Search coverage: %d/%d groups loaded. %s", result.GroupsCovered, result.GroupsTotal, strings.Join(result.Warnings, "; "))
 		}
-		return searchResultsMsg{results: results, tles: matched, warning: warning}
+		return searchResultsMsg{results: results, tles: result.TLEs, warning: warning}
 	}
 }
 
@@ -148,7 +123,7 @@ func predictCmd(sat satellite.Satellite, t time.Time, provider string) tea.Cmd {
 	return func() tea.Msg {
 		pos := PositionFromSatellite(sat, t)
 		result := PredictResult{
-			Time:   t,
+			Time:   pos.Time,
 			LatDeg: pos.LatDeg,
 			LonDeg: pos.LonDeg,
 			AltKm:  pos.AltKm,
@@ -160,12 +135,12 @@ func predictCmd(sat satellite.Satellite, t time.Time, provider string) tea.Cmd {
 
 func passesCmd(sat satellite.Satellite, obs Observer, start time.Time, duration, step time.Duration) tea.Cmd {
 	return func() tea.Msg {
-		passes := ComputePasses(sat, obs, start, duration, step)
-		return passesLoadedMsg{passes: passes}
+		passes, err := orbit.PlanPasses(sat, obs, start, duration, step)
+		return passesLoadedMsg{passes: passes, err: err}
 	}
 }
 
-func reportCmd(tleData tle.TLE, sat satellite.Satellite, orbit OrbitInfo, provider, format string) tea.Cmd {
+func reportCmd(tleData tle.TLE, sat satellite.Satellite, orbit OrbitInfo, provider, format string, meta catalog.FetchMeta) tea.Cmd {
 	return func() tea.Msg {
 		pos := PositionFromSatellite(sat, time.Now())
 		mapURL := MapURL(provider, pos.LatDeg, pos.LonDeg)
@@ -173,11 +148,34 @@ func reportCmd(tleData tle.TLE, sat satellite.Satellite, orbit OrbitInfo, provid
 		if err != nil {
 			return reportBuiltMsg{err: err}
 		}
-		output, err := formatReport(report, format)
+		encoded, err := formatReport(report, format)
+		if format == "json-v1" {
+			fetched := meta.FetchedAt.UTC()
+			provenance := output.Provenance{Source: "celestrak", SourceFormat: "tle", ElementEpoch: report.Epoch, CacheStatus: "fetched"}
+			if !meta.FetchedAt.IsZero() {
+				provenance.FetchedAt = &fetched
+			} else {
+				provenance.Source = "unknown"
+				provenance.CacheStatus = "unknown"
+			}
+			if meta.FromCache {
+				provenance.CacheStatus = "fresh"
+			}
+			if meta.Stale {
+				provenance.CacheStatus = "stale"
+			}
+			var warnings []output.Warning
+			if meta.Warning != "" {
+				warnings = append(warnings, output.Warning{Code: "stale_elements", Message: meta.Warning})
+			}
+			var bytes []byte
+			bytes, err = output.MarshalResult("report", output.ReportV1(report), provenance, warnings)
+			encoded = string(bytes)
+		}
 		if err != nil {
 			return reportBuiltMsg{err: err}
 		}
-		return reportBuiltMsg{report: report, output: output}
+		return reportBuiltMsg{report: report, output: encoded}
 	}
 }
 

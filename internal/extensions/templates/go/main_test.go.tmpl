@@ -1,0 +1,19 @@
+package main
+
+import (
+ "bytes"
+ "strings"
+ "testing"
+)
+const fixture=`{"schema_version":"1.0","kind":"position","data":{"catalog_id":"25544","evaluated_at":"2026-10-24T05:01:11Z","latitude_deg":12.5,"longitude_deg":-45.5,"altitude_km":420,"speed_km_s":7.66},"future_field":"ignored"}`
+func TestSummarize(t *testing.T){
+ var out bytes.Buffer
+ if err:=summarize(strings.NewReader(fixture),&out);err!=nil{t.Fatal(err)}
+ if !strings.Contains(out.String(),"Satellite 25544") {t.Fatal(out.String())}
+}
+func TestInvalidInputLeavesOutputEmpty(t *testing.T){
+ for _,input:=range []string{"not JSON",strings.Replace(fixture,`"1.0"`,`"2.0"`,1),strings.Replace(fixture,`"position"`,`"passes"`,1),strings.Replace(fixture,`12.5`,`null`,1),fixture+fixture}{
+  var out bytes.Buffer
+  if err:=summarize(strings.NewReader(input),&out);err==nil || out.Len()!=0{t.Fatalf("invalid input: output=%q error=%v",out.String(),err)}
+ }
+}

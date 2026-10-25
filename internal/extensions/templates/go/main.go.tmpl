@@ -1,0 +1,54 @@
+// {{.Command}} summarizes TLEGO position JSON v1 from stdin.
+package main
+
+import (
+ "encoding/json"
+ "flag"
+ "fmt"
+ "io"
+ "math"
+ "os"
+ "strconv"
+ "strings"
+ "time"
+)
+
+type position struct {
+ CatalogID string `json:"catalog_id"`
+ EvaluatedAt string `json:"evaluated_at"`
+ Latitude *float64 `json:"latitude_deg"`
+ Longitude *float64 `json:"longitude_deg"`
+ Altitude *float64 `json:"altitude_km"`
+ Speed *float64 `json:"speed_km_s"`
+}
+
+func summarize(input io.Reader, output io.Writer) error {
+ const maxInput = 32 << 20
+ bytes,err:=io.ReadAll(io.LimitReader(input,maxInput+1))
+ if err!=nil{return err}
+ if len(bytes)>maxInput{return fmt.Errorf("input exceeds 32 MiB")}
+ var document struct {
+  SchemaVersion string `json:"schema_version"`
+  Kind string `json:"kind"`
+  Data position `json:"data"`
+ }
+ if err:=json.Unmarshal(bytes,&document);err!=nil{return fmt.Errorf("read JSON: %w",err)}
+ major,minor,ok:=strings.Cut(document.SchemaVersion,".")
+ if _,err:=strconv.ParseUint(minor,10,32);!ok || major!="1" || err!=nil{return fmt.Errorf("unsupported schema_version %q; expected 1.x",document.SchemaVersion)}
+ if document.Kind!="position"{return fmt.Errorf("expected kind position, got %q",document.Kind)}
+ p:=document.Data
+ if strings.Trim(p.CatalogID,"0")==""{return fmt.Errorf("catalog_id must be a positive decimal string")}
+ for _,c:=range p.CatalogID{if c<'0'||c>'9'{return fmt.Errorf("catalog_id must be a positive decimal string")}}
+ evaluated,err:=time.Parse(time.RFC3339,p.EvaluatedAt);if err!=nil{return fmt.Errorf("invalid evaluated_at: %w",err)}
+ for _,v:=range []*float64{p.Latitude,p.Longitude,p.Altitude,p.Speed}{if v==nil || math.IsNaN(*v)||math.IsInf(*v,0){return fmt.Errorf("position fields must be present and finite")}}
+ if *p.Latitude < -90 || *p.Latitude > 90 || *p.Longitude < -180 || *p.Longitude >= 180 || *p.Speed < 0 {return fmt.Errorf("position coordinates or speed are out of range")}
+ _,err=fmt.Fprintf(output,"Satellite %s at %s: %.6f°, %.6f°, %.3f km, %.3f km/s\n",p.CatalogID,evaluated.UTC().Format(time.RFC3339),*p.Latitude,*p.Longitude,*p.Altitude,*p.Speed)
+ return err
+}
+
+func main(){
+ flag.Usage=func(){fmt.Fprintln(flag.CommandLine.Output(),"Usage: {{.Command}} < position.json\nSummarize TLEGO position JSON v1 from stdin.")}
+ flag.Parse()
+ if flag.NArg()!=0{fmt.Fprintln(os.Stderr,"{{.Command}}: unexpected arguments");os.Exit(2)}
+ if err:=summarize(os.Stdin,os.Stdout);err!=nil{fmt.Fprintln(os.Stderr,"{{.Command}}:",err);os.Exit(1)}
+}

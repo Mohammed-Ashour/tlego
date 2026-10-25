@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "kind": "position",
+  "data": {
+    "catalog_id": "25544",
+    "evaluated_at": "2026-10-24T05:01:11Z",
+    "latitude_deg": 0.0002303629778299866,
+    "longitude_deg": 220,
+    "altitude_km": 417.76279311541754,
+    "speed_km_s": 7.663192886134344
+  },
+  "provenance": {
+    "source": "file",
+    "source_format": "tle",
+    "element_epoch": "2026-10-24T05:01:11.149248Z",
+    "fetched_at": null,
+    "cache_status": "none"
+  },
+  "warnings": []
+}

@@ -3,8 +3,10 @@ package celestrak
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 const testTLE = `ISS (ZARYA)
@@ -18,10 +20,33 @@ func setupTestServer(t *testing.T) *httptest.Server {
 	DOWNLOAD_DIR = t.TempDir()
 	t.Cleanup(func() { DOWNLOAD_DIR, CELESTRAK_URL = previousDir, previousURL })
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("fail") == "1" {
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
+			return
+		}
 		w.Write([]byte(testTLE))
 	}))
 	t.Cleanup(server.Close)
 	return server
+}
+
+func TestDownloadTLEsKeepsValidCacheWhenRefreshFails(t *testing.T) {
+	server := setupTestServer(t)
+	path := filepath.Join(DOWNLOAD_DIR, "cached.tle")
+	if err := os.WriteFile(path, []byte(testTLE), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, time.Now().Add(-time.Hour), time.Now().Add(-time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	tles, err := DownloadTLEs(server.URL+"?fail=1", path)
+	if err != nil || len(tles) != 1 {
+		t.Fatalf("stale fallback = (%d TLEs, %v)", len(tles), err)
+	}
+	contents, err := os.ReadFile(path)
+	if err != nil || string(contents) != testTLE {
+		t.Fatalf("known-good cache changed: err=%v", err)
+	}
 }
 
 func TestGetSatelliteTLEByNoradID(t *testing.T) {
@@ -85,7 +110,7 @@ func TestDownloadTLEs(t *testing.T) {
 	}
 
 	// Test error cases
-	_, err = DownloadTLEs("invalid-url", path)
+	_, err = DownloadTLEs("invalid-url", filepath.Join(DOWNLOAD_DIR, "invalid.tle"))
 	if err == nil {
 		t.Error("Expected error for invalid URL")
 	}
