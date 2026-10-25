@@ -1,50 +1,55 @@
+// visualization exports a configured group's elements using validated retrieval.
 package main
 
 import (
+	"context"
 	"fmt"
-	"math/rand"
 	"os"
+	"time"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	visual "github.com/Mohammed-Ashour/tlego/pkg/visual"
+	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
+	"github.com/Mohammed-Ashour/tlego/pkg/visual"
 )
 
 func main() {
-
-	// example
-	satelliteGroup := os.Args[1]
-
-	config, err := celestrak.ReadCelestrakConfig()
-	if err != nil {
-		logger.Error("Can't get the Celestrak config", "Error", err)
-		return
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
-	cTles, err := celestrak.GetSatelliteGroupTLEs(satelliteGroup, config)
-	if err != nil {
-		logger.Error("Can't get TLEs from Celestrak", "err", err)
+}
+func run() error {
+	if len(os.Args) != 2 {
+		return fmt.Errorf("usage: go run ./examples/visualization <group-name>")
 	}
-	satData := make([]visual.SatelliteData, len(cTles))
-	for _, cTle := range cTles {
-		points, err := visual.CreateOrbitPoints(cTle, 360)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	records, meta, err := data.NewStore("", 12*time.Hour).FetchGroupTLEs(ctx, os.Args[1])
+	if err != nil {
+		return err
+	}
+	if meta.Warning != "" {
+		fmt.Fprintln(os.Stderr, meta.Warning)
+	}
+	if len(records) == 0 || len(records) > 64 {
+		return fmt.Errorf("choose a group with 1 to 64 satellites")
+	}
+	satellites := make([]visual.SatelliteData, 0, len(records))
+	start := time.Now().UTC()
+	for _, record := range records {
+		points, err := visual.CreateOrbitPointsAt(record, 360, start)
 		if err != nil {
-			logger.Error("Failed to create orbit points", "err", err)
-			continue
+			return err
 		}
-
-		r := rand.Intn(256)
-		g := rand.Intn(256)
-		b := rand.Intn(256)
-
-		satData = append(satData, visual.SatelliteData{
-			Name:   cTle.Name,
-			Points: points,
-			Color:  fmt.Sprintf("#%02X%02X%02X", r, g, b),
-		})
-
+		epoch, err := record.Time()
+		if err != nil {
+			return err
+		}
+		satellites = append(satellites, visual.SatelliteData{Name: record.Name, NORADID: record.NoradID, Epoch: epoch, Points: points})
 	}
-
-	htmlFileName := visual.CreateHTMLVisual(satData, satelliteGroup)
-	logger.Info("Created an html with orbit visualization", "filename", htmlFileName)
-
+	path, err := visual.WriteHTMLVisual(satellites, "group-orbits.html")
+	if err != nil {
+		return err
+	}
+	fmt.Println(path)
+	return nil
 }

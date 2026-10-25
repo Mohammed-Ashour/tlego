@@ -1,212 +1,91 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <title>Multiple Satellite Orbits</title>
-    <style>
-        body { margin: 0; overflow: hidden; background: #000; }
-        #info {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            font-family: monospace;
-            padding: 10px;
-            background: rgba(0,0,0,0.7);
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-            max-width: 260px;
-        }
-        #satelliteList {
-            max-height: 300px;
-            overflow-y: auto;
-            margin-top: 10px;
-            padding-right: 8px;
-            border: 1px solid #444;
-            border-radius: 4px;
-            background: rgba(20,20,20,0.6);
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>TLEGO · Orbit viewer</title>
+  <style>{{.CSS}}</style>
 </head>
 <body>
-    <div id="info">
-        <h3>Multiple Satellite Visualization</h3>
-        <div id="satelliteList"></div>
-    </div>
-    <script type="module">
-        import * as THREE from 'https://cdn.skypack.dev/three@0.128.0';
-        import { OrbitControls } from 'https://cdn.skypack.dev/three@0.128.0/examples/jsm/controls/OrbitControls.js';
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="TLEGO orbit viewer home">
+        <span class="brand-mark" aria-hidden="true"><i></i><b></b></span>
+        <span>TLEGO</span>
+      </a>
+      <div class="topbar-context">
+        <span class="eyebrow">ORBIT VIEWER</span>
+        <span class="context-separator" aria-hidden="true"></span>
+        <span id="mission-label">Orbit analysis</span>
+      </div>
+      <div class="topbar-meta"><span class="live-dot" aria-hidden="true"></span><span id="system-status">LOCAL DATA</span></div>
+    </header>
 
-        const satellites = {{ .SatellitesJS }};
-        const satelliteObjects = [];
-        
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        document.body.appendChild(renderer.domElement);
+    <main class="workspace">
+      <section class="viewport" aria-label="Three-dimensional satellite orbit viewer">
+        <div id="scene" class="scene"></div>
+        <div class="scene-wash" aria-hidden="true"></div>
+        <div class="scene-heading">
+          <p class="eyebrow">EARTH · TEME FRAME</p>
+          <h1>Orbital paths</h1>
+          <p id="scene-summary" class="scene-summary">Satellite positions at a shared UTC time</p>
+        </div>
+        <div class="scene-scale"><span class="scale-line" aria-hidden="true"></span><span>Earth radius <b id="earth-radius">—</b></span></div>
+        <div class="camera-tools" aria-label="Camera controls">
+          <button id="camera-home" class="icon-button" type="button" aria-label="Reset camera" title="Reset camera">⌂</button>
+          <button id="zoom-in" class="icon-button" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+          <button id="zoom-out" class="icon-button" type="button" aria-label="Zoom out" title="Zoom out">−</button>
+          <button id="rotate-toggle" class="icon-button rotate-button" type="button" aria-label="Enable camera rotation" aria-pressed="false" title="Enable camera rotation">↻</button>
+        </div>
+        <div id="scene-error" class="scene-error" role="alert" hidden></div>
+        <div id="webgl-note" class="webgl-note" hidden></div>
+        <p id="viewer-announcement" class="sr-only" aria-live="polite"></p>
+      </section>
 
-        // Earth setup
-        const earthGroup = new THREE.Group();
-        const textureLoader = new THREE.TextureLoader();
+      <aside class="inspector" aria-label="Orbit details">
+        <div class="inspector-top">
+          <div>
+            <p class="eyebrow">OBJECTS</p>
+            <h2>Satellites <span id="satellite-count" class="count">0</span></h2>
+          </div>
+          <span class="orbit-glyph" aria-hidden="true">◎</span>
+        </div>
+        <div id="satellite-list" class="satellite-list" role="listbox" aria-label="Select a satellite"></div>
+        <div class="inspector-rule"></div>
+        <section class="object-details">
+          <div class="detail-title-row">
+            <span id="selected-swatch" class="selected-swatch" aria-hidden="true"></span>
+            <div class="detail-title"><p class="eyebrow">SELECTED OBJECT</p><h3 id="selected-name">—</h3></div>
+          </div>
+          <dl class="readouts">
+            <div><dt>NORAD ID</dt><dd id="selected-norad">—</dd></div>
+            <div><dt>LATITUDE</dt><dd id="selected-lat">—</dd></div>
+            <div><dt>LONGITUDE</dt><dd id="selected-lon">—</dd></div>
+            <div><dt>ALTITUDE</dt><dd id="selected-alt">—</dd></div>
+            <div><dt>SPEED</dt><dd id="selected-speed">—</dd></div>
+            <div><dt>DATA EPOCH</dt><dd id="selected-epoch">—</dd></div>
+          </dl>
+          <p id="sampling-note" class="sampling-note"></p>
+        </section>
+        <div class="inspector-footer"><span class="legend-dot" aria-hidden="true"></span><span>TEME samples · spherical globe</span></div>
+      </aside>
+    </main>
 
-        // Adjusted Earth radius for better scale
-        const EARTH_RADIUS = 2.5;
-        // Adjusted satellite size for better scale
-        const SAT_RADIUS = 0.018;
-        const SAT_GLOW_RADIUS = 0.028;
-        // Adjusted orbit magnification factor
-        const MAG_FACTOR = 60;
-
-        Promise.all([
-            textureLoader.load('https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg'),
-            textureLoader.load('https://threejs.org/examples/textures/planets/earth_normal_2048.jpg')
-        ]).then(([map, normalMap]) => {
-            const geometry = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
-            const material = new THREE.MeshPhongMaterial({
-                map: map,
-                normalMap: normalMap,
-                normalScale: new THREE.Vector2(0.85, 0.85)
-            });
-            earthGroup.add(new THREE.Mesh(geometry, material));
-        });
-        scene.add(earthGroup);
-
-        // Create orbit visualizations for each satellite
-        satellites.forEach(sat => {
-            const orbitGroup = new THREE.Group();
-
-            const vertices = [];
-            sat.points.forEach(p => {
-                vertices.push(
-                    p.X * MAG_FACTOR, 
-                    p.Y * MAG_FACTOR, 
-                    p.Z * MAG_FACTOR
-                );
-            });
-            
-            const orbitGeometry = new THREE.BufferGeometry();
-            orbitGeometry.setAttribute(
-                'position',
-                new THREE.Float32BufferAttribute(vertices, 3)
-            );
-            
-            const color = new THREE.Color(sat.color);
-            const orbitMaterial = new THREE.LineBasicMaterial({
-                color: color,
-                linewidth: 2,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const glowMaterial = new THREE.LineBasicMaterial({
-                color: color,
-                linewidth: 5,
-                transparent: true,
-                opacity: 0.2
-            });
-            
-            orbitGroup.add(new THREE.Line(orbitGeometry, orbitMaterial));
-            orbitGroup.add(new THREE.Line(orbitGeometry, glowMaterial));
-
-            // Create satellite
-            const satellite = new THREE.Group();
-            const satelliteBody = new THREE.Mesh(
-                new THREE.SphereGeometry(SAT_RADIUS, 16, 16),
-                new THREE.MeshPhongMaterial({ 
-                    color: color,
-                    emissive: color,
-                    emissiveIntensity: 0.8
-                })
-            );
-            const satelliteGlow = new THREE.Mesh(
-                new THREE.SphereGeometry(SAT_GLOW_RADIUS, 16, 16),
-                new THREE.MeshBasicMaterial({
-                    color: color,
-                    transparent: true,
-                    opacity: 0.25
-                })
-            );
-            satellite.add(satelliteBody);
-            satellite.add(satelliteGlow);
-            
-            scene.add(orbitGroup);
-            scene.add(satellite);
-            
-            satelliteObjects.push({
-                satellite,
-                points: sat.points,
-                name: sat.name,
-                color: sat.color,
-                time: Math.random() * sat.points.length
-            });
-
-            if (sat.name && sat.name.trim() !== '') {
-                const satInfo = document.createElement('p');
-                satInfo.style.margin = '5px 0';
-                satInfo.innerHTML = '<span style="color:' + sat.color + '">■</span> ' + sat.name;
-                document.getElementById('satelliteList').appendChild(satInfo);
-            }       
-        });
-
-        scene.add(new THREE.AmbientLight(0x404040));
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1);
-        sunLight.position.set(10, 10, 10);
-        scene.add(sunLight);
-
-        // Camera and controls setup for new scale
-        camera.position.set(0, 0, EARTH_RADIUS + MAG_FACTOR * 2.2);
-        camera.lookAt(0, 0, 0);
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.minDistance = EARTH_RADIUS * 1.2;
-        controls.maxDistance = EARTH_RADIUS + MAG_FACTOR * 4;
-
-        const timeStep = 0.001;
-        
-        function animate() {
-            requestAnimationFrame(animate);
-            earthGroup.rotation.y += 0.001;
-            
-            satelliteObjects.forEach(obj => {
-                if (!obj.points || obj.points.length === 0) {
-                    console.warn('No points data for satellite ${obj.name}');
-                    return;
-                }
-
-                obj.time = (obj.time + timeStep) % obj.points.length;
-                const index = Math.floor(obj.time);
-                const nextIndex = (index + 1) % obj.points.length;
-                
-                const currentPoint = obj.points[index];
-                const nextPoint = obj.points[nextIndex];
-
-                if (!currentPoint || !nextPoint) {
-                    console.warn('Invalid points data for satellite ${obj.name} at index ${index}');
-                    return;
-                }
-
-                const fraction = obj.time - Math.floor(obj.time);
-                
-                obj.satellite.position.set(
-                    (currentPoint.X + (nextPoint.X - currentPoint.X) * fraction) * MAG_FACTOR,
-                    (currentPoint.Y + (nextPoint.Y - currentPoint.Y) * fraction) * MAG_FACTOR,
-                    (currentPoint.Z + (nextPoint.Z - currentPoint.Z) * fraction) * MAG_FACTOR
-                );
-            });
-            
-            controls.update();
-            renderer.render(scene, camera);
-        }
-
-        animate();
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth/window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
+    <footer class="timeline" aria-label="Timeline controls">
+      <div class="timeline-transport">
+        <button id="play-toggle" class="play-button" type="button" aria-label="Play timeline" title="Play timeline"><span aria-hidden="true">▶</span></button>
+        <label class="speed-control"><span class="sr-only">Playback speed</span><select id="playback-speed" aria-label="Playback speed"><option value="1">1×</option><option value="10">10×</option><option value="60">60×</option><option value="300">300×</option></select></label>
+      </div>
+      <div class="timeline-track-wrap">
+        <div class="timeline-labels"><time id="time-start">—</time><span class="timeline-now">UTC <b id="time-current">—</b></span><time id="time-end">—</time></div>
+        <label class="sr-only" for="time-scrubber">Simulation time</label>
+        <input id="time-scrubber" type="range" min="0" max="0" step="1" value="0" aria-label="Simulation time">
+      </div>
+      <div id="timeline-state" class="timeline-state"><span class="state-mark" aria-hidden="true"></span><span>PAUSED</span></div>
+    </footer>
+  </div>
+  <script id="orbit-data" type="application/json">{{.Payload}}</script>
+  <script>{{.JS}}</script>
 </body>
 </html>

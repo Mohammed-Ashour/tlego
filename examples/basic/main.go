@@ -1,59 +1,49 @@
+// basic exports a local TLE file without accessing a provider.
 package main
 
 import (
+	"fmt"
 	"os"
 
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	viz "github.com/Mohammed-Ashour/tlego/pkg/locate"
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	visual "github.com/Mohammed-Ashour/tlego/pkg/visual"
+	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
+	"github.com/Mohammed-Ashour/tlego/pkg/visual"
 )
 
 func main() {
-
-	// example
-	filePath := os.Args[1]
-	tles, err := tle.ReadTLEFile(filePath)
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+func run() error {
+	if len(os.Args) != 2 {
+		return fmt.Errorf("usage: go run ./examples/basic <TLE-file>")
+	}
+	records, err := data.ReadTLEFile(os.Args[1])
 	if err != nil {
-		logger.Error("Failed to read TLE file", "error", err)
-		return
+		return err
 	}
-
-	t := tles[0]
-	points, err := visual.CreateOrbitPoints(t, 3600)
+	// Use a shared epoch to make comparisons between records meaningful.
+	start, err := records[0].Time()
 	if err != nil {
-		logger.Error("Failed to create orbit points", "err", err)
-		return
+		return err
 	}
-	satData := visual.SatelliteData{
-		Name:   t.Name,
-		Points: points,
-		Color:  "#345678",
+	satellites := make([]visual.SatelliteData, 0, len(records))
+	for _, record := range records {
+		points, err := visual.CreateOrbitPointsAt(record, 360, start)
+		if err != nil {
+			return err
+		}
+		epoch, err := record.Time()
+		if err != nil {
+			return err
+		}
+		satellites = append(satellites, visual.SatelliteData{Name: record.Name, NORADID: record.NoradID, Epoch: epoch, Points: points})
 	}
-	htmlFileName := visual.CreateHTMLVisual([]visual.SatelliteData{satData}, t.Name)
-	logger.Info("Created an html with orbit visualization", "filename", htmlFileName)
-
-	logger.Info("Processing TLE",
-		"classification", t.Line1.Classification,
-		"satellite_id", t.Line1.SataliteID)
-	s := satellite.NewSatelliteFromTLE(t, satellite.GravityWGS84)
-
-	// Use epoch time instead of current time
-	epochTime, err := t.Time()
+	path, err := visual.WriteHTMLVisual(satellites, "orbits.html")
 	if err != nil {
-		logger.Error("Failed to get epoch time", "error", err)
-		return
+		return err
 	}
-
-	lat, long, alt, _ := s.Locate(epochTime)
-	logger.Info("Satellite position calculated",
-		"latitude", lat,
-		"longitude", long,
-		"altitude", alt)
-
-	googleMapsURL := viz.GetGoogleMapsURL(lat, long)
-
-	logger.Info("Google Maps:", "URL", googleMapsURL)
-
+	fmt.Println(path)
+	return nil
 }
