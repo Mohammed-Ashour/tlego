@@ -16,6 +16,7 @@ import (
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/Mohammed-Ashour/tlego/pkg/templates"
 )
@@ -53,6 +54,30 @@ func CreateOrbitPoints(t tle.TLE, numPoints int) ([]Point, error) {
 // CreateOrbitPointsAt samples one mean-motion period, including both endpoints.
 // Propagation timestamps are UTC and truncated to whole seconds.
 func CreateOrbitPointsAt(t tle.TLE, numPoints int, start time.Time) ([]Point, error) {
+	if err := validateTLE(t); err != nil {
+		return nil, err
+	}
+	motion, err := strconv.ParseFloat(strings.TrimSpace(t.Line2.MeanMotion), 64)
+	if err != nil {
+		return nil, err
+	}
+	var sat satellite.Satellite
+	if err := safely("initialize propagator", func() { sat = satellite.NewSatelliteFromTLE(t, satellite.GravityWGS84) }); err != nil {
+		return nil, err
+	}
+	return sampleOrbit(numPoints, start, motion, func(t time.Time) (orbit.State, error) { s := orbit.At(sat, t); return s, orbit.ValidateState(s) })
+}
+
+// CreateElementOrbitPointsAt samples validated TLE or GP mean elements directly.
+func CreateElementOrbitPointsAt(record elements.Record, numPoints int, start time.Time) ([]Point, error) {
+	prop, err := orbit.New(record)
+	if err != nil {
+		return nil, err
+	}
+	return sampleOrbit(numPoints, start, record.MeanMotionRevDay, prop.At)
+}
+
+func sampleOrbit(numPoints int, start time.Time, meanMotion float64, at func(time.Time) (orbit.State, error)) ([]Point, error) {
 	if numPoints < 2 || numPoints > maxOrbitPoints {
 		return nil, fmt.Errorf("point count must be between 2 and %d", maxOrbitPoints)
 	}
@@ -60,12 +85,8 @@ func CreateOrbitPointsAt(t tle.TLE, numPoints int, start time.Time) ([]Point, er
 		return nil, fmt.Errorf("start time is required")
 	}
 	start = start.UTC().Truncate(time.Second)
-	if err := validateTLE(t); err != nil {
-		return nil, err
-	}
-	meanMotion, err := strconv.ParseFloat(strings.TrimSpace(t.Line2.MeanMotion), 64)
-	if err != nil || !finite(meanMotion) || meanMotion <= 0 {
-		return nil, fmt.Errorf("invalid mean motion %q", t.Line2.MeanMotion)
+	if !finite(meanMotion) || meanMotion <= 0 {
+		return nil, fmt.Errorf("invalid mean motion")
 	}
 	periodSeconds := 86400.0 / meanMotion
 	if !finite(periodSeconds) || periodSeconds >= float64(math.MaxInt64)/float64(time.Second) || periodSeconds < float64(numPoints-1) {
@@ -74,11 +95,6 @@ func CreateOrbitPointsAt(t tle.TLE, numPoints int, start time.Time) ([]Point, er
 	period := time.Duration(periodSeconds * float64(time.Second))
 	if period <= 0 {
 		return nil, fmt.Errorf("invalid orbit period")
-	}
-
-	var sat satellite.Satellite
-	if err := safely("initialize propagator", func() { sat = satellite.NewSatelliteFromTLE(t, satellite.GravityWGS84) }); err != nil {
-		return nil, err
 	}
 	points := make([]Point, 0, numPoints)
 	var previous time.Time
@@ -93,8 +109,11 @@ func CreateOrbitPointsAt(t tle.TLE, numPoints int, start time.Time) ([]Point, er
 		previous = sampleTime
 		var p Point
 		var radius float64
+		state, err := at(sampleTime)
+		if err != nil {
+			return nil, fmt.Errorf("sample %d: %w", i, err)
+		}
 		if err := safely("propagate orbit", func() {
-			state := orbit.At(sat, sampleTime)
 			position := state.PositionTEMEKm
 			radius = math.Sqrt(position.X*position.X + position.Y*position.Y + position.Z*position.Z)
 			p = Point{

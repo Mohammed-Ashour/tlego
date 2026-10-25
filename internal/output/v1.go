@@ -129,17 +129,19 @@ type OrbitRecord struct {
 }
 
 type ReportRecord struct {
-	Name      string         `json:"name"`
-	CatalogID string         `json:"catalog_id"`
-	Position  PositionRecord `json:"position"`
-	Orbit     OrbitRecord    `json:"orbit"`
-	TLE       string         `json:"tle"`
-	MapURL    string         `json:"map_url"`
+	Name         string          `json:"name"`
+	CatalogID    string          `json:"catalog_id"`
+	Position     PositionRecord  `json:"position"`
+	Orbit        OrbitRecord     `json:"orbit"`
+	TLE          string          `json:"tle"`
+	MapURL       string          `json:"map_url"`
+	SourceFormat string          `json:"source_format,omitempty"`
+	ElementData  json.RawMessage `json:"element_data,omitempty"`
 }
 
 func ReportV1(report ReportData) ReportRecord {
 	p, o := report.Position, report.Orbit
-	return ReportRecord{report.Name, report.NoradID, PositionRecord{report.NoradID, p.Time.UTC(), p.LatDeg, p.LonDeg, p.AltKm, p.VelocityKm}, OrbitRecord{o.InclinationDeg, o.Eccentricity, o.MeanMotion, o.PeriodMinutes, o.ApogeeKm, o.PerigeeKm, o.OrbitClass}, report.TLE, report.MapURL}
+	return ReportRecord{report.Name, report.NoradID, PositionRecord{report.NoradID, p.Time.UTC(), p.LatDeg, p.LonDeg, p.AltKm, p.VelocityKm}, OrbitRecord{o.InclinationDeg, o.Eccentricity, o.MeanMotion, o.PeriodMinutes, o.ApogeeKm, o.PerigeeKm, o.OrbitClass}, report.TLE, report.MapURL, report.SourceFormat, report.ElementData}
 }
 
 func ValidateVersion(version string) error {

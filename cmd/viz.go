@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	"github.com/Mohammed-Ashour/tlego/pkg/visual"
 	"github.com/urfave/cli/v3"
 )
@@ -20,7 +20,7 @@ func newVizCommand() *cli.Command {
 		Name: "viz", Usage: "Export a self-contained interactive orbit viewer", Category: "Visualization",
 		ArgsUsage: "[NORAD-ID]",
 		Flags: append(cacheFlags(), []cli.Flag{
-			&cli.StringFlag{Name: "file", Usage: "Read validated TLE records from a local file instead of fetching an ID"},
+			&cli.StringFlag{Name: "file", Usage: "Read validated TLE or GP JSON records from a local file instead of fetching an ID"},
 			&cli.StringFlag{Name: "output", Aliases: []string{"o"}, Usage: "HTML output path (default: ID.html or input-name.html)"},
 			&cli.StringFlag{Name: "time", Usage: "Start time in RFC3339 (default: now for live data, first element epoch for a file)"},
 			&cli.IntFlag{Name: "points", Value: 360, Usage: "Samples per orbit, including endpoints (2 to 4096)"},
@@ -34,7 +34,7 @@ func visualizeSatelliteOrbit(ctx context.Context, command *cli.Command) error {
 	}
 	file := command.String("file")
 	if (file == "" && command.Args().Len() != 1) || (file != "" && command.Args().Len() != 0) {
-		return fmt.Errorf("use viz <NORAD-ID> or viz --file <TLE-file>")
+		return fmt.Errorf("use viz <NORAD-ID> or viz --file <element-file>")
 	}
 	requestedCount := command.Int("points")
 	if requestedCount < 2 || requestedCount > 4096 {
@@ -49,21 +49,21 @@ func visualizeSatelliteOrbit(ctx context.Context, command *cli.Command) error {
 		}
 		start = parsed.UTC()
 	}
-	var records []tle.TLE
+	var records []elements.Record
 	var err error
 	var defaultName string
 	if file != "" {
-		records, err = catalog.ReadLocalTLE(file)
+		records, err = catalog.ReadElements(file)
 		defaultName = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file)) + ".html"
 	} else {
 		id := command.Args().First()
-		var record tle.TLE
+		var record elements.Record
 		var meta catalog.FetchMeta
-		record, meta, err = commandStore(command).FetchTLEByNorad(ctx, id)
+		record, meta, err = commandStore(command).FetchElementByNorad(ctx, id)
 		if meta.Warning != "" {
 			fmt.Fprintln(command.ErrWriter, meta.Warning)
 		}
-		records = []tle.TLE{record}
+		records = []elements.Record{record}
 		defaultName = id + ".html"
 		if start.IsZero() {
 			start = time.Now().UTC()
@@ -86,7 +86,7 @@ func visualizeSatelliteOrbit(ctx context.Context, command *cli.Command) error {
 	}
 	satellites := make([]visual.SatelliteData, 0, len(records))
 	for _, record := range records {
-		points, err := visual.CreateOrbitPointsAt(record, count, start)
+		points, err := visual.CreateElementOrbitPointsAt(record, count, start)
 		if err != nil {
 			return fmt.Errorf("sample %s: %w", record.Name, err)
 		}
@@ -94,7 +94,7 @@ func visualizeSatelliteOrbit(ctx context.Context, command *cli.Command) error {
 		if err != nil {
 			return err
 		}
-		satellites = append(satellites, visual.SatelliteData{Name: record.Name, NORADID: record.NoradID, Epoch: epoch, Points: points})
+		satellites = append(satellites, visual.SatelliteData{Name: record.Name, NORADID: record.CatalogID, Epoch: epoch, Points: points})
 	}
 	path := command.String("output")
 	if path == "" {

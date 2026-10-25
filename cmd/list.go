@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/urfave/cli/v3"
@@ -14,12 +15,19 @@ func init() {
 func listAction(ctx context.Context, c *cli.Command) error {
 	store := commandStore(c)
 	if group := c.String("sat-group"); group != "" {
-		records, meta, err := store.FetchGroupTLEs(ctx, group)
+		records, meta, err := store.FetchGroupElements(ctx, group)
 		if err != nil {
 			return err
 		}
 		if meta.Warning != "" {
 			fmt.Fprintln(c.ErrWriter, meta.Warning)
+		}
+		if meta.Format == "gp-json" {
+			objects := make([]json.RawMessage, len(records))
+			for i, record := range records {
+				objects[i] = record.Raw
+			}
+			return json.NewEncoder(c.Writer).Encode(objects)
 		}
 		for _, record := range records {
 			fmt.Fprintln(c.Writer, record.String())

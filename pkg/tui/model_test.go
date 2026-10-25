@@ -1,12 +1,17 @@
 package tui
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,6 +22,68 @@ func testModel(t *testing.T) Model {
 	t.Helper()
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	return NewModel(Options{}, DefaultSettings(), data.NewStore(t.TempDir(), 0), nil)
+}
+
+func TestTUILoadsNineDigitGPRecordWithoutSynthesizingTLE(t *testing.T) {
+	input := []byte(`{"OBJECT_NAME":"LARGE ID TEST","NORAD_CAT_ID":234567890,"EPOCH":"2024-01-02T03:04:05.123456","MEAN_MOTION":15.5,"ECCENTRICITY":0.001,"INCLINATION":51.6,"RA_OF_ASC_NODE":20,"ARG_OF_PERICENTER":30,"MEAN_ANOMALY":40,"BSTAR":0.0001,"MEAN_MOTION_DOT":0.00001,"MEAN_MOTION_DDOT":0}`)
+	records, err := elements.ParseGPJSON(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := testModel(t)
+	m.setCurrentElement(records[0])
+	if m.currentTLE == nil || m.currentTLE.CatalogID != "234567890" || m.currentTLE.LegacyTLE != nil || m.currentSat == nil {
+		t.Fatalf("GP record was not loaded directly: %+v", m.currentTLE)
+	}
+	m.setScreen(screenDetail)
+	m.detailTab = 1
+	frame := m.View()
+	if !strings.Contains(frame, "234567890") {
+		t.Fatal("loaded ID not shown in TUI")
+	}
+	if !strings.Contains(frame, "GP JSON") {
+		t.Fatal("element tab was not labeled GP JSON")
+	}
+	info, err := orbit.OrbitInfoFromElements(records[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg := elementReportCmd(records[0], m.currentSat, info, "google", "json", m.currentMeta)().(reportBuiltMsg)
+	if msg.err != nil {
+		t.Fatal(msg.err)
+	}
+	var report map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(msg.output), &report); err != nil {
+		t.Fatal(err)
+	}
+	var legacyTLE string
+	if err := json.Unmarshal(report["tle"], &legacyTLE); err != nil || legacyTLE != "" {
+		t.Fatalf("GP report contains synthesized TLE %q (%v)", legacyTLE, err)
+	}
+	var source string
+	if err := json.Unmarshal(report["source_format"], &source); err != nil || source != "gp-json" {
+		t.Fatalf("source_format=%q err=%v", source, err)
+	}
+	var elementData json.RawMessage
+	if err := json.Unmarshal(report["element_data"], &elementData); err != nil || !sameJSON(elementData, records[0].Raw) {
+		t.Fatalf("element data not retained: %s (%v)", elementData, err)
+	}
+}
+
+func sameJSON(a, b []byte) bool {
+	var left, right bytes.Buffer
+	return json.Compact(&left, a) == nil && json.Compact(&right, b) == nil && bytes.Equal(left.Bytes(), right.Bytes())
+}
+
+func TestPassCalculationErrorIsShownInsteadOfNoPasses(t *testing.T) {
+	m := testModel(t)
+	m.passesErr = errors.New("invalid observer")
+	m.active = screenDetail
+	m.detailTab = 4
+	m.currentSat = &orbit.Propagator{}
+	if got := m.detailPassesView(); !strings.Contains(got, "Pass prediction failed: invalid observer") {
+		t.Fatalf("view=%q", got)
+	}
 }
 func keyModel(m Model, key tea.KeyMsg) Model { next, _ := m.Update(key); return next.(Model) }
 func typeModel(m Model, value string) Model {
@@ -205,5 +272,42 @@ func TestEscapeKeepsInputBlurredAcrossBackgroundMessages(t *testing.T) {
 		if m.active != screenHome {
 			t.Fatalf("%s cannot navigate after Escape", screenNames[screen])
 		}
+	}
+}
+
+func TestFailedElementLoadClearsPreviousSatelliteState(t *testing.T) {
+	good := elements.Record{Name: "Previous satellite", CatalogID: "25544", Epoch: time.Now().UTC(), SourceFormat: "gp-json", MeanMotionRevDay: 15.5, Eccentricity: .001, InclinationDeg: 51.6, RAANDeg: 20, ArgumentOfPerigeeDeg: 30, MeanAnomalyDeg: 40, BStar: .001}
+	for _, failure := range []string{"initialization", "propagation"} {
+		t.Run(failure, func(t *testing.T) {
+			m := testModel(t)
+			m.setCurrentElement(good)
+			if m.err != nil || m.currentSat == nil {
+				t.Fatalf("load good record: %v", m.err)
+			}
+			bad := good
+			bad.Name, bad.CatalogID = "Failed satellite", "999999999"
+			if failure == "initialization" {
+				bad.InclinationDeg = 181
+			} else {
+				bad.Epoch = good.Epoch.AddDate(0, 0, -1000)
+				prop, err := orbit.New(bad)
+				if err != nil {
+					t.Fatalf("expected successful initialization: %v", err)
+				}
+				if _, err := prop.At(time.Now()); err == nil {
+					t.Fatal("expected decayed-orbit propagation error")
+				}
+			}
+			m.setCurrentElement(bad)
+			if m.err == nil {
+				t.Fatal("failed load did not report an error")
+			}
+			if m.currentTLE != nil || m.currentSat != nil || m.currentPos != (Position{}) || m.currentOrb != (OrbitInfo{}) {
+				t.Fatal("failed load retained a satellite or derived state")
+			}
+			if !strings.Contains(m.detailView(), "No satellite loaded") {
+				t.Fatalf("misleading detail view: %s", m.detailView())
+			}
+		})
 	}
 }

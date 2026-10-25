@@ -19,6 +19,10 @@ func PositionFromSatellite(sat satellite.Satellite, t time.Time) Position {
 	return orbit.PositionFromSatellite(sat, t)
 }
 
+func positionFromState(state orbit.State) Position {
+	return Position{Time: state.Time, LatDeg: state.LatDeg, LonDeg: state.LonDeg, AltKm: state.AltKm, VelocityKm: state.SpeedKmS}
+}
+
 func rad2deg(rad float64) float64                   { return rad * 180 / math.Pi }
 func OrbitInfoFromTLE(t tle.TLE) (OrbitInfo, error) { return orbit.OrbitInfoFromTLE(t) }
 func MapURL(provider string, lat, lon float64) string {

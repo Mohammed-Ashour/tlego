@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
 	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	"github.com/Mohammed-Ashour/tlego/internal/output"
 	"github.com/urfave/cli/v3"
 )
@@ -25,7 +25,7 @@ func cacheFlags() []cli.Flag {
 	}
 }
 func sourceFlags() []cli.Flag {
-	return append(cacheFlags(), &cli.StringFlag{Name: "file", Usage: "Read a single satellite from a local TLE file; - reads stdin"})
+	return append(cacheFlags(), &cli.StringFlag{Name: "file", Usage: "Read a single satellite from a local TLE or GP JSON file; - reads stdin"})
 }
 func machineFlags() []cli.Flag {
 	return []cli.Flag{&cli.StringFlag{Name: "format", Value: "text", Usage: "Output format: text or json"}, &cli.StringFlag{Name: "schema-version", Value: output.SchemaVersion, Usage: "JSON schema version"}}
@@ -61,8 +61,8 @@ func evaluationTime(c *cli.Command, required bool) (time.Time, error) {
 	return time.Now().UTC().Truncate(time.Second), nil
 }
 
-func loadElement(ctx context.Context, c *cli.Command) (tle.TLE, output.Provenance, []output.Warning, error) {
-	var record tle.TLE
+func loadElement(ctx context.Context, c *cli.Command) (elements.Record, output.Provenance, []output.Warning, error) {
+	var record elements.Record
 	var provenance output.Provenance
 	var warnings []output.Warning
 	file := c.String("file")
@@ -70,20 +70,20 @@ func loadElement(ctx context.Context, c *cli.Command) (tle.TLE, output.Provenanc
 		if c.Args().Len() != 0 {
 			return record, provenance, warnings, fmt.Errorf("use a NORAD ID or --file, not both")
 		}
-		var records []tle.TLE
+		var records []elements.Record
 		var err error
 		if file == "-" {
 			contents, readErr := io.ReadAll(io.LimitReader(c.Reader, (32<<20)+1))
 			err = readErr
 			if err == nil {
 				if len(contents) > 32<<20 {
-					err = fmt.Errorf("TLE input exceeds 32 MiB")
+					err = fmt.Errorf("element input exceeds 32 MiB")
 				} else {
-					records, err = catalog.ParseTLE(contents)
+					records, err = catalog.ParseElements(contents)
 				}
 			}
 		} else {
-			records, err = catalog.ReadLocalTLE(file)
+			records, err = catalog.ReadElements(file)
 		}
 		if err != nil {
 			return record, provenance, warnings, err
@@ -92,22 +92,22 @@ func loadElement(ctx context.Context, c *cli.Command) (tle.TLE, output.Provenanc
 			return record, provenance, warnings, fmt.Errorf("this command requires exactly one satellite record")
 		}
 		record = records[0]
-		provenance = output.Provenance{Source: "file", SourceFormat: "tle", CacheStatus: "none"}
+		provenance = output.Provenance{Source: "file", SourceFormat: record.SourceFormat, CacheStatus: "none"}
 		if file == "-" {
 			provenance.Source = "stdin"
 		}
 	} else {
 		if c.Args().Len() != 1 {
-			return record, provenance, warnings, fmt.Errorf("provide one NORAD ID or --file <TLE-file>")
+			return record, provenance, warnings, fmt.Errorf("provide one NORAD ID or --file <element-file>")
 		}
 		var meta catalog.FetchMeta
 		var err error
-		record, meta, err = commandStore(c).FetchTLEByNorad(ctx, c.Args().First())
+		record, meta, err = commandStore(c).FetchElementByNorad(ctx, c.Args().First())
 		if err != nil {
 			return record, provenance, warnings, err
 		}
 		fetched := meta.FetchedAt.UTC()
-		provenance = output.Provenance{Source: "celestrak", SourceFormat: "tle", FetchedAt: &fetched, CacheStatus: "fetched"}
+		provenance = output.Provenance{Source: "celestrak", SourceFormat: record.SourceFormat, FetchedAt: &fetched, CacheStatus: "fetched"}
 		if meta.FromCache {
 			provenance.CacheStatus = "fresh"
 		}

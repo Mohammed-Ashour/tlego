@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	"gopkg.in/yaml.v3"
 )
 
@@ -28,6 +30,10 @@ type Store struct {
 const maxTLEPayloadSize = 32 << 20
 
 var CelestrakURL = "https://celestrak.org/NORAD/elements/gp.php?CATNR=NORADID&FORMAT=TLE"
+
+// CelestrakGPURL is the CelesTrak GP endpoint template used by the
+// format-neutral API. The FORMAT=JSON parameter is explicit by design.
+var CelestrakGPURL = "https://celestrak.org/NORAD/elements/gp.php?CATNR=NORADID&FORMAT=JSON"
 
 //go:embed satellite_groups.yaml
 var defaultGroupConfig []byte
@@ -200,6 +206,328 @@ func (s *Store) FetchTLEByNoradURL(ctx context.Context, noradID, template string
 	return tles[0], meta, nil
 }
 
+// FetchElementByNorad retrieves one format-neutral GP element record.
+func (s *Store) FetchElementByNorad(ctx context.Context, id string) (elements.Record, FetchMeta, error) {
+	if err := ValidateNoradID(id); err != nil {
+		return elements.Record{}, FetchMeta{}, err
+	}
+	u := strings.Replace(CelestrakGPURL, "NORADID", url.QueryEscape(id), 1)
+	path := filepath.Join(s.cacheDir, "elements", "norad", id+".json")
+	records, meta, err := s.fetchElements(ctx, u, path, id)
+	if err != nil {
+		return elements.Record{}, meta, err
+	}
+	if len(records) != 1 {
+		return elements.Record{}, meta, fmt.Errorf("expected one GP record for NORAD ID %s, got %d", id, len(records))
+	}
+	return records[0], meta, nil
+}
+
+// FetchGroupElements retrieves and validates the GP records for a configured group.
+func (s *Store) FetchGroupElements(ctx context.Context, name string) ([]elements.Record, FetchMeta, error) {
+	config, err := ReadCelestrakConfig()
+	if err != nil {
+		return nil, FetchMeta{}, err
+	}
+	for _, group := range config.SatelliteGroups {
+		if !strings.EqualFold(group.Name, name) {
+			continue
+		}
+		u, err := gpJSONURL(group.URL)
+		if err != nil {
+			return nil, FetchMeta{}, err
+		}
+		path := filepath.Join(s.cacheDir, "elements", "groups", safeFileName(group.Name)+".json")
+		return s.fetchElements(ctx, u, path, "")
+	}
+	return nil, FetchMeta{}, fmt.Errorf("unknown satellite group: %s", name)
+}
+
+// ElementSearchResult contains partial group-search results and fetch warnings.
+type ElementSearchResult struct {
+	Records       []elements.Record
+	GroupsCovered int
+	GroupsTotal   int
+	Warnings      []string
+}
+
+// SearchElements scans the configured groups and retains results from groups
+// that were available when another group failed.
+func (s *Store) SearchElements(ctx context.Context, query string) (ElementSearchResult, error) {
+	groups, err := s.FetchGroups()
+	if err != nil {
+		return ElementSearchResult{}, err
+	}
+	result := ElementSearchResult{GroupsTotal: len(groups)}
+	query = strings.ToLower(strings.TrimSpace(query))
+	seen := map[string]bool{}
+	for _, group := range groups {
+		if err := ctx.Err(); err != nil {
+			return result, err
+		}
+		records, meta, err := s.FetchGroupElements(ctx, group.Name)
+		if err != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: %v", group.Name, err))
+			continue
+		}
+		result.GroupsCovered++
+		if meta.Warning != "" {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: %s", group.Name, meta.Warning))
+		}
+		for _, record := range records {
+			if query != "" && !strings.Contains(strings.ToLower(record.Name), query) && !strings.Contains(strings.ToLower(record.CatalogID), query) {
+				continue
+			}
+			key := canonicalNoradID(record.CatalogID)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			result.Records = append(result.Records, record)
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
+	if result.GroupsCovered == 0 && result.GroupsTotal > 0 {
+		return result, fmt.Errorf("search could not fetch any satellite groups")
+	}
+	return result, nil
+}
+
+// ReadElements reads a bounded local TLE or GP JSON file.
+func ReadElements(path string) ([]elements.Record, error) {
+	b, err := readBounded(path)
+	if err != nil {
+		return nil, err
+	}
+	return ParseElements(b)
+}
+
+// ParseElements detects GP JSON and legacy TLE input without network access.
+func ParseElements(data []byte) ([]elements.Record, error) {
+	if len(data) > maxTLEPayloadSize {
+		return nil, fmt.Errorf("element input exceeds %d bytes", maxTLEPayloadSize)
+	}
+	trim := strings.TrimSpace(string(data))
+	if trim == "" {
+		return nil, fmt.Errorf("empty element input")
+	}
+	if trim[0] == '[' || trim[0] == '{' {
+		return elements.ParseGPJSON(data)
+	}
+	upper := strings.ToUpper(trim)
+	if strings.HasPrefix(upper, "CCSDS_OMM_VERS") || strings.HasPrefix(upper, "META_START") || strings.HasPrefix(upper, "OBJECT_NAME,") {
+		return nil, fmt.Errorf("unsupported element format: CSV or KVN")
+	}
+	switch trim[0] {
+	case '<':
+		return nil, fmt.Errorf("unsupported element format: XML")
+	}
+	if strings.Contains(strings.SplitN(trim, "\n", 2)[0], ",") && !strings.Contains(trim, "\n1 ") && !strings.HasPrefix(trim, "1 ") {
+		return nil, fmt.Errorf("unsupported element format: CSV")
+	}
+	tles, err := ParseTLE(data)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]elements.Record, 0, len(tles))
+	for _, tle := range tles {
+		r, err := elements.FromTLE(tle)
+		if err != nil {
+			return nil, err
+		}
+		r.Raw = []byte(tle.String())
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+func gpJSONURL(raw string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	q := u.Query()
+	q.Set("FORMAT", "JSON")
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
+func (s *Store) fetchElements(ctx context.Context, source, path, expectedID string) ([]elements.Record, FetchMeta, error) {
+	meta := FetchMeta{Path: path, Source: source, Format: "gp-json"}
+	if err := ctx.Err(); err != nil {
+		return nil, meta, err
+	}
+	if s.cacheErr != nil {
+		return nil, meta, fmt.Errorf("resolve cache directory: %w", s.cacheErr)
+	}
+	parse := func(b []byte) ([]elements.Record, error) {
+		rs, e := elements.ParseGPJSON(b)
+		if e != nil {
+			return nil, e
+		}
+		if expectedID != "" {
+			if len(rs) != 1 {
+				return nil, fmt.Errorf("expected one GP record for NORAD ID %s, got %d", expectedID, len(rs))
+			}
+			for _, r := range rs {
+				if canonicalNoradID(r.CatalogID) != canonicalNoradID(expectedID) {
+					return nil, fmt.Errorf("response NORAD ID %s does not match requested ID %s", r.CatalogID, expectedID)
+				}
+			}
+		}
+		return rs, nil
+	}
+	var cached []elements.Record
+	info, statErr := os.Stat(path)
+	if statErr == nil {
+		cacheValid := false
+		if b, e := readBounded(path); e == nil {
+			cached, e = parse(b)
+			if e == nil {
+				cacheValid = true
+				meta.Age = time.Since(info.ModTime())
+				meta.FetchedAt = info.ModTime()
+				if s.cacheTTL == 0 || s.cacheTTL > 0 && meta.Age <= s.cacheTTL {
+					meta.FromCache = true
+					return cached, meta, nil
+				}
+			}
+		}
+		if !cacheValid {
+			info = nil
+		}
+	}
+	legacyPath := legacyCachePath(path)
+	legacyRecords, legacyMeta, legacyValid := s.readLegacyElements(legacyPath, expectedID)
+	if legacyValid && cached == nil && (s.cacheTTL == 0 || s.cacheTTL > 0 && legacyMeta.Age <= s.cacheTTL) {
+		legacyMeta.FromCache = true
+		return legacyRecords, legacyMeta, nil
+	}
+	b, fetchErr := s.downloadBytes(ctx, source)
+	if fetchErr == nil {
+		var records []elements.Record
+		records, fetchErr = parse(b)
+		if fetchErr == nil {
+			fetchErr = ctx.Err()
+		}
+		if fetchErr == nil {
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				fetchErr = err
+			} else {
+				var tmp *os.File
+				tmp, fetchErr = os.CreateTemp(filepath.Dir(path), "tlego-*.tmp")
+				if fetchErr == nil {
+					tmpName := tmp.Name()
+					defer os.Remove(tmpName)
+					_, fetchErr = tmp.Write(b)
+					if e := tmp.Close(); fetchErr == nil {
+						fetchErr = e
+					}
+					if fetchErr == nil {
+						fetchErr = os.Rename(tmpName, path)
+					}
+				}
+			}
+		}
+		if fetchErr == nil {
+			info, _ = os.Stat(path)
+			if info != nil {
+				meta.Age = time.Since(info.ModTime())
+				meta.FetchedAt = info.ModTime()
+			}
+			return records, meta, nil
+		}
+	}
+	if ctx.Err() != nil {
+		return nil, meta, ctx.Err()
+	}
+	if info != nil && cached != nil {
+		meta.FromCache = true
+		meta.Stale = true
+		meta.Warning = fmt.Sprintf("refresh failed, using cached data (%v)", fetchErr)
+		return cached, meta, nil
+	}
+	if legacyValid {
+		legacyMeta.FromCache = true
+		legacyMeta.Stale = true
+		legacyMeta.Warning = fmt.Sprintf("GP JSON refresh failed, using legacy TLE cache (%v)", fetchErr)
+		return legacyRecords, legacyMeta, nil
+	}
+	return nil, meta, fetchErr
+}
+
+func legacyCachePath(jsonPath string) string {
+	file := filepath.Base(jsonPath)
+	name := strings.TrimSuffix(file, filepath.Ext(file)) + ".tle"
+	dir := filepath.Dir(jsonPath)
+	if filepath.Base(filepath.Dir(dir)) == "elements" {
+		dir = filepath.Join(filepath.Dir(filepath.Dir(dir)), filepath.Base(dir))
+	}
+	return filepath.Join(dir, name)
+}
+
+func (s *Store) readLegacyElements(path, expectedID string) ([]elements.Record, FetchMeta, bool) {
+	meta := FetchMeta{Path: path, Format: "tle"}
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, meta, false
+	}
+	meta.Age = time.Since(info.ModTime())
+	meta.FetchedAt = info.ModTime()
+	tles, err := readValidatedTLE(path, expectedID)
+	if err != nil {
+		return nil, meta, false
+	}
+	records := make([]elements.Record, 0, len(tles))
+	for _, tle := range tles {
+		record, err := elements.FromTLE(tle)
+		if err != nil {
+			return nil, meta, false
+		}
+		record.Raw = []byte(tle.String())
+		records = append(records, record)
+	}
+	return records, meta, len(records) > 0
+}
+
+func readBounded(path string) ([]byte, error) {
+	f, e := os.Open(path)
+	if e != nil {
+		return nil, e
+	}
+	defer f.Close()
+	b, e := io.ReadAll(io.LimitReader(f, maxTLEPayloadSize+1))
+	if e == nil && len(b) > maxTLEPayloadSize {
+		e = fmt.Errorf("element payload exceeds %d bytes", maxTLEPayloadSize)
+	}
+	return b, e
+}
+
+func (s *Store) downloadBytes(ctx context.Context, source string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status: %s", resp.Status)
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, maxTLEPayloadSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > maxTLEPayloadSize {
+		return nil, fmt.Errorf("response exceeds %d bytes", maxTLEPayloadSize)
+	}
+	return b, nil
+}
+
 // DownloadToPath fetches validated TLEs into an atomic cache file at path.
 func (s *Store) DownloadToPath(ctx context.Context, url, path, expectedNoradID string) ([]tle.TLE, FetchMeta, error) {
 	if expectedNoradID != "" {
@@ -264,20 +592,12 @@ func (s *Store) fetchURL(ctx context.Context, url, path, expectedNoradID string)
 }
 
 func (s *Store) download(ctx context.Context, url, path, expectedNoradID string) ([]tle.TLE, error) {
+	contents, err := s.downloadBytes(ctx, url)
+	if err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status: %s", resp.Status)
 	}
 	tmpFile, err := os.CreateTemp(filepath.Dir(path), "tlego-*.tmp")
 	if err != nil {
@@ -289,12 +609,9 @@ func (s *Store) download(ctx context.Context, url, path, expectedNoradID string)
 		os.Remove(tmpName)
 	}()
 
-	n, err := io.Copy(tmpFile, io.LimitReader(resp.Body, maxTLEPayloadSize+1))
+	_, err = tmpFile.Write(contents)
 	if err != nil {
 		return nil, err
-	}
-	if n > maxTLEPayloadSize {
-		return nil, fmt.Errorf("TLE response exceeds %d bytes", maxTLEPayloadSize)
 	}
 	if err := tmpFile.Close(); err != nil {
 		return nil, err

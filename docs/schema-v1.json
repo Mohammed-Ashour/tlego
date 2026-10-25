@@ -129,7 +129,10 @@
           ]
         },
         "source_format": {
-          "const": "tle"
+          "enum": [
+            "tle",
+            "gp-json"
+          ]
         },
         "element_epoch": {
           "type": "string",
@@ -258,6 +261,15 @@
         },
         "map_url": {
           "type": "string"
+        },
+        "source_format": {
+          "enum": [
+            "tle",
+            "gp-json"
+          ]
+        },
+        "element_data": {
+          "type": "object"
         }
       },
       "required": [

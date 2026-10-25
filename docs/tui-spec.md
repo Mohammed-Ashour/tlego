@@ -60,7 +60,7 @@ Positions are computed using UTC, displayed in degrees and km, and use the propa
 
 Pass times and maxima are sampled at one-minute steps, not refined event roots. Start/end-clipped passes are marked. Configure your observer first; the default is 0 latitude, 0 longitude and 0 km altitude. These results do not establish optical visibility, precision antenna control or collision risk.
 
-Orbit classes are altitude-based heuristics, and apogee/perigee are estimates. Element freshness and scientific calibration remain separate concerns. The source is still TLE-only, so newly cataloged objects requiring GP/OMM are not fully supported.
+Orbit classes are altitude-based heuristics, and apogee/perigee are estimates. Element freshness and scientific calibration remain separate concerns. Live retrieval uses GP JSON and retains catalog IDs up to nine digits. Legacy TLE caches remain usable. The element tab labels GP JSON and shows its original fields.
 
 Report JSON is an unversioned local export. The planned external schema and executable plugin contract are not implemented by this change. Theme is retained in persisted settings for compatibility but has no editor control until rendering supports it.
 
