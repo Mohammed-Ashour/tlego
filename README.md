@@ -121,7 +121,7 @@ Open the HTML in a WebGL 2-capable browser. The exported file includes its rende
 
 Local files may contain multiple satellites. `--time` chooses a shared RFC3339 start; `--points` controls samples per orbit. Without `--time`, live lookups start now and local files start at their first element's epoch. Playback begins paused and stays inside the shared sample interval.
 
-The globe and trajectories use the same physical scale. Lighting is illustrative, the globe is spherical, and between-sample positions are interpolated. [Visualization guide and review](docs/visualization.md) explains the limits and compatibility changes.
+The globe and trajectories use the same physical scale. Lighting is illustrative, the globe is spherical, and between-sample positions are interpolated. [Visualization guide](docs/visualization.md) explains the limits and compatibility changes.
 
 ## Current limits and next steps
 
