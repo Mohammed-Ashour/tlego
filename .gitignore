@@ -1,2 +1,9 @@
 *.tle
 *.txt
+.DS_Store
+/.local-artifacts/
+/.opencode/
+/bin/
+/tlego
+/opencode-panic-*.log
+/*.html

@@ -1,8 +1,8 @@
 package celestrak
 
 import (
+	_ "embed"
 	"os"
-	"runtime"
 
 	"io"
 	"net/http"
@@ -90,25 +90,13 @@ func DownloadTLEs(url string, filename string) ([]tle.TLE, error) {
 	return tles, nil
 }
 
+//go:embed satellite_groups.yaml
+var defaultGroupConfig []byte
+
 func ReadCelestrakConfig() (CelestrakConfig, error) {
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("Could not get current file path")
-	}
-
-	currentDir := filepath.Dir(currentFile)
-	fp := filepath.Join(currentDir, "satellite_groups.yaml")
-
-	logger.Info("Reading file", "file", fp)
-	data, err := os.ReadFile(fp)
-	if err != nil {
-		return CelestrakConfig{}, err
-	}
 	var config CelestrakConfig
-	err = yaml.Unmarshal(data, &config)
-	if err != nil {
-		logger.Error("Failed to unmarshal yaml", "error", err)
-		return CelestrakConfig{}, err
+	if err := yaml.Unmarshal(defaultGroupConfig, &config); err != nil {
+		return config, err
 	}
 	return config, nil
 }
