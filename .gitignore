@@ -7,3 +7,6 @@
 /tlego
 /opencode-panic-*.log
 /*.html
+
+# Intentional offline documentation fixture
+!examples/tui-demo/iss.tle
