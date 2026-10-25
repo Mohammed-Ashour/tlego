@@ -3,61 +3,107 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"strconv"
+	"path/filepath"
+	"strings"
+	"time"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	visual "github.com/Mohammed-Ashour/tlego/pkg/visual"
+	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
+	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
+	"github.com/Mohammed-Ashour/tlego/pkg/visual"
 	"github.com/urfave/cli/v3"
 )
 
-func init() {
-	RootCmd.Commands = append(RootCmd.Commands, &cli.Command{
-		Name:        "viz",
-		Usage:       "tlego viz <NORAD-ID>",
-		Description: "Visualize the orbit of a satellite using its NORAD ID.",
-		Action:      visualizeSatelliteOrbit,
-		Category:    "Visualization",
-	})
+func init() { RootCmd.Commands = append(RootCmd.Commands, newVizCommand()) }
+
+func newVizCommand() *cli.Command {
+	return &cli.Command{
+		Name: "viz", Usage: "Export a self-contained interactive orbit viewer", Category: "Visualization",
+		ArgsUsage: "[NORAD-ID]",
+		Flags: []cli.Flag{
+			&cli.StringFlag{Name: "file", Usage: "Read validated TLE records from a local file instead of fetching an ID"},
+			&cli.StringFlag{Name: "output", Aliases: []string{"o"}, Usage: "HTML output path (default: ID.html or input-name.html)"},
+			&cli.StringFlag{Name: "time", Usage: "Start time in RFC3339 (default: now for live data, first element epoch for a file)"},
+			&cli.IntFlag{Name: "points", Value: 360, Usage: "Samples per orbit, including endpoints (2 to 4096)"},
+		}, Action: visualizeSatelliteOrbit,
+	}
 }
 
-func visualizeSatelliteOrbit(ctx context.Context, cmd *cli.Command) error {
-	args := cmd.Args()
-	if args.Len() != 1 {
-		return fmt.Errorf("the viz (visualize) command only supports on argument mode at the moment")
-	}
-	noradId := args.First()
-	err := validateNoradID(noradId)
-	if err != nil {
+func visualizeSatelliteOrbit(ctx context.Context, command *cli.Command) error {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if _, err := strconv.Atoi(noradId); err != nil {
-		return fmt.Errorf("noradId is only digits %s was passed.\n", noradId)
+	file := command.String("file")
+	if (file == "" && command.Args().Len() != 1) || (file != "" && command.Args().Len() != 0) {
+		return fmt.Errorf("use viz <NORAD-ID> or viz --file <TLE-file>")
 	}
-	tle, err := celestrak.GetSatelliteTLEByNoradID(noradId)
+	requestedCount := command.Int("points")
+	if requestedCount < 2 || requestedCount > 4096 {
+		return fmt.Errorf("points must be between 2 and 4096")
+	}
+	count := int(requestedCount)
+	var start time.Time
+	if value := command.String("time"); value != "" {
+		parsed, err := time.Parse(time.RFC3339, value)
+		if err != nil {
+			return fmt.Errorf("invalid start time: %w", err)
+		}
+		start = parsed.UTC()
+	}
+	var records []tle.TLE
+	var err error
+	var defaultName string
+	if file != "" {
+		records, err = data.ReadTLEFile(file)
+		defaultName = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file)) + ".html"
+	} else {
+		id := command.Args().First()
+		var record tle.TLE
+		var meta data.FetchMeta
+		record, meta, err = data.NewStore("", 12*time.Hour).FetchTLEByNorad(ctx, id)
+		if meta.Warning != "" {
+			fmt.Fprintln(command.ErrWriter, meta.Warning)
+		}
+		records = []tle.TLE{record}
+		defaultName = id + ".html"
+		if start.IsZero() {
+			start = time.Now().UTC()
+		}
+	}
 	if err != nil {
-		return fmt.Errorf("failed to fetch TLE for NORAD ID %s: %w", noradId, err)
+		return fmt.Errorf("load orbit elements: %w", err)
 	}
-	satData := make([]visual.SatelliteData, 1)
-	points, err := visual.CreateOrbitPoints(tle, 36)
+	if len(records) == 0 || len(records) > 64 {
+		return fmt.Errorf("visualization needs 1 to 64 satellite records")
+	}
+	if len(records)*count > 250000 {
+		return fmt.Errorf("export exceeds 250000 total samples; reduce --points or the number of records")
+	}
+	if start.IsZero() {
+		start, err = records[0].Time()
+		if err != nil {
+			return fmt.Errorf("read first element epoch: %w", err)
+		}
+	}
+	satellites := make([]visual.SatelliteData, 0, len(records))
+	for _, record := range records {
+		points, err := visual.CreateOrbitPointsAt(record, count, start)
+		if err != nil {
+			return fmt.Errorf("sample %s: %w", record.Name, err)
+		}
+		epoch, err := record.Time()
+		if err != nil {
+			return err
+		}
+		satellites = append(satellites, visual.SatelliteData{Name: record.Name, NORADID: record.NoradID, Epoch: epoch, Points: points})
+	}
+	path := command.String("output")
+	if path == "" {
+		path = defaultName
+	}
+	written, err := visual.WriteHTMLVisual(satellites, path)
 	if err != nil {
-		return fmt.Errorf("failed to create orbit points for satellite %s: %w", tle.Name, err)
+		return fmt.Errorf("export orbit viewer: %w", err)
 	}
-
-	r := rand.Intn(256)
-	g := rand.Intn(256)
-	b := rand.Intn(256)
-
-	satData = []visual.SatelliteData{
-		visual.SatelliteData{
-			Name:   tle.Name,
-			Points: points,
-			Color:  fmt.Sprintf("#%02X%02X%02X", r, g, b),
-		},
-	}
-
-	htmlFileName := visual.CreateHTMLVisual(satData, noradId)
-	logger.Info("Created an html with orbit visualization", "filename", htmlFileName)
+	fmt.Fprintln(command.Writer, written)
 	return nil
 }

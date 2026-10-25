@@ -93,17 +93,35 @@ The terminal UI is the recommended route for position calculations. The older `p
 | `tlego tle 25544` | Fetch the ISS element set |
 | `tlego list --sat-group "Space Stations"` | Fetch a configured group's elements; use the catalog's exact spelling |
 | `tlego search starlink` | Search names across configured groups |
-| `tlego viz 25544` | Write a single-satellite orbit preview to `25544.html` |
+| `tlego viz 25544` | Write a self-contained orbit viewer to `25544.html` |
 | `tlego server` | Start the experimental web UI/API on port 8080 from the checkout |
 | `tlego --help` | List all commands; add `--help` to a command for its options |
 
-CLI retrieval currently uses a separate download path from the TUI. Its caching and failure behavior are being consolidated. The experimental server binds all interfaces and serves the checkout's `public/` directory; see [the input/binding issue](https://github.com/Mohammed-Ashour/tlego/issues/22) before exposing it to a network.
+The orbit viewer uses the TUI's validated cache store. Other legacy CLI retrieval commands still use a separate download path; their caching and failure behavior are being consolidated. The experimental server binds all interfaces and serves the checkout's `public/` directory; see [the input/binding issue](https://github.com/Mohammed-Ashour/tlego/issues/22) before exposing it to a network.
 
-### Orbit preview
+### Orbit viewer
 
-Run `tlego viz 25544`, then open the generated HTML file in a browser. The CLI currently exports one satellite at a time.
+[![Interactive ISS orbit viewer with UTC playback, camera controls and satellite details](assets/orbit-demo.gif)](assets/orbit-demo.mp4)
 
-![Example HTML orbit visualization](assets/visual.png)
+[Download the orbit walkthrough MP4](https://github.com/Mohammed-Ashour/tlego/raw/refs/heads/main/assets/orbit-demo.mp4). [Static preview](assets/orbit-demo.jpg). This recording uses the saved ISS snapshot at its 2026-10-24 epoch.
+
+Fetch the ISS and export its orbit:
+
+```bash
+tlego viz 25544 --output iss-orbit.html
+```
+
+From a checkout, generate the same view as the video without a provider request:
+
+```bash
+go run . viz --file examples/tui-demo/iss.tle --output iss-orbit.html
+```
+
+Open the HTML in a WebGL 2-capable browser. The exported file includes its renderer, styles, geography and orbit samples, so it needs no external assets. Drag to orbit the camera, scroll to zoom, or use the camera buttons. Play/Pause, speed and the UTC slider control the sampled timeline.
+
+Local files may contain multiple satellites. `--time` chooses a shared RFC3339 start; `--points` controls samples per orbit. Without `--time`, live lookups start now and local files start at their first element's epoch. Playback begins paused and stays inside the shared sample interval.
+
+The globe and trajectories use the same physical scale. Lighting is illustrative, the globe is spherical, and between-sample positions are interpolated. [Visualization guide and review](docs/visualization.md) explains the limits and compatibility changes.
 
 ## Current limits and next steps
 

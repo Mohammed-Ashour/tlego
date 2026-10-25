@@ -10,3 +10,4 @@
 
 # Intentional offline documentation fixture
 !examples/tui-demo/iss.tle
+/pkg/templates/node_modules/

@@ -6,11 +6,11 @@ TLEGO retrieves satellite elements, computes positions, and exposes catalog, tra
 
 ## Scope and Assumptions
 
-Verified on 2026-10-25 from README.md, docs/tui-spec.md and the TUI shipping branch based on current main. This document describes the implemented baseline. The proposed core/extension refactor is tracked in GitHub issue #29 and is not part of the current architecture.
+Verified on 2026-10-25 from README.md, docs/tui-spec.md and the visualization update based on main commit 80462ad. This document describes the implemented baseline. The proposed core/extension refactor is tracked in GitHub issue #29 and is not part of the current architecture.
 
 ## System Overview
 
-The CLI uses urfave/cli v3. Bubble Tea implements the TUI. Both use the pinned go-satellite-v2 dependency for orbital calculations. Catalog retrieval has two implementations with different caching and validation behavior.
+The CLI uses urfave/cli v3. Bubble Tea implements the TUI. Both use the pinned go-satellite-v2 dependency for orbital calculations. The viz command now shares the validated TUI data store; other legacy commands/server retain a separate retrieval path.
 
 ## Architecture Diagram
 
@@ -21,6 +21,7 @@ flowchart TD
     Cmd --> TUI[pkg/tui]
     Cmd --> Server[pkg/server]
     Cmd --> Visual[pkg/visual]
+    Cmd -->|viz| Store
     TUI --> Store[pkg/tui/data]
     Store --> Legacy
     Server --> Legacy
@@ -50,7 +51,7 @@ flowchart TD
 | pkg/tui/data | HTTP client, user cache and stale fallback | Shared behavior belongs outside TUI; validated cache replacement and stale fallback are implemented |
 | pkg/tui | UI state, settings, computation and report formatting | Reusable domain computations depend on UI package ownership |
 | pkg/server | HTTP responses and static files | Direct propagation and fetches diverge from other frontends |
-| pkg/visual, pkg/templates | Orbit sampling and embedded HTML export | Errors do not propagate cleanly to callers |
+| pkg/visual, pkg/templates | Orbit sampling and embedded HTML export | Validated TEME-km samples and atomic HTML exports; a pinned offline viewer is embedded |
 | pkg/tle, pkg/utils | Local parser and conversion helpers | Active fetches use the dependency parser instead |
 
 ## External Integrations
@@ -58,14 +59,16 @@ flowchart TD
 - CelesTrak supplies group and single-object elements over HTTPS. Current queries request TLE format.
 - go-satellite-v2 supplies TLE parsing, SGP4 propagation and conversions. Locate returns radians and an approximate speed; Propagate returns position and velocity vectors.
 - Google Maps and OpenStreetMap links consume geographic coordinates.
-- Default group YAML and orbit templates are embedded.
+- Default group YAML, orbit templates and the compiled viewer are embedded. The viewer bundles Three.js/OrbitControls and Natural Earth outlines; exports make no asset requests.
 - pkg/logger writes diagnostic logs to stdout.
 
 ## Core Data Flow (Current)
 
-CLI/server retrieval calls pkg/celestrak, downloads into a file and parses it using the external tle package. GetSatelliteTLEByNoradID selects the first parsed result. Most CLI position paths call Locate directly; HTTP uses Propagate and a local conversion helper.
+Legacy CLI/server retrieval calls pkg/celestrak, downloads into a file and parses it using the external tle package. GetSatelliteTLEByNoradID selects the first parsed result. Most CLI position paths call Locate directly; HTTP uses Propagate and a local conversion helper.
 
 TUI retrieval calls pkg/tui/data.Store, validates IDs and TLE records, checks cache timestamps, validates temporary downloads before replacement and can fall back to validated stale files. pkg/tui/derive.go normalizes UTC, converts positions and uses the propagated velocity vector; pkg/tui/passes.go samples horizon events with clipping flags; pkg/tui/report.go formats report records. Observer and recent-history state persist atomically in the user configuration directory. Request generations reject superseded results, and text fields own their printable input.
+
+The viz command accepts a live catalog ID or validated local TLE file. It samples all records from one UTC start through pkg/visual, then writes JSON data plus embedded renderer/CSS through an error-returning atomic writer. Points are physical TEME kilometres with UTC times and derived metadata. The frontend maps axes into Three.js, rotates the globe using sampled GMST, and interpolates only within the common sample interval. Its committed bundle is rebuilt and checked in a separate Node CI job; Go consumers do not need Node.
 
 ## Module Ownership Boundaries
 
@@ -76,7 +79,7 @@ TUI retrieval calls pkg/tui/data.Store, validates IDs and TLE records, checks ca
 
 ## Architecture Change Protocol
 
-1. Document nontrivial decisions before implementing them. The earlier proposed decision records are preserved in the local pre-TUI archive.
+1. Record behavior and compatibility changes in the relevant review or pull request.
 2. Keep current state in this document and proposals in [GitHub issue #29](https://github.com/Mohammed-Ashour/tlego/issues/29).
 3. Correct units, UTC and failure contracts with regression tests before migrating callers.
 4. Migrate one frontend at a time. Preserve exported APIs with deprecation wrappers where needed; do not silently change existing JSON contracts.

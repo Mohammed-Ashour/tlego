@@ -417,3 +417,16 @@ func validateNumericTLEFields(line1, line2, noradID string) error {
 	}
 	return nil
 }
+
+// ReadTLEFile reads local input through the same validation used by the cache.
+// It never performs a network request.
+func ReadTLEFile(path string) ([]tle.TLE, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if info.Size() > maxTLEPayloadSize {
+		return nil, fmt.Errorf("TLE file exceeds %d bytes", maxTLEPayloadSize)
+	}
+	return readValidatedTLE(path, "")
+}
