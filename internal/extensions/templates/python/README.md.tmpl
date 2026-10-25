@@ -1,0 +1,32 @@
+# {{.Command}}
+
+Summarize TLEGO position JSON v1 from stdin. The runtime uses only Python's standard library. Requires Python 3.10 or newer.
+
+## Test and run directly
+
+```bash
+python3 -m unittest -v
+python3 -m {{.Module}} --help
+python3 -m {{.Module}} < position.json
+```
+
+## Install and run through TLEGO
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install .
+tlego plugin list
+tlego {{.Name}} --help
+tlego predict --time 2026-10-24T05:01:11Z --format json 25544 | tlego {{.Name}}
+```
+
+On Windows use `py -m venv .venv` and activate with `.\.venv\Scripts\Activate.ps1` in PowerShell. Installation creates the native console-script executable. Alternatively use `pipx install .`.
+
+For an offline pipeline, replace `25544` with `--file /absolute/path/to/satellite.tle`. The environment's `bin` or Windows `Scripts` directory must be on PATH. Use `{{.Command}} < position.json` to run independently of the host.
+
+## Customize
+
+Edit `summarize` in `{{.Module}}.py`. Keep stdout for results, stderr for errors and diagnostics, and a nonzero exit status on failure. Validate the schema major and kind. Ignore unfamiliar fields and warning codes within a compatible major. Extend `test_extension.py` with your behavior and error cases.
+
+The host passes arguments and streams directly and supplies `TLEGO_HOST_VERSION` and `TLEGO_EXTENSION_VERSION`. No host package or Python SDK is required. See TLEGO's `docs/extensions.md` for the full protocol and schema.

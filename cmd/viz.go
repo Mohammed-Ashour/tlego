@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
+	"github.com/Mohammed-Ashour/tlego/internal/catalog"
 	"github.com/Mohammed-Ashour/tlego/pkg/visual"
 	"github.com/urfave/cli/v3"
 )
@@ -19,12 +19,12 @@ func newVizCommand() *cli.Command {
 	return &cli.Command{
 		Name: "viz", Usage: "Export a self-contained interactive orbit viewer", Category: "Visualization",
 		ArgsUsage: "[NORAD-ID]",
-		Flags: []cli.Flag{
+		Flags: append(cacheFlags(), []cli.Flag{
 			&cli.StringFlag{Name: "file", Usage: "Read validated TLE records from a local file instead of fetching an ID"},
 			&cli.StringFlag{Name: "output", Aliases: []string{"o"}, Usage: "HTML output path (default: ID.html or input-name.html)"},
 			&cli.StringFlag{Name: "time", Usage: "Start time in RFC3339 (default: now for live data, first element epoch for a file)"},
 			&cli.IntFlag{Name: "points", Value: 360, Usage: "Samples per orbit, including endpoints (2 to 4096)"},
-		}, Action: visualizeSatelliteOrbit,
+		}...), Action: visualizeSatelliteOrbit,
 	}
 }
 
@@ -53,13 +53,13 @@ func visualizeSatelliteOrbit(ctx context.Context, command *cli.Command) error {
 	var err error
 	var defaultName string
 	if file != "" {
-		records, err = data.ReadTLEFile(file)
+		records, err = catalog.ReadLocalTLE(file)
 		defaultName = strings.TrimSuffix(filepath.Base(file), filepath.Ext(file)) + ".html"
 	} else {
 		id := command.Args().First()
 		var record tle.TLE
-		var meta data.FetchMeta
-		record, meta, err = data.NewStore("", 12*time.Hour).FetchTLEByNorad(ctx, id)
+		var meta catalog.FetchMeta
+		record, meta, err = commandStore(command).FetchTLEByNorad(ctx, id)
 		if meta.Warning != "" {
 			fmt.Fprintln(command.ErrWriter, meta.Warning)
 		}

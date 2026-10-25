@@ -1,0 +1,58 @@
+"""Summarize TLEGO position JSON v1 from stdin."""
+
+import argparse
+import json
+import math
+import re
+import sys
+from datetime import datetime, timezone
+
+
+def summarize(document):
+    if not isinstance(document, dict):
+        raise ValueError("expected a JSON object")
+    version = document.get("schema_version")
+    if not isinstance(version, str) or not re.fullmatch(r"1\.[0-9]+", version):
+        raise ValueError("expected schema_version 1.x")
+    if document.get("kind") != "position":
+        raise ValueError("expected kind position")
+    data = document.get("data")
+    if not isinstance(data, dict):
+        raise ValueError("expected a position data object")
+    catalog = data.get("catalog_id")
+    if not isinstance(catalog, str) or not re.fullmatch(r"[0-9]+", catalog) or not catalog.strip("0"):
+        raise ValueError("catalog_id must be a positive decimal string")
+    evaluated = data.get("evaluated_at")
+    if not isinstance(evaluated, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})", evaluated):
+        raise ValueError("expected an RFC3339 evaluated_at")
+    instant = datetime.fromisoformat(evaluated.replace("Z", "+00:00"))
+    numbers = []
+    for key in ("latitude_deg", "longitude_deg", "altitude_km", "speed_km_s"):
+        value = data.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            raise ValueError(f"{key} must be present and finite")
+        numbers.append(value)
+    lat, lon, alt, speed = numbers
+    if not -90 <= lat <= 90 or not -180 <= lon < 180 or speed < 0:
+        raise ValueError("position coordinates or speed are out of range")
+    timestamp = instant.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return f"Satellite {catalog} at {timestamp}: {lat:.6f}°, {lon:.6f}°, {alt:.3f} km, {speed:.3f} km/s\n"
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Summarize TLEGO position JSON v1 from stdin.")
+    parser.parse_args(argv)
+    try:
+        content = sys.stdin.read((32 << 20) + 1)
+        if len(content.encode("utf-8")) > 32 << 20:
+            raise ValueError("input exceeds 32 MiB")
+        result = summarize(json.loads(content))
+    except (ValueError, TypeError, OverflowError) as exc:
+        print(f"{{.Command}}: {exc}", file=sys.stderr)
+        return 1
+    sys.stdout.write(result)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

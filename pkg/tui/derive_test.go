@@ -53,16 +53,6 @@ func TestPositionFromSatelliteUsesUTCAndActualVelocityNorm(t *testing.T) {
 	}
 }
 
-func TestNormalizeLongitude(t *testing.T) {
-	for _, tt := range []struct{ input, want float64 }{
-		{180, -180}, {-180, -180}, {200, -160}, {-200, 160}, {720, 0},
-	} {
-		if got := normalizeLongitude(tt.input); got != tt.want {
-			t.Errorf("normalizeLongitude(%v) = %v, want %v", tt.input, got, tt.want)
-		}
-	}
-}
-
 func TestOrbitInfoFromTLEKeepsInclinationInDegrees(t *testing.T) {
 	got, err := OrbitInfoFromTLE(satelliteTLE.TLE{Line2: satelliteTLE.TLELine2{
 		Inclination: "51.6416", Eccentricity: "0.0006703", MeanMotion: "15.72125391",

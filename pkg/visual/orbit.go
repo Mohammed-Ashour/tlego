@@ -15,6 +15,8 @@ import (
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
+	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/Mohammed-Ashour/tlego/pkg/templates"
 )
 
@@ -92,16 +94,13 @@ func CreateOrbitPointsAt(t tle.TLE, numPoints int, start time.Time) ([]Point, er
 		var p Point
 		var radius float64
 		if err := safely("propagate orbit", func() {
-			position, velocity := satellite.Propagate(sat, sampleTime.Year(), int(sampleTime.Month()), sampleTime.Day(), sampleTime.Hour(), sampleTime.Minute(), sampleTime.Second())
-			gmst := satellite.GSTimeFromDate(sampleTime.Year(), int(sampleTime.Month()), sampleTime.Day(), sampleTime.Hour(), sampleTime.Minute(), sampleTime.Second())
-			altitude, _, latlon := satellite.ECIToLLA(position, gmst)
+			state := orbit.At(sat, sampleTime)
+			position := state.PositionTEMEKm
 			radius = math.Sqrt(position.X*position.X + position.Y*position.Y + position.Z*position.Z)
-			speed := math.Sqrt(velocity.X*velocity.X + velocity.Y*velocity.Y + velocity.Z*velocity.Z)
 			p = Point{
-				X: position.X, Y: position.Y, Z: position.Z, Time: sampleTime,
-				LatitudeDeg:  latlon.Latitude * 180 / math.Pi,
-				LongitudeDeg: normalizeLongitude(latlon.Longitude) * 180 / math.Pi,
-				AltitudeKm:   altitude, SpeedKmS: speed, GMSTRad: gmst,
+				X: position.X, Y: position.Y, Z: position.Z, Time: state.Time,
+				LatitudeDeg: state.LatDeg, LongitudeDeg: state.LonDeg,
+				AltitudeKm: state.AltKm, SpeedKmS: state.SpeedKmS, GMSTRad: state.GMSTRad,
 			}
 		}); err != nil {
 			return nil, fmt.Errorf("sample %d at %s: %w", i, sampleTime.Format(time.RFC3339), err)
@@ -115,24 +114,8 @@ func CreateOrbitPointsAt(t tle.TLE, numPoints int, start time.Time) ([]Point, er
 }
 
 func validateTLE(t tle.TLE) error {
-	line1, line2 := t.Line1.LineString, t.Line2.LineString
-	if len(line1) < 69 || len(line2) < 69 || !strings.HasPrefix(line1, "1 ") || !strings.HasPrefix(line2, "2 ") {
-		return fmt.Errorf("invalid TLE: expected complete line 1 and line 2 records")
-	}
-	id1, id2 := strings.TrimSpace(line1[2:7]), strings.TrimSpace(line2[2:7])
-	if len(id1) == 0 || id1 != id2 {
-		return fmt.Errorf("invalid TLE: satellite identifiers do not match")
-	}
-	for _, field := range []string{line1[18:20], line1[20:32], line2[8:16], line2[17:25], "0." + line2[26:33], line2[34:42], line2[43:51], line2[52:63]} {
-		v, err := strconv.ParseFloat(strings.TrimSpace(field), 64)
-		if err != nil || !finite(v) {
-			return fmt.Errorf("invalid TLE numeric field %q", strings.TrimSpace(field))
-		}
-	}
-	if _, err := t.Time(); err != nil {
-		return fmt.Errorf("invalid TLE epoch: %w", err)
-	}
-	return nil
+	_, err := catalog.ParseTLE([]byte(t.String()))
+	return err
 }
 
 func safely(label string, fn func()) (err error) {
@@ -143,10 +126,6 @@ func safely(label string, fn func()) (err error) {
 	}()
 	fn()
 	return nil
-}
-
-func normalizeLongitude(radians float64) float64 {
-	return math.Mod(math.Mod(radians+math.Pi, 2*math.Pi)+2*math.Pi, 2*math.Pi) - math.Pi
 }
 
 func finite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }

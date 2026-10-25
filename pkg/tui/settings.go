@@ -8,14 +8,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"gopkg.in/yaml.v3"
 )
 
-type Observer struct {
-	Lat float64 `yaml:"lat"`
-	Lon float64 `yaml:"lon"`
-	Alt float64 `yaml:"alt"`
-}
+const earthRadiusKm = 6378.137
+
+type Observer = orbit.Observer
 
 type Settings struct {
 	RefreshSeconds  int      `yaml:"refresh_seconds"`
@@ -131,14 +130,8 @@ func (s Settings) Validate() error {
 	if int64(s.CacheTTLSeconds) > int64(math.MaxInt64/int64(time.Second)) {
 		return fmt.Errorf("cache_ttl_seconds is too large")
 	}
-	if math.IsNaN(s.Observer.Lat) || math.IsInf(s.Observer.Lat, 0) || s.Observer.Lat < -90 || s.Observer.Lat > 90 {
-		return fmt.Errorf("observer latitude must be finite and between -90 and 90 degrees")
-	}
-	if math.IsNaN(s.Observer.Lon) || math.IsInf(s.Observer.Lon, 0) || s.Observer.Lon < -180 || s.Observer.Lon > 180 {
-		return fmt.Errorf("observer longitude must be finite and between -180 and 180 degrees")
-	}
-	if math.IsNaN(s.Observer.Alt) || math.IsInf(s.Observer.Alt, 0) || s.Observer.Alt <= -earthRadiusKm {
-		return fmt.Errorf("observer altitude must be finite and greater than -%.3f km", earthRadiusKm)
+	if err := s.Observer.Validate(); err != nil {
+		return err
 	}
 	switch strings.ToLower(s.MapProvider) {
 	case "", "google", "osm", "openstreetmap":

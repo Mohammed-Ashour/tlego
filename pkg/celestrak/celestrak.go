@@ -1,115 +1,63 @@
 package celestrak
 
 import (
-	_ "embed"
+	"context"
+	"fmt"
 	"os"
-
-	"io"
-	"net/http"
-
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
-	"gopkg.in/yaml.v3"
+	"github.com/Mohammed-Ashour/tlego/internal/catalog"
 )
 
-var CELESTRAK_URL = "https://celestrak.org/NORAD/elements/gp.php?CATNR=NORADID&FORMAT=TLE"
-
-// Define the directory where all TLE files will be downloaded
+// These variables remain mutable for compatibility with existing callers.
+var CELESTRAK_URL = catalog.CelestrakURL
 var DOWNLOAD_DIR = "downloads"
 
-type SatelliteGroup struct {
-	Name string `yaml:"name"`
-	URL  string `yaml:"url"`
-}
-
-type CelestrakConfig struct {
-	SatelliteGroups []SatelliteGroup `yaml:"satellite_groups"`
-	Metadata        struct {
-		Source      string `yaml:"source"`
-		URL         string `yaml:"url"`
-		Format      string `yaml:"format"`
-		Provider    string `yaml:"provider"`
-		DataSource  string `yaml:"data_source"`
-		LastUpdated string `yaml:"last_updated"`
-	} `yaml:"metadata"`
-}
+type SatelliteGroup = catalog.SatelliteGroup
+type CelestrakConfig = catalog.CelestrakConfig
 
 func GetSatelliteTLEByNoradID(noradID string) (tle.TLE, error) {
+	if err := catalog.ValidateNoradID(noradID); err != nil {
+		return tle.TLE{}, err
+	}
+	store := catalog.NewStore(DOWNLOAD_DIR, -time.Nanosecond)
 	url := strings.Replace(CELESTRAK_URL, "NORADID", noradID, 1)
-	filename := filepath.Join(DOWNLOAD_DIR, noradID+".tle")
-	tles, err := DownloadTLEs(url, filename)
+	tles, _, err := store.DownloadToPath(context.Background(), url, filepath.Join(DOWNLOAD_DIR, noradID+".tle"), noradID)
 	if err != nil {
 		return tle.TLE{}, err
+	}
+	if len(tles) == 0 {
+		return tle.TLE{}, fmt.Errorf("no TLEs found for NORAD ID %s", noradID)
 	}
 	return tles[0], nil
 }
 
 func GetSatelliteGroupTLEs(groupName string, config CelestrakConfig) ([]tle.TLE, error) {
-	for _, group := range config.SatelliteGroups {
-		if group.Name == groupName {
-			filename := filepath.Join(DOWNLOAD_DIR, groupName+".tle")
-			return DownloadTLEs(group.URL, filename)
+	var group *SatelliteGroup
+	for i := range config.SatelliteGroups {
+		if strings.EqualFold(config.SatelliteGroups[i].Name, groupName) {
+			group = &config.SatelliteGroups[i]
+			break
 		}
 	}
-	return []tle.TLE{}, nil
+	if group == nil {
+		return nil, fmt.Errorf("unknown satellite group: %s", groupName)
+	}
+	store := catalog.NewStore(DOWNLOAD_DIR, -time.Nanosecond)
+	path := filepath.Join(DOWNLOAD_DIR, group.Name+".tle")
+	tles, _, err := store.DownloadToPath(context.Background(), group.URL, path, "")
+	return tles, err
 }
 
-func DownloadTLEs(url string, filename string) ([]tle.TLE, error) {
-	// Ensure the download directory exists
-	err := ensureDownloadDir()
-	if err != nil {
-		return []tle.TLE{}, err
-	}
-
-	// Fetch the TLE data from the URL
-	resp, err := http.Get(url)
-	if err != nil {
-		return []tle.TLE{}, err
-	}
-	defer resp.Body.Close()
-	file, err := os.Create(filename)
-	if err != nil {
-		logger.Error("Failed to create file", "error", err)
-		return []tle.TLE{}, err
-	}
-	defer file.Close()
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
-		logger.Error("Error writing to file", "error", err)
-		return []tle.TLE{}, err
-	}
-
-	tles, err := tle.ReadTLEFile(filename)
-	if err != nil {
-		logger.Error("Failed to read TLE file", "error", err)
-		return []tle.TLE{}, err
-	}
-	return tles, nil
+func DownloadTLEs(url, filename string) ([]tle.TLE, error) {
+	store := catalog.NewStore(filepath.Dir(filename), -time.Nanosecond)
+	tles, _, err := store.DownloadToPath(context.Background(), url, filename, "")
+	return tles, err
 }
 
-//go:embed satellite_groups.yaml
-var defaultGroupConfig []byte
+func ReadCelestrakConfig() (CelestrakConfig, error) { return catalog.ReadCelestrakConfig() }
 
-func ReadCelestrakConfig() (CelestrakConfig, error) {
-	var config CelestrakConfig
-	if err := yaml.Unmarshal(defaultGroupConfig, &config); err != nil {
-		return config, err
-	}
-	return config, nil
-}
-
-// ensureDownloadDir ensures that the download directory exists
-func ensureDownloadDir() error {
-	if _, err := os.Stat(DOWNLOAD_DIR); os.IsNotExist(err) {
-		logger.Info("Creating download directory", "dir", DOWNLOAD_DIR)
-		err := os.MkdirAll(DOWNLOAD_DIR, os.ModePerm)
-		if err != nil {
-			logger.Error("Failed to create download directory", "error", err)
-			return err
-		}
-	}
-	return nil
-}
+func ensureDownloadDir() error { return os.MkdirAll(DOWNLOAD_DIR, 0o755) }

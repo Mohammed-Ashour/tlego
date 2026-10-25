@@ -2,97 +2,64 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/tlego/internal/output"
 	"github.com/Mohammed-Ashour/tlego/pkg/locate"
 	"github.com/urfave/cli/v3"
 )
 
-func init() {
-	RootCmd.Commands = append(RootCmd.Commands, &cli.Command{
-		Name:        "report",
-		Usage:       "tlego report <NORAD-ID>",
-		Description: "Generate a detailed report for a satellite identified by its NORAD ID.",
-		Action:      generateSatelliteReport,
-		Category:    "Reporting",
-	})
+func init() { RootCmd.Commands = append(RootCmd.Commands, newReportCommand()) }
+func newReportCommand() *cli.Command {
+	flags := append(sourceFlags(), machineFlags()...)
+	flags = append(flags, &cli.StringFlag{Name: "time", Usage: "Evaluation time in RFC3339 (default: now)"})
+	return &cli.Command{Name: "report", Usage: "Generate a satellite report", ArgsUsage: "[NORAD-ID]", Flags: flags, Action: generateSatelliteReport}
+}
+func generateSatelliteReport(ctx context.Context, c *cli.Command) error {
+	if err := checkFormat(c, true); err != nil {
+		return commandError(c, err)
+	}
+	instant, err := evaluationTime(c, false)
+	if err != nil {
+		return commandError(c, err)
+	}
+	record, p, warnings, err := loadElement(ctx, c)
+	if err != nil {
+		return commandError(c, err)
+	}
+	sat := satellite.NewSatelliteFromTLE(record, satellite.GravityWGS84)
+	state := orbit.At(sat, instant)
+	if err := orbit.ValidateState(state); err != nil {
+		return commandError(c, err)
+	}
+	info, err := orbit.OrbitInfoFromTLE(record)
+	if err != nil {
+		return commandError(c, err)
+	}
+	report, err := output.BuildReportAt(record, orbit.PositionFromSatellite(sat, instant), info, locate.GetGoogleMapsURL(state.LatDeg, state.LonDeg), time.Now())
+	if err != nil {
+		return commandError(c, err)
+	}
+	if c.String("format") == "json" {
+		return emitResult(c, "report", output.ReportV1(report), p, warnings)
+	}
+	printWarnings(c, warnings)
+	text := output.FormatReportText(report)
+	if c.String("format") == "csv" {
+		text, err = output.FormatReportCSV(report)
+		if err != nil {
+			return err
+		}
+	}
+	_, err = fmt.Fprint(c.Writer, text)
+	return err
 }
 
-func generateSatelliteReport(ctx context.Context, cmd *cli.Command) error {
-	args := cmd.Args()
-	if args.Len() == 0 {
-		return errors.New("please provide a NORAD ID for the satellite to generate a report")
-	}
-
-	noradID := args.First()
-	err := validateNoradID(noradID)
-	if err != nil {
-		return err
-	}
-
-	// Fetch TLE data for the satellite
-	tle, err := celestrak.GetSatelliteTLEByNoradID(noradID)
-	if err != nil {
-		return fmt.Errorf("failed to fetch TLE for NORAD ID %s: %w", noradID, err)
-	}
-
-	// Create a satellite object from the TLE
-	sat := satellite.NewSatelliteFromTLE(tle, satellite.GravityWGS84)
-
-	// Calculate the satellite's current position
-	now := time.Now()
-	lat, lon, alt, _ := sat.Locate(now)
-	fmt.Println(alt)
-	fmt.Println("------")
-
-	// Generate the report
-	report := generateReport(tle, lat, lon, alt, now)
-
-	// Display the report
-	fmt.Println(report)
-
-	return nil
-}
-
-func generateReport(tle tle.TLE, lat, lon, alt float64, now time.Time) string {
-	// Format the report
-
-	report := fmt.Sprintf(`
-Satellite Report
-================
-Name: %s
-NORAD ID: %s
-
-TLE Data:
----------
-%s
-
-
-Current Position (as of %s):
-----------------------------
-Latitude: %.6f°
-Longitude: %.6f°
-Altitude: %.6f
-
-Google Maps URL:
-----------------
-%s
-`,
-		tle.Name,
-		tle.NoradID,
-		tle.String(),
-		now.Format(time.RFC3339),
-		lat,
-		lon,
-		alt,
-
-		locate.GetGoogleMapsURL(lat, lon),
-	)
-
-	return report
+// Retain the original report helper for callers and compatibility tests.
+func generateReport(element tle.TLE, lat, lon, alt float64, now time.Time) string {
+	return fmt.Sprintf("\nSatellite Report\n================\nName: %s\nNORAD ID: %s\n\nTLE Data:\n---------\n%s\n\nCurrent Position (as of %s):\n----------------------------\nLatitude: %.6f°\nLongitude: %.6f°\nAltitude: %.6f km\n\nGoogle Maps URL:\n----------------\n%s\n", element.Name, element.NoradID, element.String(), now.Format(time.RFC3339), lat, lon, alt, locate.GetGoogleMapsURL(lat, lon))
 }

@@ -1,4 +1,4 @@
-package data
+package catalog
 
 import "time"
 
@@ -13,4 +13,7 @@ type FetchMeta struct {
 	Stale     bool
 	Warning   string
 	Path      string
+	Source    string
+	FetchedAt time.Time
+	Format    string
 }

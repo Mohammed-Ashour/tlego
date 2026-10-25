@@ -3,12 +3,12 @@ package tui
 import (
 	"fmt"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
+	"github.com/Mohammed-Ashour/tlego/internal/catalog"
 	"github.com/charmbracelet/bubbles/list"
 )
 
 type groupItem struct {
-	group data.Group
+	group catalog.Group
 }
 
 func (i groupItem) Title() string       { return i.group.Name }
@@ -45,7 +45,7 @@ func (i tleItem) FilterValue() string {
 	return i.summary.Name + " " + i.summary.NoradID
 }
 
-func groupsToItems(groups []data.Group) []list.Item {
+func groupsToItems(groups []catalog.Group) []list.Item {
 	items := make([]list.Item, 0, len(groups))
 	for _, group := range groups {
 		items = append(items, groupItem{group: group})

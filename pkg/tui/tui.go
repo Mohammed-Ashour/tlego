@@ -2,7 +2,7 @@ package tui
 
 import (
 	"context"
-	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
+	"github.com/Mohammed-Ashour/tlego/internal/catalog"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -20,8 +20,8 @@ func RunContext(ctx context.Context, opts Options) error {
 	if settingsErr != nil {
 		settings = DefaultSettings()
 	}
-	cacheDir, _ := data.DefaultCacheDir()
-	store := data.NewStore(cacheDir, settings.CacheTTL())
+	cacheDir, _ := catalog.DefaultCacheDir()
+	store := catalog.NewStore(cacheDir, settings.CacheTTL())
 	model := NewModel(opts, settings, store, settingsErr)
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithContext(ctx))
 	_, err := p.Run()

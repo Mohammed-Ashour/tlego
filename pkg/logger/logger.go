@@ -16,7 +16,7 @@ func init() {
 		AddSource: true,
 	}
 
-	defaultLogger = slog.New(slog.NewTextHandler(os.Stdout, opts))
+	defaultLogger = slog.New(slog.NewTextHandler(os.Stderr, opts))
 	slog.SetDefault(defaultLogger)
 }
 

@@ -80,24 +80,28 @@ On Reports, f changes format, r generates, Tab edits the save path, and s saves 
 
 ### Cache and settings
 
-The TUI stores validated elements in the platform user cache directory under `tlego`. If a refresh fails, it can use a valid stale cache and displays a warning. r reloads through the cache and respects its TTL; it does not force a provider download.
+CLI, TUI and HTTP retrieval share validated elements in the platform user cache directory under `tlego`. If a refresh fails, it can use a valid stale cache and displays a warning. r reloads through the cache and respects its TTL; it does not force a provider download.
 
 Settings and recent satellites live in the platform user configuration directory under `tlego/tui.yaml`. An absolute `XDG_CONFIG_HOME` overrides the settings directory. [TUI implementation notes](docs/tui-spec.md) cover paths, startup options and behavior in detail.
 
 ## CLI commands
 
-The terminal UI is the recommended route for position calculations. The older `predict`, `track` and `report` commands still have tracked [coordinate-unit](https://github.com/Mohammed-Ashour/tlego/issues/16) and [UTC-handling](https://github.com/Mohammed-Ashour/tlego/issues/17) bugs.
+CLI, TUI, HTTP and orbit exports use the same orbital core, with UTC calculations and degree-valued geographic coordinates. Use `--format json` with predict, report or passes for versioned machine output.
 
 | Command | What it does |
 |---|---|
 | `tlego tle 25544` | Fetch the ISS element set |
-| `tlego list --sat-group "Space Stations"` | Fetch a configured group's elements; use the catalog's exact spelling |
-| `tlego search starlink` | Search names across configured groups |
+| `tlego list --sat-group "Space Stations"` | Fetch a configured group's elements, ignoring case |
+| `tlego search starlink` | Search names and IDs with partial-coverage warnings |
+| `tlego predict --time 2026-10-24T05:01:11Z 25544` | Predict a position |
+| `tlego report 25544 --format json` | Generate a versioned JSON report |
+| `tlego passes --lat 51.48 --lon 0 25544 --format json` | Estimate passes for an observer |
+| `tlego plugin list` | Inspect executable extensions on PATH |
 | `tlego viz 25544` | Write a self-contained orbit viewer to `25544.html` |
-| `tlego server` | Start the experimental web UI/API on port 8080 from the checkout |
+| `tlego server` | Start the experimental web UI/API on localhost:8080 |
 | `tlego --help` | List all commands; add `--help` to a command for its options |
 
-The orbit viewer uses the TUI's validated cache store. Other legacy CLI retrieval commands still use a separate download path; their caching and failure behavior are being consolidated. The experimental server binds all interfaces and serves the checkout's `public/` directory; see [the input/binding issue](https://github.com/Mohammed-Ashour/tlego/issues/22) before exposing it to a network.
+All frontends use the shared catalog and cache, with validated atomic replacement and stale fallback. CLI retrieval supports `--cache-dir` and `--cache-ttl`. Position, report and pass commands accept `--file path.tle` or `--file -` for offline input. The experimental server binds `127.0.0.1:8080` by default; `--addr` changes the address, and `--static-dir` selects the checkout UI directory.
 
 ### Orbit viewer
 
@@ -128,7 +132,22 @@ The globe and trajectories use the same physical scale. Lighting is illustrative
 - Retrieval uses TLE data. Full coverage of newer catalog objects needs [GP/OMM support](https://github.com/Mohammed-Ashour/tlego/issues/18).
 - Pass events and maxima are sampled at one-minute steps. Clipped forecast boundaries are marked. Optical visibility and precision antenna control are not calculated.
 - Orbit classes use altitude-based heuristics; apogee and perigee are estimates. Independent scientific validation is [tracked separately](https://github.com/Mohammed-Ashour/tlego/issues/27).
-- TUI JSON reports are unversioned exports. The [shared core and extension contract](https://github.com/Mohammed-Ashour/tlego/issues/29) are planned work; executable plugins are not implemented yet.
+- TUI `json` reports retain their legacy format. Select `json-v1` for the versioned report contract. [Core and extension documentation](docs/extensions.md) describes the JSON schema, compatibility and executable extensions.
+
+## Extensions
+
+Create a standalone project with `tlego plugin init summary` or `tlego plugin init summary --language python`. The [extension authoring guide](docs/writing-extensions.md) covers the generated code, tests and PATH installation.
+
+An executable named `tlego-calendar` on PATH runs as `tlego calendar`. Native commands take precedence, and arguments and streams pass directly to the extension.
+
+The [Python calendar example](examples/calendar/README.md) turns pass-plan JSON into an iCalendar file:
+
+```bash
+tlego passes --file examples/tui-demo/iss.tle --time 2026-10-24T05:01:11Z \
+  --lat 51.48 --lon 0 --format json | tlego calendar > passes.ics
+```
+
+Install the example first using its README. [Extension authoring and output schema](docs/extensions.md) covers discovery, failure codes and versioning.
 
 [Browse the backlog](https://github.com/Mohammed-Ashour/tlego/issues) for the current priorities and acceptance criteria.
 

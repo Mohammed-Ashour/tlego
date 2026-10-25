@@ -4,63 +4,36 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
 	"github.com/urfave/cli/v3"
 )
 
 func init() {
-	RootCmd.Commands = append(RootCmd.Commands, &cli.Command{
-		Name:        "search",
-		Usage:       "tlego search <keyword>",
-		Description: "Search for satellites by name or partial name match.",
-		Action:      searchSatellites,
-		Category:    "Search",
-	})
+	RootCmd.Commands = append(RootCmd.Commands, &cli.Command{Name: "search", Usage: "Search catalog names and IDs", ArgsUsage: "<keyword>", Flags: cacheFlags(), Action: searchSatellites})
 }
-
-func searchSatellites(ctx context.Context, cmd *cli.Command) error {
-	args := cmd.Args()
-	if args.Len() == 0 {
-		return fmt.Errorf("please provide a keyword to search for")
+func searchSatellites(ctx context.Context, c *cli.Command) error {
+	if c.Args().Len() != 1 || strings.TrimSpace(c.Args().First()) == "" {
+		return fmt.Errorf("provide one search keyword")
 	}
-
-	keyword := strings.ToLower(args.First())
-
-	// Load satellite groups from the configuration
-	config, err := celestrak.ReadCelestrakConfig()
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	result, err := commandStore(c).Search(ctx, c.Args().First())
 	if err != nil {
-		return fmt.Errorf("failed to read Celestrak configuration: %w", err)
+		return err
 	}
-
-	fmt.Printf("Searching for satellites matching keyword: %q\n", keyword)
-
-	// Iterate through all satellite groups and search for matches
-	var matches []string
-	for _, group := range config.SatelliteGroups {
-		tles, err := celestrak.GetSatelliteGroupTLEs(group.Name, config)
-		if err != nil {
-			fmt.Printf("Warning: Failed to fetch TLEs for group %q: %v\n", group.Name, err)
-			continue
-		}
-
-		for _, tle := range tles {
-			if strings.Contains(strings.ToLower(tle.Name), keyword) {
-				matches = append(matches, fmt.Sprintf("Name: %s | NORAD ID: %s", tle.Name, tle.NoradID))
-			}
+	if len(result.Warnings) > 0 {
+		fmt.Fprintf(c.ErrWriter, "Search coverage: %d/%d groups loaded\n", result.GroupsCovered, result.GroupsTotal)
+		for _, warning := range result.Warnings {
+			fmt.Fprintln(c.ErrWriter, warning)
 		}
 	}
-
-	// Display results
-	if len(matches) == 0 {
-		fmt.Printf("No satellites found matching keyword: %q\n", keyword)
+	if len(result.TLEs) == 0 {
+		fmt.Fprintf(c.Writer, "No satellites found matching keyword: %q\n", c.Args().First())
 		return nil
 	}
-
-	fmt.Println("Matching Satellites:")
-	for _, match := range matches {
-		fmt.Println(match)
+	for _, record := range result.TLEs {
+		fmt.Fprintf(c.Writer, "Name: %s | NORAD ID: %s\n", record.Name, record.NoradID)
 	}
-
 	return nil
 }
