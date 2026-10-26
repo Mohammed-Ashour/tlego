@@ -109,6 +109,17 @@ func TestDirectDeepSpaceValladoReference(t *testing.T) {
 				t.Errorf("At(%g min) component %d = %.12f, python-sgp4 reference %.12f", tc.minutes, i, values[i], want)
 			}
 		}
+		if tc.minutes == 0 {
+			// Norm of the independent python-sgp4 epoch velocity above. At this
+			// eccentric-orbit point a circular speed estimate is ~3.0812 km/s.
+			if math.Abs(got.SpeedKmS-2.884150184752515) > 1e-6 {
+				t.Errorf("speed = %.12f, want eccentric reference 2.884150184752515 km/s", got.SpeedKmS)
+			}
+			radius := math.Sqrt(got.PositionTEMEKm.X*got.PositionTEMEKm.X + got.PositionTEMEKm.Y*got.PositionTEMEKm.Y + got.PositionTEMEKm.Z*got.PositionTEMEKm.Z)
+			if math.Abs(got.SpeedKmS-math.Sqrt(earthMu/radius)) < .1 {
+				t.Error("eccentric-orbit speed regressed to the circular approximation")
+			}
+		}
 	}
 }
 

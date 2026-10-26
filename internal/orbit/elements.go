@@ -53,10 +53,5 @@ func OrbitInfoFromElements(r elements.Record) (OrbitInfo, error) {
 	if err := r.Validate(); err != nil {
 		return OrbitInfo{}, err
 	}
-	period := 1440 / r.MeanMotionRevDay
-	n := r.MeanMotionRevDay * 2 * math.Pi / 86400
-	a := math.Cbrt(earthMu / (n * n))
-	per := a*(1-r.Eccentricity) - earthRadiusKm
-	apo := a*(1+r.Eccentricity) - earthRadiusKm
-	return OrbitInfo{r.InclinationDeg, r.Eccentricity, r.MeanMotionRevDay, period, apo, per, classify((per + apo) / 2)}, nil
+	return orbitInfo(r.InclinationDeg, r.Eccentricity, r.MeanMotionRevDay)
 }

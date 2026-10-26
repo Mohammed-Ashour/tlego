@@ -26,8 +26,10 @@ func ValidateState(s State) error {
 }
 
 const (
-	earthRadiusKm = 6378.137
-	earthMu       = 398600.4418
+	earthRadiusKm      = 6378.137
+	earthMu            = 398600.4418
+	siderealDayMinutes = 1436.068
+	geoAltitudeKm      = 35786.0
 )
 
 type Position struct {
@@ -71,23 +73,43 @@ func OrbitInfoFromTLE(tle tle.TLE) (OrbitInfo, error) {
 	if !finite(motion) || motion <= 0 {
 		return OrbitInfo{}, fmt.Errorf("mean motion must be finite and greater than zero")
 	}
+	return orbitInfo(inc, ecc, motion)
+}
+
+// orbitInfo applies two-body estimates to mean elements, not osculating states.
+// Both ingestion paths use these same estimates and classification criteria.
+func orbitInfo(inc, ecc, motion float64) (OrbitInfo, error) {
 	period := 1440 / motion
 	n := motion * 2 * math.Pi / 86400
 	a := math.Cbrt(earthMu / (n * n))
 	per := a*(1-ecc) - earthRadiusKm
 	apo := a*(1+ecc) - earthRadiusKm
-	return OrbitInfo{inc, ecc, motion, period, apo, per, classify((per + apo) / 2)}, nil
+	if !finite(period) || !finite(a) || a <= 0 || !finite(per) || !finite(apo) {
+		return OrbitInfo{}, fmt.Errorf("mean motion cannot produce finite orbit estimates")
+	}
+	info := OrbitInfo{inc, ecc, motion, period, apo, per, ""}
+	info.OrbitClass = classify(info)
+	return info, nil
 }
 func finite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }
-func classify(a float64) string {
+
+// classify returns project heuristics documented in docs/orbit-estimates.md.
+// GEO requires a nearly circular, equatorial, sidereal-period orbit; altitude
+// alone cannot distinguish geostationary from inclined or drifting orbits.
+func classify(o OrbitInfo) string {
 	switch {
-	case a < 2000:
+	case math.Abs(o.PeriodMinutes-siderealDayMinutes) <= 0.01*siderealDayMinutes:
+		if o.InclinationDeg <= 1 && o.Eccentricity <= 0.01 {
+			return "GEO"
+		}
+		return "GSO"
+	case o.ApogeeKm < 2000:
 		return "LEO"
-	case a < 35786:
+	case o.PerigeeKm >= 2000 && o.ApogeeKm < geoAltitudeKm:
 		return "MEO"
-	case a < 42000:
-		return "GEO"
-	default:
+	case o.PerigeeKm >= geoAltitudeKm:
 		return "HEO"
+	default:
+		return "Other"
 	}
 }

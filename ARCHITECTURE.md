@@ -110,5 +110,5 @@ Unknown valid top-level commands resolve to tlego-command on PATH. Built-in name
 
 ## Future Clarifications
 
-- Orbit classifications and derived orbital estimates need independent numerical reference validation, tracked in issue #27.
+- Orbit classifications use declared period, shape and altitude heuristics. Both input paths share two-body estimates checked against independent high-precision ellipse calculations; these do not establish SGP4 trajectory extrema or station keeping. See docs/orbit-estimates.md for criteria and limits.
 - Runtime TUI panels, custom providers, extension installation and a marketplace require separate designs based on actual use.

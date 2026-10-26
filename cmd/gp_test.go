@@ -87,6 +87,33 @@ func TestGPJSONOrbitExport(t *testing.T) {
 		t.Fatal("export truncated catalog ID")
 	}
 }
+
+func TestReportExportsCorrectedOrbitClass(t *testing.T) {
+	for _, tc := range []struct{ name, motion, inclination, class string }{
+		{"stationary candidate", "1.002743960677476", "0", "GEO"},
+		{"inclined synchronous", "1.002743960677476", "20", "GSO"},
+		{"old false GEO", "0.9094608139888118", "0", "HEO"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := newReportCommand()
+			c.Reader = strings.NewReader(`{"NORAD_CAT_ID":25544,"EPOCH":"2026-10-24T05:01:11Z","MEAN_MOTION":` + tc.motion + `,"ECCENTRICITY":0,"INCLINATION":` + tc.inclination + `,"RA_OF_ASC_NODE":0,"ARG_OF_PERICENTER":0,"MEAN_ANOMALY":0,"BSTAR":0,"MEAN_MOTION_DOT":0,"MEAN_MOTION_DDOT":0}`)
+			var out bytes.Buffer
+			c.Writer = &out
+			if err := c.Run(context.Background(), []string{"report", "--file", "-", "--time", "2026-10-24T05:01:11Z", "--format=json"}); err != nil {
+				t.Fatal(err)
+			}
+			var doc struct {
+				Data output.ReportRecord `json:"data"`
+			}
+			if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+				t.Fatal(err)
+			}
+			if doc.Data.Orbit.OrbitClassEstimate != tc.class {
+				t.Fatalf("class = %s, want %s", doc.Data.Orbit.OrbitClassEstimate, tc.class)
+			}
+		})
+	}
+}
 func TestUnsupportedInputFailsWithJSONError(t *testing.T) {
 	c := newPredictCommand()
 	c.Reader = strings.NewReader("<omm>unsupported XML</omm>")

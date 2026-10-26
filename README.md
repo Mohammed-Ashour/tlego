@@ -143,7 +143,7 @@ The globe and trajectories use the same physical scale. Lighting is illustrative
 
 - Retrieval uses TLE data. Full coverage of newer catalog objects needs [GP/OMM support](https://github.com/Mohammed-Ashour/tlego/issues/18).
 - Pass events and maxima are sampled at one-minute steps. Clipped forecast boundaries are marked. Optical visibility and precision antenna control are not calculated.
-- Orbit classes use altitude-based heuristics; apogee and perigee are estimates. Independent scientific validation is [tracked separately](https://github.com/Mohammed-Ashour/tlego/issues/27).
+- Orbit classes use declared period, shape and altitude criteria; apogee and perigee are two-body estimates. [Criteria, reference checks and limits](docs/orbit-estimates.md) explain their meaning.
 - TUI `json` reports retain their legacy format. Select `json-v1` for the versioned report contract. [Core and extension documentation](docs/extensions.md) describes the JSON schema, compatibility and executable extensions.
 
 ## Extensions
