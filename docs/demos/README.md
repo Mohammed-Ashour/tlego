@@ -27,3 +27,25 @@ This produces:
 - `assets/tui-demo.gif`, the animated README preview.
 
 The tape builds the example before showing it and records the TUI's real terminal output. It does not mock screenshots or alter application time. Keep both outputs together when updating the walkthrough, and inspect key screens before committing them.
+
+## Orbit classification comparison
+
+The before/after recordings run the same five synthetic GP records through the real `report --format json` command at a fixed epoch. `orbit-classification.py` displays selected output fields; it does not supply expected labels or substitute report results. All records reuse catalog ID 25544 for offline parsing and are not observations of the ISS.
+
+The baseline is merged PR #36 at `fc471afd9b7c76747c7fc13b88247c300984b549`. Build both binaries, then record from the repository root:
+
+```bash
+mkdir -p .local-artifacts/orbit-before .local-artifacts/orbit-after
+git archive fc471afd9b7c76747c7fc13b88247c300984b549 | tar -x -C .local-artifacts/orbit-before
+go build -C .local-artifacts/orbit-before -o "$PWD/.local-artifacts/orbit-before/tlego" .
+go build -o .local-artifacts/orbit-after/tlego .
+
+TLEGO_DEMO_BIN_DIR="$PWD/.local-artifacts/orbit-before" vhs \
+  -o assets/orbit-classification-before.mp4 -o assets/orbit-classification-before.gif \
+  docs/demos/orbit-classification.tape
+TLEGO_DEMO_BIN_DIR="$PWD/.local-artifacts/orbit-after" vhs \
+  -o assets/orbit-classification-after.mp4 -o assets/orbit-classification-after.gif \
+  docs/demos/orbit-classification.tape
+```
+
+Run `python3 docs/demos/orbit-classification.py /absolute/path/to/tlego` for the same comparison without recording. The changed labels and their limits are described in [orbit estimates](../orbit-estimates.md).

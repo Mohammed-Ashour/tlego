@@ -26,7 +26,7 @@ Use a catalog ID instead of `--file` for live retrieval. `--file -` reads a sing
 
 - Catalog IDs are decimal strings with one to nine digits. The element reader accepts legacy TLE and GP JSON. GP reports preserve the original object in `element_data`, leave `tle` empty and identify `source_format: "gp-json"`. See [GP JSON support](gp-elements.md).
 - Timestamps are RFC3339 UTC with `Z`. Propagation uses whole seconds; `evaluated_at` identifies the instant actually calculated.
-- Geographic positions use degrees, longitude in `[-180, 180)`, altitude in km and vector speed in km/s. Cartesian calculations use TEME. Orbit classes and apogee/perigee values in reports are estimates.
+- Geographic positions use degrees, longitude in `[-180, 180)`, altitude in km and vector speed in km/s. Cartesian calculations use TEME. Orbit classes and apogee/perigee values in reports are estimates. [Orbit estimate criteria and checks](orbit-estimates.md) define GEO, GSO, LEO, MEO, HEO and Other; consumers should accept unfamiliar class strings.
 - Provenance identifies source, input format, element epoch, retrieval time and cache status. File/stdin input has a null retrieval time and no cache. Cache paths are not exported. TUI records with unavailable retrieval metadata use `unknown` explicitly.
 - Pass records separate the requested window from estimated rise/set times. A clipped boundary has a null rise/set and a clipping flag. Empty passes are a successful result with `passes: []`.
 - Passes use the geometric zero-degree horizon. Times and maxima are sampled estimates with the declared step, not optical visibility predictions. Planning is limited to 30 days, at least one-second steps and 250,000 samples.
