@@ -24,7 +24,7 @@ The race run reported 61.2% total statement coverage. The report contains packag
 The retained program uses only the Go standard library. Run it from the repository root.
 
 ```sh
-cp docs/reviews/architecture-2026-10-27/metrics.go.txt /tmp/tlego-review-metrics.go
+cp docs/reviews/architecture-2026-10-27/metrics.go.example /tmp/tlego-review-metrics.go
 GOCACHE=/tmp/tlego-review-go-cache GO111MODULE=off go run /tmp/tlego-review-metrics.go > /tmp/tlego-review-complexity.csv
 ```
 

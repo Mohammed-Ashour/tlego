@@ -595,7 +595,7 @@ Do not begin with a package-wide rename or broad interface hierarchy. Those chan
 ## 11. Report artifacts
 
 - [Complexity measurements](complexity.csv)
-- [Measurement program](metrics.go.txt)
+- [Measurement program](metrics.go.example)
 - [Verification details and review probes](verification.md)
 
 Application source files were not changed. `ARCHITECTURE.md` was used as the architecture baseline and was not changed.

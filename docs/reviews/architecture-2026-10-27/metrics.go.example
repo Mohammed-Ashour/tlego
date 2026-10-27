@@ -1,0 +1,169 @@
+package main
+
+import (
+	"encoding/csv"
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+)
+
+type row struct {
+	file, name                     string
+	line, lines, cc, depth, params int
+}
+
+func main() {
+	fs := token.NewFileSet()
+	rows := []row{}
+	files, tests, loc := 0, 0, 0
+	edges := map[string]map[string]bool{}
+	exports := map[string]int{}
+	fields := 0
+	filepath.Walk(".", func(p string, i os.FileInfo, e error) error {
+		if e != nil {
+			return e
+		}
+		if i.IsDir() {
+			if (p != "." && strings.HasPrefix(i.Name(), ".")) || i.Name() == "node_modules" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(p, ".go") {
+			return nil
+		}
+		if strings.HasSuffix(p, "_test.go") {
+			tests++
+			return nil
+		}
+		f, err := parser.ParseFile(fs, p, nil, 0)
+		if err != nil {
+			panic(err)
+		}
+		files++
+		b, _ := os.ReadFile(p)
+		loc += strings.Count(string(b), "\n")
+		pkg := filepath.Dir(p)
+		if edges[pkg] == nil {
+			edges[pkg] = map[string]bool{}
+		}
+		for _, im := range f.Imports {
+			s, _ := strconv.Unquote(im.Path.Value)
+			if strings.HasPrefix(s, "github.com/Mohammed-Ashour/tlego/") {
+				edges[pkg][strings.TrimPrefix(s, "github.com/Mohammed-Ashour/tlego/")] = true
+			}
+		}
+		for _, d := range f.Decls {
+			if fn, ok := d.(*ast.FuncDecl); ok && fn.Body != nil {
+				cc, depth, level := 1, 0, 0
+				ast.Inspect(fn.Body, func(n ast.Node) bool {
+					if n == nil {
+						return false
+					}
+					switch x := n.(type) {
+					case *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt:
+						cc++
+					case *ast.CaseClause:
+						if x.List != nil {
+							cc++
+						}
+					case *ast.CommClause:
+						if x.Comm != nil {
+							cc++
+						}
+					case *ast.BinaryExpr:
+						if x.Op == token.LAND || x.Op == token.LOR {
+							cc++
+						}
+					}
+					return true
+				})
+				var walk func(ast.Node, int)
+				walk = func(n ast.Node, d int) {
+					if n == nil {
+						return
+					}
+					ast.Inspect(n, func(child ast.Node) bool {
+						if child == nil {
+							return false
+						}
+						if child == n {
+							return true
+						}
+						switch child.(type) {
+						case *ast.IfStmt, *ast.ForStmt, *ast.RangeStmt, *ast.SwitchStmt, *ast.TypeSwitchStmt, *ast.SelectStmt:
+							if d+1 > depth {
+								depth = d + 1
+							}
+							walk(child, d+1)
+							return false
+						}
+						return true
+					})
+				}
+				walk(fn.Body, level)
+				params := 0
+				for _, v := range fn.Type.Params.List {
+					if len(v.Names) == 0 {
+						params++
+					} else {
+						params += len(v.Names)
+					}
+				}
+				name := fn.Name.Name
+				if fn.Recv != nil {
+					if id, ok := fn.Recv.List[0].Type.(*ast.Ident); ok {
+						name = id.Name + "." + name
+					} else if star, ok := fn.Recv.List[0].Type.(*ast.StarExpr); ok {
+						if id, ok := star.X.(*ast.Ident); ok {
+							name = id.Name + "." + name
+						}
+					}
+				}
+				if ast.IsExported(fn.Name.Name) {
+					exports[pkg]++
+				}
+				rows = append(rows, row{p, name, fs.Position(fn.Pos()).Line, fs.Position(fn.End()).Line - fs.Position(fn.Pos()).Line + 1, cc, depth, params})
+			}
+			ast.Inspect(d, func(n ast.Node) bool {
+				ts, ok := n.(*ast.TypeSpec)
+				if ok && ts.Name.Name == "Model" && pkg == "pkg/tui" {
+					if st, ok := ts.Type.(*ast.StructType); ok {
+						for _, f := range st.Fields.List {
+							fields += len(f.Names)
+						}
+					}
+				}
+				return true
+			})
+		}
+		return nil
+	})
+	sort.Slice(rows, func(i, j int) bool { return rows[i].cc > rows[j].cc })
+	w := csv.NewWriter(os.Stdout)
+	w.Write([]string{"file", "function", "line", "physical_lines", "cyclomatic_estimate", "control_nesting", "parameters"})
+	for _, r := range rows {
+		w.Write([]string{r.file, r.name, strconv.Itoa(r.line), strconv.Itoa(r.lines), strconv.Itoa(r.cc), strconv.Itoa(r.depth), strconv.Itoa(r.params)})
+	}
+	w.Flush()
+	fmt.Fprintf(os.Stderr, "files=%d test_files=%d physical_lines=%d functions=%d tui_model_fields=%d\n", files, tests, loc, len(rows), fields)
+	ps := []string{}
+	for p := range edges {
+		ps = append(ps, p)
+	}
+	sort.Strings(ps)
+	for _, p := range ps {
+		es := []string{}
+		for e := range edges[p] {
+			es = append(es, e)
+		}
+		sort.Strings(es)
+		fmt.Fprintf(os.Stderr, "%s exported_functions=%d imports=%s\n", p, exports[p], strings.Join(es, ","))
+	}
+}
