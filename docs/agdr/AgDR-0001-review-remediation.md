@@ -53,4 +53,4 @@ Choose cohesive values and shared typed operations because they correct the iden
 ## Artifacts
 
 - `docs/reviews/architecture-2026-10-27/report.md`
-- Remediation draft PR to be added after publication.
+- Draft PR: [#38](https://github.com/Mohammed-Ashour/tlego/pull/38).
