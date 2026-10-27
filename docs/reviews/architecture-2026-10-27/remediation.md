@@ -1,7 +1,9 @@
 # Architecture review corrections
 
-Date: 2026-10-27  
-Branch: `fix/architecture-review-findings`  
+Date: 2026-10-27
+
+Branch: `fix/architecture-review-findings`
+
 Review baseline: `edd02fd89c22bf5443f77e6e702f62c94b13ce00`
 
 All P1 and P2 findings from the [baseline report](report.md) have corrections and regression tests.

@@ -1,8 +1,11 @@
 # TLEGO architecture, complexity, and design pattern review
 
-Review date: 2026-10-27  
-Branch: `main`  
-Commit: `edd02fd89c22bf5443f77e6e702f62c94b13ce00`  
+Review date: 2026-10-27
+
+Branch: `main`
+
+Commit: `edd02fd89c22bf5443f77e6e702f62c94b13ce00`
+
 Scope: Current repository code, including the Go application, browser code, and Python calendar example.
 
 ## 1. Review result

@@ -1,6 +1,7 @@
 # Verification record
 
-Review date: 2026-10-27  
+Review date: 2026-10-27
+
 Commit: `edd02fd89c22bf5443f77e6e702f62c94b13ce00`
 
 ## Existing checks
