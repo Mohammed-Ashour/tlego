@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	utils "github.com/Mohammed-Ashour/tlego/pkg/utils"
 )
 
@@ -124,5 +125,70 @@ func TestInvalidTLE(t *testing.T) {
 				t.Errorf("ParseTLE() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestMalformedInputAndParserParity(t *testing.T) {
+	lines := strings.Split(sampleTLE, "\n")
+	mutate := func(s string, start, end int, value string) string { return s[:start] + value + s[end:] }
+	tests := []struct {
+		name, line1, line2 string
+	}{
+		{"valid", lines[1], lines[2]},
+		{"short line 1", "1 ", lines[2]},
+		{"short line 2", lines[1], "2 "},
+		{"missing ID", mutate(lines[1], 2, 7, "     "), lines[2]},
+		{"mismatched IDs", lines[1], mutate(lines[2], 2, 7, "12345")},
+		{"bad epoch", mutate(lines[1], 20, 23, "000"), lines[2]},
+		{"bad derivative", mutate(lines[1], 44, 52, " invalid"), lines[2]},
+		{"bad inclination", lines[1], mutate(lines[2], 8, 16, "     NaN")},
+		{"bad eccentricity", lines[1], mutate(lines[2], 26, 33, "12x4567")},
+		{"bad mean motion", lines[1], mutate(lines[2], 52, 63, " 0.00000000")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload := []byte(tt.line1 + "\n" + tt.line2)
+			shared, sharedErr := elements.ParseTLE(payload, "")
+			public, publicErr := ParseTLE(tt.line1, tt.line2, "NAME")
+			if (sharedErr == nil) != (publicErr == nil) || (sharedErr == nil) != (tt.name == "valid") {
+				t.Fatalf("shared error %v; public error %v", sharedErr, publicErr)
+			}
+			if sharedErr == nil && (public.Line1.LineString != shared[0].Line1.LineString || public.Line2.LineString != shared[0].Line2.LineString || public.Line2.MeanMotion != shared[0].Line2.MeanMotion) {
+				t.Fatalf("parsed lines differ: %#v and %#v", public, shared[0])
+			}
+		})
+	}
+}
+
+func TestReadTLEFileRejectsUnpairedLines(t *testing.T) {
+	lines := strings.Split(sampleTLE, "\n")
+	for _, contents := range []string{"2 ", lines[1], lines[2], lines[1] + "\n" + lines[1], ""} {
+		path := t.TempDir() + "/input.tle"
+		if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ReadTLEFile(path); err == nil {
+			t.Fatalf("accepted %q", contents)
+		}
+	}
+}
+
+func TestStandaloneLinesValidateFields(t *testing.T) {
+	lines := strings.Split(sampleTLE, "\n")
+	if _, err := ReadTLELine1(lines[1]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadTLELine2(lines[2]); err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range []string{"1 ", strings.Replace(lines[1], "44744", "     ", 1)} {
+		if _, err := ReadTLELine1(line); err == nil {
+			t.Fatalf("accepted %q", line)
+		}
+	}
+	for _, line := range []string{"2 ", strings.Replace(lines[2], "15.06407194", " 0.00000000", 1)} {
+		if _, err := ReadTLELine2(line); err == nil {
+			t.Fatalf("accepted %q", line)
+		}
 	}
 }
