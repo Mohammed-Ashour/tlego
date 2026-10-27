@@ -75,6 +75,7 @@
             <label for="satellite">Satellites (hold Ctrl/Cmd to select multiple):</label>
             <select id="satellite" onchange="onSatelliteChange()" multiple size="5"></select>
         </div>
+        <div id="request-status" role="status" aria-live="polite"></div>
     </div>
     <div id="info"></div>
     <div id="container"></div>
@@ -82,8 +83,8 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { createCatalogRequests } from './catalog-requests.mjs';
         
-        const apiBase = '/api';
         const EARTH_RADIUS = 6371; // km
         const SCALE = 1/6371; // Scale everything relative to Earth radius
 
@@ -151,44 +152,35 @@
         const starField = new THREE.Points(starGeometry, starMaterial);
         scene.add(starField);
 
-        async function fetchGroups() {
-            const res = await fetch(`${apiBase}/satellite-groups`);
-            const groups = await res.json();
-            const groupDropdown = document.getElementById('group');
-            groupDropdown.innerHTML = '';
-            groups.forEach(group => {
-                const option = document.createElement('option');
-                option.value = group;
-                option.textContent = group;
-                groupDropdown.appendChild(option);
-            });
-            if (groups.length > 0) {
-                groupDropdown.selectedIndex = 0;
-                await fetchSatellites(groups[0]);
-            }
-        }
+        const requests = createCatalogRequests({
+            onGroups(groups) {
+                const dropdown = document.getElementById('group');
+                dropdown.replaceChildren(...groups.map(group => new Option(group, group)));
+                if (groups.length) dropdown.selectedIndex = 0;
+            },
+            onSatellites(records) {
+                const dropdown = document.getElementById('satellite');
+                dropdown.replaceChildren(...records.map(sat => new Option(`${sat.name} (${sat.norad_id})`, sat.norad_id)));
+                if (records.length) dropdown.selectedIndex = 0;
+            },
+            onPositions: displaySatellitePositions,
+            onLoading(kind) {
+                document.getElementById('satellite').disabled = kind !== 'positions';
+                document.getElementById('request-status').textContent = 'Loading selection...';
+            },
+            onSettled() {
+                document.getElementById('satellite').disabled = false;
+                const status = document.getElementById('request-status');
+                if (status.textContent === 'Loading selection...') status.textContent = '';
+            },
+            onError(error) {
+                document.getElementById('request-status').textContent = `Unable to load selection. ${error.message}`;
+            },
+        });
 
-        async function fetchSatellites(group) {
-            const response = await fetch(`${apiBase}/satellites?group=${encodeURIComponent(group)}`);
-            const satellites = await response.json();
-            const satDropdown = document.getElementById('satellite');
-            satDropdown.innerHTML = '';
-            satellites.forEach(sat => {
-                const option = document.createElement('option');
-                option.value = sat.norad_id;
-                option.textContent = `${sat.name} (${sat.norad_id})`;
-                satDropdown.appendChild(option);
-            });
-            if (satellites.length > 0) {
-                satDropdown.selectedIndex = 0;
-                await updateSatellitePositions();
-            }
-        }
-
-        async function updateSatellitePositions() {
-            const satDropdown = document.getElementById('satellite');
-            const selectedNoradIDs = Array.from(satDropdown.selectedOptions).map(opt => opt.value);
-            
+        // Replace the last valid scene only after the complete selection loads.
+        function displaySatellitePositions(records) {
+            const selectedNoradIDs = records.map(record => record.id);
             // Remove satellites that are no longer selected
             for (const [noradId, sat] of satellites.entries()) {
                 if (!selectedNoradIDs.includes(noradId)) {
@@ -203,11 +195,7 @@
 
             // Update or add selected satellites
             const infoTexts = [];
-            for (const noradID of selectedNoradIDs) {
-                if (!noradID) continue;
-
-                const response = await fetch(`${apiBase}/location?norad_id=${noradID}`);
-                const data = await response.json();
+            for (const { id: noradID, data } of records) {
                 
                 // Add to info panel
                 infoTexts.push(
@@ -275,12 +263,10 @@ Geodetic Position:
             document.getElementById('info').textContent = infoTexts.join('\n\n');
         }
 
-        window.onGroupChange = async function() {
-            const group = document.getElementById('group').value;
-            await fetchSatellites(group);
-        };
-
-        window.onSatelliteChange = updateSatellitePositions;
+        window.onGroupChange = () => requests.selectGroup(document.getElementById('group').value);
+        window.onSatelliteChange = () => requests.selectSatellites(
+            Array.from(document.getElementById('satellite').selectedOptions, option => option.value).filter(Boolean)
+        );
 
         // Animation loop
         function animate() {
@@ -306,7 +292,7 @@ Geodetic Position:
         });
 
         // Start everything
-        fetchGroups();
+        requests.loadGroups();
         animate();
     </script>
 </body>
