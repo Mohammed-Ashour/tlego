@@ -6,7 +6,7 @@ TLEGO retrieves satellite elements, computes positions and pass estimates, and e
 
 ## Scope and Assumptions
 
-Verified on 2026-10-25 against the current repository, using the previous ARCHITECTURE.md baseline and inspecting the implemented packages. The core and executable extension system is implemented. GP JSON ingestion and direct SGP4 initialization are implemented. Runtime TUI/provider extensions remain outside the executable extension contract.
+Verified on 2026-10-27 against the current repository, using the previous ARCHITECTURE.md baseline and inspecting the implemented packages. The core and executable extension system is implemented. GP JSON ingestion and direct SGP4 initialization are implemented. Runtime TUI/provider extensions remain outside the executable extension contract.
 
 ## System Overview
 
@@ -58,17 +58,17 @@ flowchart TD
 | Area | Responsibility | Dependencies and limits |
 |---|---|---|
 | cmd | Input validation, orchestration, presentation and dispatch | Shared core and frontend entry points; no independent fetching or propagation |
-| internal/catalog | Embedded groups, ID and element validation, HTTP retrieval, cache policy, provenance and deduplicated search | Standard HTTP/filesystem and the dependency TLE parser; no UI or orbital calculation |
-| internal/elements | Validated TLE and GP JSON records, exact catalog IDs and original source | Standard library and legacy TLE types; no fetching or propagation |
+| internal/catalog | Embedded groups, ID validation, HTTP retrieval, cache policy, provenance and deduplicated search | Standard HTTP/filesystem and internal/elements parsing; no UI or orbital calculation |
+| internal/elements | Shared TLE line/payload validation and parsing, GP JSON records, exact catalog IDs and original source | Standard library and legacy TLE field types; no fetching or propagation |
 | internal/sgp4 | Direct mean-element initialization and near-Earth/deep-space propagation | Source-carried numerical engine with upstream license and provenance |
 | internal/orbit | UTC propagation, TEME vectors, geographic coordinates, vector speed, derived orbit estimates, observers and pass sampling | Internal SGP4 engine and dependency coordinate conversions; no HTTP, filesystem, output encoding or terminal state |
 | internal/output | Legacy report encoding and explicit JSON v1 transport records | Orbit types and element records; no fetching or process execution |
 | internal/extensions | PATH discovery, direct executable launch, streams, status, cancellation and embedded starter generation | Standard process/filesystem APIs; Windows cleanup uses the existing x/sys dependency |
-| pkg/tui | Screen/input state, settings, request generations and rendering | Core packages; old exported domain/report helpers remain wrappers |
+| pkg/tui | Screen/input state, settings, selected records with provenance, cancellable requests, tracking sessions and pass results | Core packages; old exported domain/report helpers remain wrappers |
 | pkg/server | HTTP request validation, response adapters and static serving | Shared catalog, orbit and output packages |
 | pkg/visual, pkg/templates | Orbit sampling and embedded offline HTML export | Core orbital states, export validation and the pinned compiled viewer |
 | pkg/celestrak, pkg/tui/data | Historical public catalog APIs | Thin adapters to internal/catalog; mutable legacy URL/download configuration remains supported |
-| pkg/tle, pkg/utils | Historical parser/conversion APIs | Retained for compatibility; active frontends use the shared core |
+| pkg/tle, pkg/utils | Historical parser/conversion APIs | Public TLE parsing adapts internal/elements with unchanged exported types; legacy conversion helpers remain |
 
 ## External Integrations
 
@@ -81,13 +81,19 @@ flowchart TD
 
 ## Core Data Flow (Current)
 
-All frontends retrieve through internal/catalog.Store. A request validates its ID before network/filesystem access, validates usable cache records, performs bounded context-aware HTTP retrieval when needed, validates a temporary payload before atomic cache replacement, and can fall back to a valid stale cache with a warning. GP JSON uses isolated elements/norad and elements/groups cache directories. Valid legacy .tle caches remain usable offline, and expired legacy records can be a fallback when JSON retrieval fails. A valid JSON cache takes priority over legacy data. Cache modification time records retrieval freshness; element epoch remains separate. Group lookup ignores case. Shared search deduplicates matches, returns coverage and warns on partial results; complete retrieval failure is an error. Local input passes through the same element validation without a provider request.
+All frontends retrieve through internal/catalog.Store. A request validates its ID before network/filesystem access, validates usable cache records, performs bounded context-aware HTTP retrieval when needed, validates the payload before atomic cache replacement, and can fall back to a valid stale cache with a warning. GP JSON uses isolated elements/norad and elements/groups cache directories. Valid legacy .tle caches remain usable offline, and expired legacy records can be a fallback when JSON retrieval fails. A valid JSON cache takes priority over legacy data. Cache modification time records retrieval freshness; element epoch remains separate. Group lookup ignores case. Shared search deduplicates matches and retains each selected record with its retrieval metadata. It returns coverage and warns on partial results. Deadline expiry preserves successful coverage; explicit cancellation and complete retrieval failure remain errors. Local input passes through the same element validation without a provider request.
 
-internal/orbit.Propagator.At converts evaluation time to whole-second UTC, retains the full element epoch, propagates TEME position and velocity in km and km/s, converts latitude/longitude to degrees with longitude in [-180, 180), and derives altitude and vector speed. PlanPasses validates the observer and sample budget, then samples the zero-degree horizon with clipped-window flags. Pass events and maxima have the declared sampling resolution. PositionFromSatellite, OrbitInfoFromTLE and TUI ComputePasses retain their original public signatures through adapters.
+Cache lifecycle and refresh coordination live in internal/catalog/cache.go. Valid fresh cache hits bypass active refreshes. Equivalent overlapping requests share one refresh outcome, including stale fallback or provider failure. Waiters have independent cancellation and receive copies of mutable record data. A canceled leader allows remaining callers to retry. Coordination uses absolute paths and remains process-local. TLE and GP use the same lifecycle with typed decoders and explicit legacy fallback.
 
-internal/output builds legacy reports with explicit generation time and encodes legacy text, JSON and CSV. Versioned JSON uses separate position/report/pass records and provenance. CLI predict/report/passes support --format json and --schema-version 1.0; stdout receives one complete successful document, while failures use JSON stderr and a nonzero status. The TUI retains legacy json and adds json-v1. HTTP retains /api/location and adds /api/v1/position. GP reports preserve the original object in element_data and leave the legacy tle string empty. source_format identifies gp-json; no synthetic TLE is created. Field names and units are documented in docs/schema-v1.json and docs/extensions.md.
+internal/elements owns TLE line and payload validation before the retained upstream field parser runs. Catalog and public pkg/tle entry points share these rules. Public legacy structs and signatures remain available through conversion adapters.
+
+internal/orbit.Propagator.At converts evaluation time to whole-second UTC, retains the full element epoch, propagates TEME position and velocity in km and km/s, converts latitude/longitude to degrees with longitude in [-180, 180), and derives altitude and vector speed. PlanPasses validates the observer and sample budget, then samples the zero-degree horizon with clipped-window flags. Pass events and maxima have the declared sampling resolution. Context-aware pass APIs stop sampling on cancellation; the original APIs remain wrappers. PositionFromSatellite, OrbitInfoFromTLE and TUI ComputePasses retain their original public signatures through adapters.
+
+internal/output builds legacy reports with explicit generation time and encodes legacy text, JSON and CSV. Versioned JSON uses separate position/report/pass records and provenance. CLI predict/report/passes support --format json and --schema-version 1.0; stdout receives one complete successful document, while failures use JSON stderr and a nonzero status. The TUI retains legacy json and adds json-v1. Selected records carry their retrieval metadata through group and search caches. Requests inherit the program context and cancel on replacement, navigation or exit. Tracking ticks identify their session. Pass results retain their element version, observer, window and step; observer or element changes invalidate them. Report replacement uses a checked temporary file and preserves existing permission bits. HTTP retains /api/location and adds /api/v1/position. GP reports preserve the original object in element_data and leave the legacy tle string empty. source_format identifies gp-json; no synthetic TLE is created. Field names and units are documented in docs/schema-v1.json and docs/extensions.md.
 
 The viz command accepts a live catalog ID or a validated local TLE or GP JSON file. pkg/visual samples core states from one UTC start and atomically writes embedded data, renderer and CSS. Points are physical TEME kilometres with UTC times and metadata. The frontend maps axes into Three.js, rotates the globe using UTC-derived GMST, and interpolates only within the common sample interval. The viewer bundle has a separate Node build/check job; Go consumers do not need Node.
+
+The experimental public browser client owns one active selection request. New selections abort previous requests and reject their late responses. HTTP failures show a status message and preserve the last complete scene.
 
 Unknown valid top-level commands resolve to tlego-command on PATH. Built-in names and aliases always win; invalid native flags do not trigger dispatch. Extensions inherit arguments, streams, environment and working directory. Discovery lists paths without executing code. plugin init creates standalone projects from internal/extensions/templates with a sample command, tests and installation instructions. docs/writing-extensions.md explains extension development. The Python calendar example consumes pass-plan JSON and emits an iCalendar file as an independent process.
 
@@ -95,7 +101,7 @@ Unknown valid top-level commands resolve to tlego-command on PATH. Built-in name
 
 - Core packages do not import cmd, pkg/tui or pkg/server. UI request state and rendering remain in the frontend.
 - internal/sgp4 owns numerical SGP4 calculations and direct initialization. TLEGO owns consistent time, units, input validation and output contracts. Changes to the source-carried numerical files require comparison with the pinned upstream revision and reference-vector validation.
-- Settings and recent-history persistence remain TUI concerns. Report generation time is explicit in the reusable builder.
+- Settings and recent-history persistence remain TUI concerns. Selection metadata, pass input identity and tracking session identity belong to the TUI. Report generation time is explicit in the reusable builder.
 - Versioned transport records are separate from legacy exported Go/report structures. Schema additions must remain compatible within a major version.
 - Executable extensions add commands only. They do not inject TUI panels, replace providers or register in-process callbacks. They run with the user's permissions and are not sandboxed by the host.
 - Public pkg APIs are compatibility commitments. Thin wrappers remain where implementations moved into internal/.
