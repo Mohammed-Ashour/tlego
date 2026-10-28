@@ -18,21 +18,32 @@ func writeReport(path, output string) error {
 }
 
 func writeReportWith(path string, data []byte, create func(string, string) (reportTemp, error)) error {
-	mode := os.FileMode(0o644)
-	info, err := os.Stat(path)
-	if err == nil {
-		mode = info.Mode() & (os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky)
-	} else if !os.IsNotExist(err) {
+	info, err := os.Lstat(path)
+	if err != nil && !os.IsNotExist(err) {
 		return err
+	}
+	if err == nil && info.Mode()&os.ModeSymlink != 0 {
+		path, err = filepath.EvalSymlinks(path)
+		if err != nil {
+			return err
+		}
+		info, err = os.Stat(path)
+		if err != nil {
+			return err
+		}
 	}
 	f, err := create(filepath.Dir(path), ".tlego-report-*")
 	if err != nil {
 		return err
 	}
 	defer os.Remove(f.Name())
-	if err = f.Chmod(mode); err != nil {
-		_ = f.Close()
-		return err
+	// CreateTemp keeps new reports private and respects a restrictive umask.
+	if info != nil {
+		mode := info.Mode() & (os.ModePerm | os.ModeSetuid | os.ModeSetgid | os.ModeSticky)
+		if err = f.Chmod(mode); err != nil {
+			_ = f.Close()
+			return err
+		}
 	}
 	n, err := f.Write(data)
 	if err == nil && n != len(data) {
