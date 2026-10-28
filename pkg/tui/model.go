@@ -279,7 +279,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		m.warning = msg.meta.Warning
+		resumeTracking := m.active == screenTrack && m.trackRunning && m.currentEntry != nil && m.currentEntry.Record.CatalogID == msg.record.CatalogID
 		m.setCurrentEntry(catalog.ElementEntry{Record: msg.record, Meta: msg.meta})
+		if resumeTracking && m.currentSat != nil {
+			m.trackRunning = true
+			return m, trackTickCmd(m.settings.RefreshInterval(), m.trackSession)
+		}
 	case searchResultsMsg:
 		m.loading = false
 		if msg.err != nil {
