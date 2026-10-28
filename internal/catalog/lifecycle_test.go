@@ -583,3 +583,76 @@ func TestSharedLegacyFallbackHasIndependentNestedData(t *testing.T) {
 		t.Fatal("shared legacy data")
 	}
 }
+
+func TestDefaultStoresShareOverlappingRefreshes(t *testing.T) {
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+	for _, format := range []string{"tle", "gp-json"} {
+		for _, outcome := range []string{"success", "failure"} {
+			t.Run(format+"/"+outcome, func(t *testing.T) {
+				started, release := make(chan struct{}), make(chan struct{})
+				var calls atomic.Int32
+				http.DefaultTransport = roundTripFunc(func(*http.Request) (*http.Response, error) {
+					if calls.Add(1) == 1 {
+						close(started)
+						<-release
+					}
+					if outcome == "failure" {
+						return nil, errors.New("provider unavailable")
+					}
+					body := validTLE
+					if format == "gp-json" {
+						body = gpJSON("25544", "ISS")
+					}
+					return response(http.StatusOK, body), nil
+				})
+				dir := t.TempDir()
+				first, second := NewStore(dir, -1), NewStore(dir, -1)
+				path := filepath.Join(dir, "cache")
+				fetch := func(ctx context.Context, store *Store) error {
+					if format == "gp-json" {
+						_, _, err := store.fetchElements(ctx, "https://fixture.invalid", path, "25544")
+						return err
+					}
+					_, _, err := store.fetchURL(ctx, "https://fixture.invalid", path, "25544")
+					return err
+				}
+				done := make(chan error, 2)
+				go func() { done <- fetch(context.Background(), first) }()
+				<-started
+				waiter := newObservingContext()
+				go func() { done <- fetch(waiter, second) }()
+				waitForWaiter(t, waiter)
+				close(release)
+				for i := 0; i < 2; i++ {
+					err := <-done
+					if (err != nil) != (outcome == "failure") {
+						t.Fatalf("outcome=%s error=%v", outcome, err)
+					}
+				}
+				if calls.Load() != 1 {
+					t.Fatalf("provider calls=%d, want one shared refresh", calls.Load())
+				}
+				// A later forced refresh must still contact the provider.
+				_ = fetch(context.Background(), second)
+				if calls.Load() != 2 {
+					t.Fatalf("sequential provider calls=%d, want 2", calls.Load())
+				}
+			})
+		}
+	}
+}
+
+func TestCustomStoreClientDoesNotChangeDefaultClient(t *testing.T) {
+	before := NewStore(t.TempDir(), 0)
+	custom := &http.Client{Timeout: time.Second}
+	configured := NewStoreWithClient(t.TempDir(), 0, custom)
+	after := NewStore(t.TempDir(), 0)
+	if configured.client != custom || before.client != after.client || configured.client == after.client {
+		t.Fatal("default and custom client identities were mixed")
+	}
+	configured.SetHTTPClient(&http.Client{Timeout: 2 * time.Second})
+	if after.client != before.client || after.client.Timeout != 30*time.Second {
+		t.Fatal("custom store changed the shared default client")
+	}
+}

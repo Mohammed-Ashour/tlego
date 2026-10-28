@@ -28,6 +28,10 @@ type Store struct {
 
 const maxTLEPayloadSize = 32 << 20
 
+// Default stores share a client so equivalent refreshes share its identity.
+// Store-specific clients remain separate and are never modified here.
+var defaultHTTPClient = &http.Client{Timeout: 30 * time.Second}
+
 var CelestrakURL = "https://celestrak.org/NORAD/elements/gp.php?CATNR=NORADID&FORMAT=TLE"
 
 // CelestrakGPURL is the CelesTrak GP endpoint template used by the
@@ -80,7 +84,7 @@ func NewStore(cacheDir string, cacheTTL time.Duration) *Store {
 		cacheDir: cacheDir,
 		cacheErr: cacheErr,
 		cacheTTL: cacheTTL,
-		client:   &http.Client{Timeout: 30 * time.Second},
+		client:   defaultHTTPClient,
 	}
 }
 
