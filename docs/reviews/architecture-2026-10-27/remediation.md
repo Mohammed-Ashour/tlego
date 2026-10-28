@@ -71,3 +71,23 @@ Search remains sequential. Its deadline and partial-result contract is now expli
 Windows runtime tests remain the responsibility of the existing Windows CI job. Local cross-compilation does not establish Windows runtime behavior.
 
 The baseline measurements and defect probes describe the review commit. The new regression tests verify the corrected behavior.
+
+
+## Terra review corrections, 2026-10-28
+
+The follow-up review used commit `6b6797e4d73a06d39d9300d734055ca8ffc81617`. All four confirmed findings have focused corrections.
+
+| Finding | Correction | Regression checks |
+|---|---|---|
+| New report permissions bypassed the umask | New reports retain private temporary-file permissions. Existing target permissions remain unchanged. | Unix umasks 022, 077 and 777. |
+| Symlink report destinations were replaced | Existing links resolve before temporary-file creation and target replacement. The links remain intact. | Absolute, relative and chained links; injected write and close failures. |
+| Successful tracking reload stopped tracking | Reload of the same active satellite starts one new session tick. Previous ticks remain invalid. | Active and paused tracking, changed satellite, initialization failure and previous-session ticks. |
+| Default stores missed refresh sharing | Default stores share one private HTTP client. Explicit custom clients remain separate. | Overlapping success and failure for both formats across separate stores; later forced refresh and custom-client isolation. |
+
+The browser review also identified an existing group-state gap. A group change now clears previous satellite choices. Empty choices stay disabled after failure, while the last valid scene remains visible.
+
+The JavaScript suite now has 12 tests, including the failed-group transition.
+
+Existing valid report symlinks remain supported. Dangling or unresolved links return an error before writing. New Unix reports use mode 0600 or stricter; they no longer default to 0644.
+
+The approach is recorded in [AgDR-0002](../../agdr/AgDR-0002-review-regressions.md).
