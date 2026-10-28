@@ -30,7 +30,7 @@ test('group responses completed in reverse order preserve the latest selection',
     await current;
     h.respond(0, [{ norad_id: '25544', name: 'old' }]);
     await previous;
-    assert.deepEqual(h.updates.satellites, [[]]);
+    assert.equal(h.updates.satellites.every(records => records.length === 0), true);
     assert.deepEqual(h.updates.positions, [[]]);
     assert.equal(h.pending.length, 2);
     assert.equal(h.updates.settled, 1);
@@ -124,4 +124,24 @@ test('invalid JSON reports a failure without changing the scene', async () => {
     await current;
     assert.deepEqual(h.updates.positions, []);
     assert.deepEqual(h.updates.errors, ['Invalid JSON']);
+});
+
+
+test('failed group changes clear old choices without replacing the last valid scene', async () => {
+    const h = harness();
+    const first = h.requests.selectGroup('working');
+    h.respond(0, [{ name: 'ISS', norad_id: '25544' }]);
+    await flush();
+    h.respond(1, { name: 'ISS' });
+    await first;
+    const displayed = h.updates.positions.at(-1);
+    const failed = h.requests.selectGroup('broken');
+    // Old options disappear immediately, before the failing request completes.
+    assert.deepEqual(h.updates.satellites.at(-1), []);
+    h.pending[2].resolve({ ok: false, status: 502, statusText: 'Bad Gateway' });
+    await failed;
+    assert.deepEqual(h.updates.satellites.at(-1), []);
+    assert.deepEqual(h.updates.positions, [displayed]);
+    assert.deepEqual(h.updates.errors, ['Request failed (502 Bad Gateway).']);
+    assert.equal(h.pending.length, 3);
 });

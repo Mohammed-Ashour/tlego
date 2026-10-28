@@ -169,7 +169,8 @@
                 document.getElementById('request-status').textContent = 'Loading selection...';
             },
             onSettled() {
-                document.getElementById('satellite').disabled = false;
+                const dropdown = document.getElementById('satellite');
+                dropdown.disabled = dropdown.options.length === 0;
                 const status = document.getElementById('request-status');
                 if (status.textContent === 'Loading selection...') status.textContent = '';
             },

@@ -38,6 +38,7 @@ export function createCatalogRequests({ fetch: fetchJSON = globalThis.fetch, onG
     }
 
     async function group(name, request) {
+        onSatellites([]);
         const result = await readJSON(`/api/satellites?group=${encodeURIComponent(name)}`, request.signal);
         if (!request.current()) return;
         onSatellites(result);
