@@ -37,7 +37,7 @@ func planPasses(ctx context.Context, c *cli.Command) error {
 	if err != nil {
 		return commandError(c, err)
 	}
-	passes, err := orbit.PlanPassesElements(sat, obs, instant, duration, step)
+	passes, err := orbit.PlanPassesElementsContext(ctx, sat, obs, instant, duration, step)
 	if err != nil {
 		return commandError(c, err)
 	}

@@ -1,6 +1,7 @@
 package orbit
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
@@ -42,15 +43,25 @@ func (o Observer) Validate() error {
 
 // PlanPasses estimates passes by sampling elevation at step intervals.
 func PlanPasses(sat satellite.Satellite, obs Observer, start time.Time, duration, step time.Duration) ([]Pass, error) {
-	return planPasses(func(t time.Time) (State, error) { state := At(sat, t); return state, ValidateState(state) }, obs, start, duration, step)
+	return PlanPassesContext(context.Background(), sat, obs, start, duration, step)
+}
+
+// PlanPassesContext estimates passes and stops sampling when ctx is canceled.
+func PlanPassesContext(ctx context.Context, sat satellite.Satellite, obs Observer, start time.Time, duration, step time.Duration) ([]Pass, error) {
+	return planPasses(ctx, func(t time.Time) (State, error) { state := At(sat, t); return state, ValidateState(state) }, obs, start, duration, step)
 }
 
 // PlanPassesElements estimates passes from directly initialized mean elements.
 func PlanPassesElements(prop *Propagator, obs Observer, start time.Time, duration, step time.Duration) ([]Pass, error) {
-	return planPasses(prop.At, obs, start, duration, step)
+	return PlanPassesElementsContext(context.Background(), prop, obs, start, duration, step)
 }
 
-func planPasses(at func(time.Time) (State, error), obs Observer, start time.Time, duration, step time.Duration) ([]Pass, error) {
+// PlanPassesElementsContext stops sampling when ctx is canceled.
+func PlanPassesElementsContext(ctx context.Context, prop *Propagator, obs Observer, start time.Time, duration, step time.Duration) ([]Pass, error) {
+	return planPasses(ctx, prop.At, obs, start, duration, step)
+}
+
+func planPasses(ctx context.Context, at func(time.Time) (State, error), obs Observer, start time.Time, duration, step time.Duration) ([]Pass, error) {
 	if err := obs.Validate(); err != nil {
 		return nil, err
 	}
@@ -76,6 +87,9 @@ func planPasses(at func(time.Time) (State, error), obs Observer, start time.Time
 	var cur Pass
 	maxEl := -90.0
 	for t := start; ; {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		state, err := at(t)
 		if err != nil {
 			return nil, fmt.Errorf("invalid propagated state at %s: %w", t.Format(time.RFC3339), err)

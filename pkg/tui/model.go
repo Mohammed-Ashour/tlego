@@ -1,8 +1,8 @@
 package tui
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -84,14 +84,13 @@ type Model struct {
 	results    []TLESummary
 	resultList list.Model
 
-	groupCache map[string][]elements.Record
-	tleCache   map[string]elements.Record
+	groupCache map[string][]catalog.ElementEntry
+	tleCache   map[string]catalog.ElementEntry
 
-	currentTLE  *elements.Record
-	currentMeta catalog.FetchMeta
-	currentSat  *orbit.Propagator
-	currentPos  Position
-	currentOrb  OrbitInfo
+	currentEntry *catalog.ElementEntry
+	currentSat   *orbit.Propagator
+	currentPos   Position
+	currentOrb   OrbitInfo
 
 	detailTab int
 
@@ -105,12 +104,15 @@ type Model struct {
 	reportOutput string
 	reportSaved  string
 
-	passes        []Pass
+	passResult    passResult
 	passesLoading bool
 	passesErr     error
 
-	requestID    uint64
-	scrollOffset int
+	requestID      uint64
+	request        *requestState
+	trackSession   uint64
+	elementVersion uint64
+	scrollOffset   int
 
 	loading       bool
 	loadingReason string
@@ -174,9 +176,10 @@ func NewModel(opts Options, settings Settings, store *catalog.Store, settingsErr
 		reportPath:     reportPath,
 		settingsInputs: settingsInputs,
 		settingsIndex:  0,
-		groupCache:     make(map[string][]elements.Record),
-		tleCache:       make(map[string]elements.Record),
+		groupCache:     make(map[string][]catalog.ElementEntry),
+		tleCache:       make(map[string]catalog.ElementEntry),
 		reportFormat:   "text",
+		request:        &requestState{parent: context.Background()},
 		detailTab:      0,
 	}
 
@@ -189,13 +192,13 @@ func (m Model) Init() tea.Cmd {
 		fetchGroupsCmd(m.store),
 	}
 	if m.options.NoradID != "" && m.options.TrackNorad == "" {
-		cmds = append(cmds, m.wrapRequest(fetchNoradCmd(m.store, m.options.NoradID)))
+		cmds = append(cmds, m.wrapRequest(fetchNoradCmd(m.initialContext(), m.store, m.options.NoradID)))
 	}
 	if m.options.TrackNorad != "" {
-		cmds = append(cmds, m.wrapRequest(fetchNoradCmd(m.store, m.options.TrackNorad)))
+		cmds = append(cmds, m.wrapRequest(fetchNoradCmd(m.initialContext(), m.store, m.options.TrackNorad)))
 	}
 	if m.options.Group != "" && m.options.NoradID == "" && m.options.TrackNorad == "" {
-		cmds = append(cmds, m.wrapRequest(fetchGroupTLEsCmd(m.store, m.options.Group)))
+		cmds = append(cmds, m.wrapRequest(fetchGroupTLEsCmd(m.initialContext(), m.store, m.options.Group)))
 	}
 	return tea.Batch(cmds...)
 }
@@ -221,6 +224,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resultList.SetSize(listWidth, listHeight)
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
+			m.cancelRequest()
 			return m, tea.Quit
 		}
 		if m.commandMode {
@@ -252,14 +256,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			break
 		}
-		m.currentMeta = msg.meta
 		m.warning = msg.meta.Warning
-		m.groupCache[msg.group] = msg.records
+		entries := make([]catalog.ElementEntry, 0, len(msg.records))
+		for _, record := range msg.records {
+			entries = append(entries, catalog.ElementEntry{Record: record, Meta: msg.meta})
+		}
+		m.groupCache[msg.group] = entries
 		m.selectedGroup = msg.group
 		m.results = buildElementSummaries(msg.records)
 		m.resultList.SetItems(tleSummariesToItems(m.results))
 		for _, item := range msg.records {
-			m.tleCache[item.CatalogID] = item
+			m.tleCache[item.CatalogID] = catalog.ElementEntry{Record: item, Meta: msg.meta}
 		}
 		if msg.query != "" {
 			m.applySearch(msg.group, msg.query)
@@ -272,8 +279,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		m.warning = msg.meta.Warning
-		m.currentMeta = msg.meta
-		m.setCurrentElement(msg.record)
+		resumeTracking := m.active == screenTrack && m.trackRunning && m.currentEntry != nil && m.currentEntry.Record.CatalogID == msg.record.CatalogID
+		m.setCurrentEntry(catalog.ElementEntry{Record: msg.record, Meta: msg.meta})
+		if resumeTracking && m.currentSat != nil {
+			m.trackRunning = true
+			return m, trackTickCmd(m.settings.RefreshInterval(), m.trackSession)
+		}
 	case searchResultsMsg:
 		m.loading = false
 		if msg.err != nil {
@@ -281,17 +292,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			break
 		}
-		for _, item := range msg.records {
-			m.tleCache[item.CatalogID] = item
+		for _, entry := range msg.entries {
+			m.tleCache[entry.Record.CatalogID] = entry
 		}
 		m.results = msg.results
 		m.resultList.SetItems(tleSummariesToItems(m.results))
 		m.status = fmt.Sprintf("Found %d matches", len(msg.results))
 		m.warning = msg.warning
 	case trackTickMsg:
-		if m.trackRunning && m.currentSat != nil {
-			m.updateTrackPosition(time.Time(msg))
-			return m, trackTickCmd(m.settings.RefreshInterval())
+		if m.trackRunning && m.currentSat != nil && msg.session == m.trackSession {
+			m.updateTrackPosition(msg.at)
+			return m, trackTickCmd(m.settings.RefreshInterval(), m.trackSession)
 		}
 	case predictDoneMsg:
 		m.loading = false
@@ -303,14 +314,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.predictResult = &msg.result
 		m.status = "Prediction ready"
 	case passesLoadedMsg:
+		if m.currentEntry == nil || msg.input.element != m.currentEntry.Record.CatalogID || msg.input.version != m.elementVersion || msg.input.observer != m.settings.Observer {
+			break
+		}
 		m.passesLoading = false
+		m.loading = false
 		m.passesErr = msg.err
 		if msg.err != nil {
 			m.status = "Pass prediction failed"
 			m.err = msg.err
 			break
 		}
-		m.passes = msg.passes
+		m.passResult = passResult{input: msg.input, passes: msg.passes}
 	case reportBuiltMsg:
 		m.loading = false
 		if msg.err != nil {
@@ -361,6 +376,7 @@ func (m *Model) handleGlobalKeys(msg tea.KeyMsg) (tea.Cmd, bool) {
 	case "q":
 		if m.active == screenHome {
 			m.status = "Exiting"
+			m.cancelRequest()
 			return tea.Quit, true
 		}
 		m.setScreen(screenHome)
@@ -440,10 +456,19 @@ func previousScreen(current screen) screen {
 }
 
 func (m *Model) setCurrentElement(record elements.Record) {
+	m.setCurrentEntry(catalog.ElementEntry{Record: record})
+}
+
+func (m *Model) setCurrentEntry(entry catalog.ElementEntry) {
+	record := entry.Record
+	m.cancelRequest()
 	m.requestID++
+	m.trackSession++
+	m.elementVersion++
+	m.trackRunning = false
 	m.loading = false
 	m.predictResult = nil
-	m.passes = nil
+	m.passResult = passResult{}
 	m.passesLoading = false
 	m.passesErr = nil
 	m.trackTrail = nil
@@ -451,7 +476,7 @@ func (m *Model) setCurrentElement(record elements.Record) {
 	m.reportOutput = ""
 	m.reportSaved = ""
 	m.err = nil
-	m.currentTLE = nil
+	m.currentEntry = nil
 	m.currentSat = nil
 	m.currentPos = Position{}
 	m.currentOrb = OrbitInfo{}
@@ -473,11 +498,12 @@ func (m *Model) setCurrentElement(record elements.Record) {
 		m.status = "Invalid orbital elements"
 		return
 	}
-	m.currentTLE = &record
+	m.currentEntry = &entry
+	m.warning = entry.Meta.Warning
 	m.currentSat = propagator
 	m.currentPos = positionFromState(state)
 	m.currentOrb = info
-	m.tleCache[record.CatalogID] = record
+	m.tleCache[record.CatalogID] = entry
 	m.appendRecent(record.CatalogID)
 	m.status = fmt.Sprintf("Loaded %s (%s)", record.Name, record.CatalogID)
 }
@@ -538,15 +564,15 @@ func (m *Model) refreshCurrentView() tea.Cmd {
 			m.loadingReason = "Refreshing group"
 			m.status = "Refreshing group data"
 			m.beginRequest()
-			return m.wrapRequest(fetchGroupTLEsCmd(m.store, m.selectedGroup))
+			return m.wrapRequest(fetchGroupTLEsCmd(m.newRequestContext(), m.store, m.selectedGroup))
 		}
 	case screenDetail, screenTrack, screenPredict, screenReports:
-		if m.currentTLE != nil {
+		if m.currentEntry != nil {
 			m.loading = true
 			m.loadingReason = "Refreshing NORAD"
 			m.status = "Refreshing satellite data"
 			m.beginRequest()
-			return m.wrapRequest(fetchNoradCmd(m.store, m.currentTLE.CatalogID))
+			return m.wrapRequest(fetchNoradCmd(m.newRequestContext(), m.store, m.currentEntry.Record.CatalogID))
 		}
 	}
 	return nil
@@ -649,6 +675,7 @@ func (m Model) handleCommand(command string) (tea.Model, tea.Cmd) {
 	parts := strings.Fields(command)
 	switch strings.ToLower(parts[0]) {
 	case "quit", "exit":
+		m.cancelRequest()
 		return m, tea.Quit
 	case "help":
 		m.showHelp = true
@@ -665,7 +692,7 @@ func (m Model) handleCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		m.setScreen(screenDetail)
 		m.loading = true
-		return m.startRequest(fetchNoradCmd(m.store, parts[1]))
+		return m.startContextRequest(func(ctx context.Context) tea.Cmd { return fetchNoradCmd(ctx, m.store, parts[1]) })
 	case "track":
 		if len(parts) < 2 {
 			m.status = "usage: :track <id>"
@@ -673,7 +700,7 @@ func (m Model) handleCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		m.setScreen(screenTrack)
 		m.loading = true
-		return m.startRequest(fetchNoradCmd(m.store, parts[1]))
+		return m.startContextRequest(func(ctx context.Context) tea.Cmd { return fetchNoradCmd(ctx, m.store, parts[1]) })
 	case "group":
 		if len(parts) < 2 {
 			m.status = "usage: :group <name>"
@@ -683,7 +710,7 @@ func (m Model) handleCommand(command string) (tea.Model, tea.Cmd) {
 		m.setScreen(screenExplore)
 		m.selectedGroup = group
 		m.loading = true
-		return m.startRequest(fetchGroupTLEsCmd(m.store, group))
+		return m.startContextRequest(func(ctx context.Context) tea.Cmd { return fetchGroupTLEsCmd(ctx, m.store, group) })
 	case "search":
 		query := strings.Join(parts[1:], " ")
 		if query == "" {
@@ -693,7 +720,7 @@ func (m Model) handleCommand(command string) (tea.Model, tea.Cmd) {
 		m.setScreen(screenExplore)
 		m.searchInput.SetValue(query)
 		m.loading = true
-		return m.startRequest(searchAllGroupsCmd(m.store, query))
+		return m.startContextRequest(func(ctx context.Context) tea.Cmd { return searchAllGroupsCmd(ctx, m.store, query) })
 	}
 	m.status = "Unknown command"
 	return m, nil
@@ -727,7 +754,7 @@ func (m Model) updateExplore(msg tea.Msg) (Model, tea.Cmd) {
 			m.loading = true
 			m.loadingReason = "Searching all groups"
 			m.status = "Searching all groups"
-			return m.startRequest(searchAllGroupsCmd(m.store, query))
+			return m.startContextRequest(func(ctx context.Context) tea.Cmd { return searchAllGroupsCmd(ctx, m.store, query) })
 		case "enter":
 			switch m.focus {
 			case focusSearch:
@@ -739,7 +766,7 @@ func (m Model) updateExplore(msg tea.Msg) (Model, tea.Cmd) {
 				if m.selectedGroup == "" {
 					m.loading = true
 					m.status = "Searching all groups"
-					return m.startRequest(searchAllGroupsCmd(m.store, query))
+					return m.startContextRequest(func(ctx context.Context) tea.Cmd { return searchAllGroupsCmd(ctx, m.store, query) })
 				}
 				if _, ok := m.groupCache[m.selectedGroup]; ok {
 					m.applySearch(m.selectedGroup, query)
@@ -747,7 +774,7 @@ func (m Model) updateExplore(msg tea.Msg) (Model, tea.Cmd) {
 				}
 				m.loading = true
 				m.status = fmt.Sprintf("Loading %s", m.selectedGroup)
-				return m.startRequest(fetchGroupSearchCmd(m.store, m.selectedGroup, query))
+				return m.startContextRequest(func(ctx context.Context) tea.Cmd { return fetchGroupSearchCmd(ctx, m.store, m.selectedGroup, query) })
 			case focusGroupList:
 				item, ok := m.groupList.SelectedItem().(groupItem)
 				if !ok {
@@ -756,20 +783,20 @@ func (m Model) updateExplore(msg tea.Msg) (Model, tea.Cmd) {
 				m.selectedGroup = item.group.Name
 				m.loading = true
 				m.status = fmt.Sprintf("Loading %s", m.selectedGroup)
-				return m.startRequest(fetchGroupTLEsCmd(m.store, m.selectedGroup))
+				return m.startContextRequest(func(ctx context.Context) tea.Cmd { return fetchGroupTLEsCmd(ctx, m.store, m.selectedGroup) })
 			case focusResultList:
 				item, ok := m.resultList.SelectedItem().(tleItem)
 				if !ok {
 					return m, nil
 				}
 				if cached, ok := m.tleCache[item.summary.NoradID]; ok {
-					m.setCurrentElement(cached)
+					m.setCurrentEntry(cached)
 					m.setScreen(screenDetail)
 					return m, nil
 				}
 				m.setScreen(screenDetail)
 				m.loading = true
-				return m.startRequest(fetchNoradCmd(m.store, item.summary.NoradID))
+				return m.startContextRequest(func(ctx context.Context) tea.Cmd { return fetchNoradCmd(ctx, m.store, item.summary.NoradID) })
 			}
 		}
 	}
@@ -798,7 +825,7 @@ func (m Model) updateHome(msg tea.Msg) (Model, tea.Cmd) {
 				noradID := m.settings.Recent[index]
 				m.setScreen(screenDetail)
 				m.loading = true
-				return m.startRequest(fetchNoradCmd(m.store, noradID))
+				return m.startContextRequest(func(ctx context.Context) tea.Cmd { return fetchNoradCmd(ctx, m.store, noradID) })
 			}
 		}
 	}
@@ -826,10 +853,11 @@ func (m Model) updateDetail(msg tea.Msg) (Model, tea.Cmd) {
 				m.passesLoading = true
 				m.passesErr = nil
 				m.status = "Calculating passes"
-				return m.startRequest(passesCmd(m.currentSat, m.settings.Observer, time.Now(), 24*time.Hour, time.Minute))
+				input := passInput{element: m.currentEntry.Record.CatalogID, version: m.elementVersion, observer: m.settings.Observer, start: time.Now().UTC(), duration: 24 * time.Hour, step: time.Minute}
+				return m.startContextRequest(func(ctx context.Context) tea.Cmd { return passesCmd(ctx, m.currentSat, input) })
 			}
 		case "t":
-			if m.currentTLE != nil {
+			if m.currentEntry != nil {
 				m.setScreen(screenTrack)
 			}
 		}
@@ -846,10 +874,11 @@ func (m Model) updateTrack(msg tea.Msg) (Model, tea.Cmd) {
 				return m, nil
 			}
 			m.trackRunning = !m.trackRunning
+			m.trackSession++
 			if m.trackRunning {
 				m.status = "Tracking started"
 				m.updateTrackPosition(time.Now())
-				return m, trackTickCmd(m.settings.RefreshInterval())
+				return m, trackTickCmd(m.settings.RefreshInterval(), m.trackSession)
 			}
 			m.status = "Tracking stopped"
 		case "s":
@@ -903,6 +932,7 @@ func (m Model) updateReports(msg tea.Msg) (Model, tea.Cmd) {
 	if key, ok := msg.(tea.KeyMsg); ok {
 		switch key.String() {
 		case "f":
+			m.cancelRequest()
 			m.requestID++
 			m.loading = false
 			m.reportOutput = ""
@@ -910,21 +940,21 @@ func (m Model) updateReports(msg tea.Msg) (Model, tea.Cmd) {
 			m.reportFormat = nextReportFormat(m.reportFormat)
 			m.status = fmt.Sprintf("Format: %s", m.reportFormat)
 		case "r", "enter":
-			if m.currentTLE == nil || m.currentSat == nil {
+			if m.currentEntry == nil || m.currentSat == nil {
 				m.status = "Load a satellite first"
 				return m, nil
 			}
 			m.loading = true
 			m.status = "Generating report"
-			return m.startRequest(elementReportCmd(*m.currentTLE, m.currentSat, m.currentOrb, m.settings.MapProvider, m.reportFormat, m.currentMeta))
+			return m.startRequest(elementReportCmd(m.currentEntry.Record, m.currentSat, m.currentOrb, m.settings.MapProvider, m.reportFormat, m.currentEntry.Meta))
 		case "s":
 			if m.reportOutput == "" {
 				m.status = "Generate a report first"
 				return m, nil
 			}
 			path := strings.TrimSpace(m.reportPath.Value())
-			if path == "" && m.currentTLE != nil {
-				path = defaultReportPath(m.currentTLE.CatalogID, m.reportFormat)
+			if path == "" && m.currentEntry != nil {
+				path = defaultReportPath(m.currentEntry.Record.CatalogID, m.reportFormat)
 			}
 			if path == "" {
 				m.status = "Provide a save path"
@@ -966,6 +996,13 @@ func (m Model) updateSettings(msg tea.Msg) (Model, tea.Cmd) {
 				m.status = fmt.Sprintf("Save failed: %v", err)
 				return m, nil
 			}
+			if settings.Observer != m.settings.Observer {
+				m.cancelRequest()
+				m.requestID++
+				m.passResult = passResult{}
+				m.passesErr = nil
+				m.passesLoading = false
+			}
 			m.settings = settings
 			m.settingsErr = nil
 			m.store = catalog.NewStore(m.cacheDir, settings.CacheTTL())
@@ -979,6 +1016,7 @@ func (m Model) updateSettings(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func (m *Model) applySearch(group, query string) {
+	m.cancelRequest()
 	m.requestID++
 	m.loading = false
 	m.passesLoading = false
@@ -990,8 +1028,9 @@ func (m *Model) applySearch(group, query string) {
 	source := m.groupCache[group]
 	var summaries []TLESummary
 	for _, item := range source {
-		if strings.Contains(strings.ToLower(item.Name), query) || strings.Contains(item.CatalogID, query) {
-			summaries = append(summaries, summaryFromElement(item))
+		if strings.Contains(strings.ToLower(item.Record.Name), query) || strings.Contains(item.Record.CatalogID, query) {
+			m.tleCache[item.Record.CatalogID] = item
+			summaries = append(summaries, summaryFromElement(item.Record))
 		}
 	}
 	m.results = summaries
@@ -1044,14 +1083,6 @@ func nextReportFormat(current string) string {
 	default:
 		return "text"
 	}
-}
-
-func writeReport(path, output string) error {
-	return writeFile(path, []byte(output))
-}
-
-func writeFile(path string, data []byte) error {
-	return os.WriteFile(path, data, 0o644)
 }
 
 func buildSettingsInputs(settings Settings) []textinput.Model {
@@ -1113,43 +1144,10 @@ func parseSettingsInputs(inputs []textinput.Model, settings Settings) (Settings,
 	return settings, settings.Validate()
 }
 
-// requestResultMsg prevents an older asynchronous operation replacing newer state.
-type requestResultMsg struct {
-	id  uint64
-	msg tea.Msg
-}
-
-func (m *Model) beginRequest() { m.requestID++; m.err = nil; m.warning = ""; m.loading = true }
-func (m Model) wrapRequest(cmd tea.Cmd) tea.Cmd {
-	id := m.requestID
-	return func() tea.Msg { return requestResultMsg{id: id, msg: cmd()} }
-}
-func (m Model) startRequest(cmd tea.Cmd) (Model, tea.Cmd) {
-	m.beginRequest()
-	return m, m.wrapRequest(cmd)
-}
 func (m Model) editingInput() bool {
 	switch m.focus {
 	case focusSearch, focusPredictInput, focusReportPath, focusSettings:
 		return true
 	}
 	return false
-}
-func (m *Model) setScreen(next screen) {
-	m.requestID++
-	m.loading = false
-	m.passesLoading = false
-	if next != screenTrack {
-		m.trackRunning = false
-	}
-	m.blurInputs()
-	m.active = next
-	m.scrollOffset = 0
-	if next == screenPredict {
-		m.focus = focusPredictInput
-	}
-	if next == screenSettings {
-		m.focus = focusSettings
-	}
-	m.applyFocus()
 }
