@@ -213,7 +213,9 @@ func refineCrossing(sample passSample, low, high time.Time, rising bool) (time.T
 	return high, az, err
 }
 
-// refinePeak narrows the sampled maximum to whole-second resolution inside the pass.
+// refinePeak narrows the sampled maximum to whole-second resolution inside the
+// pass. The search runs on whole seconds, because propagation truncates to them,
+// and that also guarantees each step shrinks the interval.
 func refinePeak(sample passSample, at time.Time, elevation float64, step time.Duration, passStart, passEnd time.Time) (time.Time, float64, float64, error) {
 	low, high := at.Add(-step), at.Add(step)
 	if low.Before(passStart) {
@@ -222,9 +224,13 @@ func refinePeak(sample passSample, at time.Time, elevation float64, step time.Du
 	if high.After(passEnd) {
 		high = passEnd
 	}
+	if whole := low.Truncate(time.Second); whole.Before(low) {
+		low = whole.Add(time.Second)
+	}
+	high = high.Truncate(time.Second)
 	for high.Sub(low) > 2*time.Second {
-		third := high.Sub(low) / 3
-		a, b := low.Add(third).Truncate(time.Second), high.Add(-third).Truncate(time.Second)
+		third := (high.Sub(low) / 3).Truncate(time.Second)
+		a, b := low.Add(third), high.Add(-third)
 		elA, _, err := sample(a)
 		if err != nil {
 			return time.Time{}, 0, 0, err

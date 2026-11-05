@@ -82,8 +82,8 @@ func FromTLE(t tle.TLE) (Record, error) {
 			return Record{}, err
 		}
 	}
-	// The legacy parser drops the implied leading decimal point in these two
-	// fields, so a TLE's BSTAR would be ten times too large. Prefer the original line.
+	// The legacy parser misplaces the implied decimal point in unsigned values of
+	// these two fields, making them ten times too large. Prefer the original line.
 	if line := t.Line1.LineString; len(line) >= 61 {
 		for _, f := range []struct {
 			name   string

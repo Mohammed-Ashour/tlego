@@ -115,6 +115,10 @@ func renderSkyView(track []orbit.LookPoint, radius int) string {
 		place(az, 1, '.')
 		place(az, 0.5, '.')
 	}
+	place(0, 1, 'N')
+	place(90, 1, 'E')
+	place(180, 1, 'S')
+	place(270, 1, 'W')
 	place(0, 0, '+')
 	skyFraction := func(elevationDeg float64) float64 { return (90 - clamp(elevationDeg, 0, 90)) / 90 }
 	peak := -1
@@ -130,10 +134,6 @@ func renderSkyView(track []orbit.LookPoint, radius int) string {
 		last := track[len(track)-1]
 		place(last.AzimuthDeg, skyFraction(last.ElevationDeg), 'x')
 	}
-	place(0, 1, 'N')
-	place(90, 1, 'E')
-	place(180, 1, 'S')
-	place(270, 1, 'W')
 	var b strings.Builder
 	for y, row := range grid {
 		b.WriteString(strings.TrimRight(string(row), " "))

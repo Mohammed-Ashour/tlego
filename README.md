@@ -34,6 +34,8 @@ These commands fetch live data when a usable cache is unavailable. To see the in
 tlego tonight --lat 51.48 --lon 0
 ```
 
+With the saved ISS snapshot, adding `--file examples/tui-demo/iss.tle --time 2026-10-24T12:00:00Z --utc` from a checkout prints:
+
 ```text
 ISS (ZARYA) (25544) from 51.4800°, 0.0000°
 Dark sky: Sat 24 Oct 17:23 UTC to Sun 25 Oct 06:07 UTC
@@ -44,7 +46,7 @@ Sun 25 Oct  visible for 3m 25s
   ends     04:40:36  11° above E
 ```
 
-This example uses the saved ISS snapshot. Pass another catalog ID to check a different satellite. If you have saved an observer in the TUI's Settings, you can leave out `--lat` and `--lon`. [Visibility estimates](docs/visibility.md) explain the criteria and limits.
+Pass another catalog ID to check a different satellite. If you have saved an observer in the TUI's Settings, you can leave out `--lat` and `--lon`. [Visibility estimates](docs/visibility.md) explain the criteria and limits.
 
 ## Try it offline
 

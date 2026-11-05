@@ -17,6 +17,8 @@ const (
 	defaultTonightID  = "25544"
 	darkSearchLimit   = 24 * time.Hour
 	oldElementsWarnAt = 3 * 24 * time.Hour
+	// A dark period ending this soon says little about the coming night.
+	shortDarkRemainder = time.Hour
 )
 
 func init() { RootCmd.Commands = append(RootCmd.Commands, newTonightCommand()) }
@@ -104,6 +106,19 @@ func planTonight(ctx context.Context, c *cli.Command) error {
 		passes, err = orbit.PlanVisiblePasses(ctx, prop, obs, window.Start, window.End.Sub(window.Start), criteria)
 		if err != nil {
 			return commandError(c, err)
+		}
+		if len(passes) == 0 && !window.Clipped && window.Start.Equal(from) && window.End.Sub(from) < shortDarkRemainder {
+			next, nextFound, err := orbit.NextDarkWindow(obs, window.End, darkSearchLimit, criteria.MaxSunElevationDeg)
+			if err != nil {
+				return commandError(c, err)
+			}
+			if nextFound {
+				darkWindow = &next
+				passes, err = orbit.PlanVisiblePasses(ctx, prop, obs, next.Start, next.End.Sub(next.Start), criteria)
+				if err != nil {
+					return commandError(c, err)
+				}
+			}
 		}
 	}
 	warnings = append(warnings, output.Warning{Code: "estimated_visibility", Message: "Visibility is a geometric estimate. It does not consider weather, brightness or local obstructions."})

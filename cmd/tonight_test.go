@@ -131,3 +131,35 @@ func TestTonightRejectsInvalidCriteriaAndFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestTonightMovesPastAnEndingDarkPeriodWithNoPasses(t *testing.T) {
+	stdout, _, err := runTonight(t, "--file", tonightFixture, "--time", "2026-10-24T06:04:30Z", "--lat", "51.48", "--lon", "0", "--utc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout, "Dark sky: Sat 24 Oct 17:") {
+		t.Fatalf("stdout = %s", stdout)
+	}
+}
+
+func TestTonightParserFailuresUseJSONErrors(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	oldOut, oldErr := RootCmd.Writer, RootCmd.ErrWriter
+	RootCmd.Writer, RootCmd.ErrWriter = &stdout, &stderr
+	t.Cleanup(func() {
+		if oldOut == nil {
+			oldOut = os.Stdout
+		}
+		if oldErr == nil {
+			oldErr = os.Stderr
+		}
+		RootCmd.Writer, RootCmd.ErrWriter = oldOut, oldErr
+	})
+	err := Run(context.Background(), []string{"tlego", "tonight", "--format=json", "--unknown"})
+	if err == nil || !IsReported(err) {
+		t.Fatalf("error = %v, expected reported machine error", err)
+	}
+	if stdout.Len() != 0 || !strings.Contains(stderr.String(), `"kind":"error"`) {
+		t.Fatalf("stdout = %q, stderr = %q", stdout.String(), stderr.String())
+	}
+}

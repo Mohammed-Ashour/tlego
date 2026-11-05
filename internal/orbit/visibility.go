@@ -85,7 +85,7 @@ func NextDarkWindow(obs Observer, from time.Time, limit time.Duration, maxSunEle
 			t = end
 		}
 	}
-	if inside {
+	if inside && window.Start.Before(end) {
 		window.End, window.Clipped = end, true
 		return window, true, nil
 	}

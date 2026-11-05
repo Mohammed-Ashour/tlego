@@ -65,7 +65,7 @@ func runNative(ctx context.Context, args []string, name string) error {
 
 func requestsMachineOutput(args []string, command string) bool {
 	switch command {
-	case "predict", "report", "passes":
+	case "predict", "report", "passes", "tonight":
 	default:
 		return false
 	}

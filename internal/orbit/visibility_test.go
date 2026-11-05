@@ -228,3 +228,39 @@ func TestPassTrackIncludesEndsInOrder(t *testing.T) {
 		t.Fatalf("track has %d points from %s to %s", len(track), track[0].Time, track[19].Time)
 	}
 }
+
+func TestPassPlanningFinishesWithFractionalTimes(t *testing.T) {
+	prop := issPropagator(t)
+	base := parseUTC(t, "2026-10-24T05:01:11Z")
+	type plan struct {
+		start          time.Time
+		duration, step time.Duration
+	}
+	plans := []plan{
+		{base, 24 * time.Hour, 1500 * time.Millisecond},
+		{base, 3*time.Hour + 33*time.Minute + 22500*time.Millisecond, time.Minute},
+	}
+	for i := 0; i < 288; i++ {
+		plans = append(plans, plan{base.Add(time.Duration(i)*5*time.Minute + 500*time.Millisecond), 24 * time.Hour, time.Minute})
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	for _, p := range plans {
+		passes, err := PlanPassesElementsContext(ctx, prop, greenwich, p.start, p.duration, p.step)
+		if err != nil {
+			t.Fatalf("start %s duration %s step %s: %v", p.start, p.duration, p.step, err)
+		}
+		for _, pass := range passes {
+			if pass.MaxTime.Before(pass.Start.Truncate(time.Second)) || pass.MaxTime.After(pass.End) {
+				t.Fatalf("peak %s outside %s to %s", pass.MaxTime, pass.Start, pass.End)
+			}
+		}
+	}
+}
+
+func TestNextDarkWindowIgnoresZeroLengthWindow(t *testing.T) {
+	obs := Observer{Lat: 68.6724}
+	if window, ok, err := NextDarkWindow(obs, parseUTC(t, "2026-08-10T00:00:00Z"), 24*time.Hour, -6); err != nil || (ok && !window.End.After(window.Start)) {
+		t.Fatalf("window=%+v ok=%t err=%v", window, ok, err)
+	}
+}

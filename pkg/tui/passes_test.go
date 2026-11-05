@@ -62,7 +62,7 @@ func TestRenderSkyViewPlacesCompassAndTrack(t *testing.T) {
 		t.Fatalf("north and south misplaced:\n%s", strings.Join(rows, "\n"))
 	}
 	centre := rows[4]
-	if centre[8] != '@' || !strings.HasPrefix(centre, "W") || !strings.HasSuffix(centre, "E") {
+	if centre[8] != '@' || !strings.HasPrefix(centre, "o") || !strings.HasSuffix(centre, "x") {
 		t.Fatalf("centre row = %q", centre)
 	}
 }

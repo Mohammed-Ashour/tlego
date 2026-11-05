@@ -328,15 +328,25 @@ func TestDetailPassesViewShowsSkyViewAndCyclesSelection(t *testing.T) {
 	if err != nil || len(passes) < 2 {
 		t.Fatalf("passes=%d err=%v", len(passes), err)
 	}
-	m := Model{currentSat: sat, detailTab: 4}
+	m := Model{currentSat: sat, detailTab: 4, width: 80, height: 24}
 	m.passResult = passResult{input: passInput{observer: observer, start: start, duration: 24 * time.Hour, step: time.Minute}, passes: passes}
 	first := m.detailPassesView()
-	if !strings.Contains(first, "> "+passes[0].Start.Format(time.RFC3339)) || !strings.Contains(first, "Sky view") {
+	selection := func(i int) string { return ">  10-" + passes[i].Start.Format("02 15:04:05") }
+	if !strings.Contains(first, selection(0)) || !strings.Contains(first, "Sky:") {
 		t.Fatalf("view:\n%s", first)
+	}
+	lines := strings.Split(strings.TrimRight(first, "\n"), "\n")
+	if len(lines) > 14 {
+		t.Fatalf("view has %d lines, which does not fit 80x24:\n%s", len(lines), first)
+	}
+	for _, line := range lines {
+		if width := len([]rune(line)); width > 80 {
+			t.Fatalf("line is %d columns wide: %q", width, line)
+		}
 	}
 	updated, _ := m.updateDetail(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
 	second := updated.detailPassesView()
-	if !strings.Contains(second, "> "+passes[1].Start.Format(time.RFC3339)) {
+	if !strings.Contains(second, selection(1)) {
 		t.Fatalf("selection did not move:\n%s", second)
 	}
 }

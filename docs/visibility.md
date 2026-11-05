@@ -17,7 +17,7 @@ Without an ID, it checks the ISS (25544). Without `--lat` and `--lon`, it uses t
 | Satellite is above this elevation | 10° | `--min-elevation` |
 | Satellite is sunlit | Outside Earth's shadow | |
 
-The dark period is the first one at or after the start time, searched up to 24 hours ahead. In polar summer there may be none, which is a successful result with no passes. In polar night the period ends at the 24-hour limit and is marked as clipped.
+The dark period is the first one at or after the start time, searched up to 24 hours ahead. If less than an hour of it remains and it has no visible passes, the next dark period is used instead. In polar summer there may be none, which is a successful result with no passes. In polar night the period ends at the 24-hour limit and is marked as clipped.
 
 If a pass meets the criteria in more than one stretch, only the longest is listed. `fades` means it ends by entering Earth's shadow, while `ends` means it drops below the minimum elevation or the sky brightens.
 
@@ -27,7 +27,7 @@ If a pass meets the criteria in more than one stretch, only the longest is liste
 - **Local conditions:** weather, terrain, buildings and light pollution are not considered.
 - **Shadow model:** Earth's shadow is a cylinder with no penumbra, so the moment a satellite fades can differ by a few seconds.
 - **Sun model:** this is the Astronomical Almanac low-precision formula with no refraction, which is accurate well beyond what the criteria need.
-- **Resolution:** visible times resolve to five seconds, and a pass shorter than 30 seconds can be missed.
+- **Resolution:** visible times resolve to five seconds and dark-period edges to one minute. A pass shorter than 30 seconds can be missed.
 - **Element age:** SGP4 accuracy falls with distance from the element epoch. A `distant_epoch` warning appears beyond three days.
 
 ## Checks
