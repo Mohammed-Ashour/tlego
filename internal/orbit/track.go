@@ -13,7 +13,8 @@ type TrackSample struct {
 	Look   *LookPoint
 }
 
-// Track samples a window at a fixed step, including both ends. If propagation
+// Track samples a window at a fixed step from its start, stopping at the last step
+// that fits. If propagation
 // fails partway, for example on a decaying object, it returns the samples so far
 // with the error.
 func Track(ctx context.Context, prop *Propagator, start time.Time, duration, step time.Duration, maxSamples int, obs *Observer) ([]TrackSample, error) {

@@ -220,7 +220,7 @@ func TestPassTrackIncludesEndsInOrder(t *testing.T) {
 	if err != nil || len(passes) == 0 {
 		t.Fatalf("passes=%d err=%v", len(passes), err)
 	}
-	track, err := PassTrack(prop, greenwich, passes[0], 20)
+	track, err := PassTrack(context.Background(), prop, greenwich, passes[0], 20)
 	if err != nil {
 		t.Fatal(err)
 	}

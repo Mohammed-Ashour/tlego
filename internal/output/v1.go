@@ -121,6 +121,19 @@ func PassPlanV1(id string, obs orbit.Observer, start time.Time, duration, step t
 	return result
 }
 
+// DistantEpochWarning warns when a time is far enough from the element epoch that
+// predictions lose accuracy. It returns nil when the time is close enough.
+func DistantEpochWarning(epoch, at time.Time) []Warning {
+	age := at.Sub(epoch)
+	if age < 0 {
+		age = -age
+	}
+	if age <= 3*24*time.Hour {
+		return nil
+	}
+	return []Warning{{Code: "distant_epoch", Message: fmt.Sprintf("Element epoch %s is %.0f days from the requested time, so predicted times may be well off.", epoch.UTC().Format(time.RFC3339), age.Hours()/24)}}
+}
+
 // LookPointRecord is a satellite direction at one instant.
 type LookPointRecord struct {
 	At           time.Time `json:"at"`

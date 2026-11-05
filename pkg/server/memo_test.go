@@ -3,7 +3,13 @@ package server
 import (
 	"context"
 	"errors"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,7 +32,9 @@ type fakeLive struct {
 	providerEpoch time.Time
 }
 
-func (f *fakeLive) FetchGroups() ([]catalog.Group, error) { return nil, nil }
+func (f *fakeLive) FetchGroups() ([]catalog.Group, error) {
+	return []catalog.Group{{Name: "Stations"}, {Name: "Other"}}, nil
+}
 
 func (f *fakeLive) wait(ctx context.Context) error {
 	if f.block != nil {
@@ -219,5 +227,141 @@ func TestGroupDoesNotOverwriteNewerElement(t *testing.T) {
 	record, _, err := memo.FetchElementByNorad(context.Background(), "25544")
 	if err != nil || record.Name != "newer" {
 		t.Fatalf("record=%+v err=%v", record, err)
+	}
+}
+
+// A real store reports a failed refresh as stale data with no error.
+func TestRefreshFailureWithSavedDataBacksOffAgainstRealStore(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "elements", "norad", "25544.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	payload, err := os.ReadFile("../../internal/elements/testdata/25544.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-24 * time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+	var calls atomic.Int32
+	transport := roundTripFunc(func(*http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return &http.Response{StatusCode: http.StatusForbidden, Status: "403 Forbidden", Body: http.NoBody, Header: http.Header{}}, nil
+	})
+	store := catalog.NewStoreWithClient(dir, time.Hour, &http.Client{Transport: transport})
+	memo := newMemoSource(context.Background(), store, time.Hour)
+	var meta catalog.FetchMeta
+	for i := 0; i < 20; i++ {
+		_, meta, err = memo.FetchElementByNorad(context.Background(), "25544")
+		if err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("provider calls = %d, want 1", got)
+	}
+	if !meta.Stale || !strings.Contains(meta.Warning, "refresh failed") {
+		t.Fatalf("meta = %+v", meta)
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestRememberedResultsReportTheCache(t *testing.T) {
+	memo := newMemoSource(context.Background(), &fakeLive{}, time.Hour)
+	if _, _, err := memo.FetchElementByNorad(context.Background(), "25544"); err != nil {
+		t.Fatal(err)
+	}
+	_, meta, err := memo.FetchElementByNorad(context.Background(), "25544")
+	if err != nil || !meta.FromCache {
+		t.Fatalf("meta = %+v, err = %v", meta, err)
+	}
+}
+
+func TestLeadingZerosShareOneRequestAndKey(t *testing.T) {
+	live := &fakeLive{}
+	memo := newMemoSource(context.Background(), live, time.Hour)
+	record, _, err := memo.FetchElementByNorad(context.Background(), "0025544")
+	if err != nil || record.CatalogID != "25544" {
+		t.Fatalf("record = %+v, err = %v", record, err)
+	}
+	if _, _, err := memo.FetchElementByNorad(context.Background(), "25544"); err != nil {
+		t.Fatal(err)
+	}
+	if _, calls := live.counts(); calls != 1 {
+		t.Fatalf("calls = %d", calls)
+	}
+}
+
+func TestUnknownGroupsNeverReachTheProvider(t *testing.T) {
+	live := &fakeLive{}
+	memo := newMemoSource(context.Background(), live, time.Hour)
+	_, _, err := memo.FetchGroupElements(context.Background(), strings.Repeat("x", 1000))
+	if status := upstreamStatus(err); status != http.StatusNotFound {
+		t.Fatalf("status = %d, err = %v", status, err)
+	}
+	if groups, _ := live.counts(); groups != 0 || len(memo.lastFailed) != 0 {
+		t.Fatalf("group calls = %d, failures = %d", groups, len(memo.lastFailed))
+	}
+}
+
+func TestPanicInBackgroundLoadBecomesAnError(t *testing.T) {
+	live := &panicLive{}
+	memo := newMemoSource(context.Background(), live, time.Hour)
+	if _, _, err := memo.FetchElementByNorad(context.Background(), "25544"); err == nil {
+		t.Fatal("expected an error")
+	}
+	if len(memo.inFlight) != 0 {
+		t.Fatalf("in flight = %d", len(memo.inFlight))
+	}
+}
+
+type panicLive struct{ fakeLive }
+
+func (p *panicLive) FetchElementByNorad(context.Context, string) (elements.Record, catalog.FetchMeta, error) {
+	panic("transport bug")
+}
+
+func TestFailureMemoryIsBounded(t *testing.T) {
+	memo := newMemoSource(context.Background(), &fakeLive{fail: errors.New("down")}, time.Hour)
+	for i := 0; i < maxRememberedFailures*3; i++ {
+		memo.mu.Lock()
+		memo.recordFailure(strconv.Itoa(i), errors.New("down"))
+		memo.mu.Unlock()
+	}
+	if len(memo.lastFailed) > maxRememberedFailures || len(memo.lastErrors) > maxRememberedFailures {
+		t.Fatalf("failures = %d, errors = %d", len(memo.lastFailed), len(memo.lastErrors))
+	}
+}
+
+func TestSearchUsesTheMemoAndBacksOffFailingGroups(t *testing.T) {
+	live := &fakeLive{group: []elements.Record{{CatalogID: "25544", Name: "ISS"}}}
+	memo := newMemoSource(context.Background(), live, time.Hour)
+	for i := 0; i < 3; i++ {
+		result, err := memo.SearchElements(context.Background(), "iss")
+		if err != nil || len(result.Records) != 1 || result.GroupsCovered != 2 {
+			t.Fatalf("result = %+v, err = %v", result, err)
+		}
+	}
+	if groups, _ := live.counts(); groups != 2 {
+		t.Fatalf("group calls = %d", groups)
+	}
+	failing := &fakeLive{fail: errors.New("down")}
+	memo = newMemoSource(context.Background(), failing, time.Hour)
+	for i := 0; i < 2; i++ {
+		if _, err := memo.SearchElements(context.Background(), "iss"); err == nil {
+			t.Fatal("expected an error with no groups covered")
+		}
+	}
+	if groups, _ := failing.counts(); groups != 2 {
+		t.Fatalf("failing group calls = %d", groups)
 	}
 }

@@ -69,7 +69,7 @@ func (a api) listSatellites(w http.ResponseWriter, r *http.Request) {
 	}
 	records, meta, err := a.store.FetchGroupElements(r.Context(), group)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
+		http.Error(w, err.Error(), upstreamStatus(err))
 		return
 	}
 	if meta.Stale {
@@ -90,7 +90,7 @@ func (a api) location(w http.ResponseWriter, r *http.Request) {
 	}
 	record, meta, err := a.store.FetchElementByNorad(r.Context(), id)
 	if err != nil {
-		http.Error(w, "Unable to fetch TLE data", http.StatusBadGateway)
+		http.Error(w, "Unable to fetch TLE data", upstreamStatus(err))
 		return
 	}
 	prop, err := orbit.New(record)
@@ -154,7 +154,7 @@ func (a api) positionV1(w http.ResponseWriter, r *http.Request) {
 	}
 	record, meta, err := a.store.FetchElementByNorad(r.Context(), id)
 	if err != nil {
-		fail(http.StatusBadGateway, err)
+		fail(upstreamStatus(err), err)
 		return
 	}
 	prop, err := orbit.New(record)
@@ -189,6 +189,16 @@ func (a api) positionV1(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintln(w, string(body))
 }
+
+// upstreamStatus keeps a source's own status, such as not found for a local file.
+func upstreamStatus(err error) int {
+	var failure requestError
+	if errors.As(err, &failure) {
+		return failure.status
+	}
+	return http.StatusBadGateway
+}
+
 func containsFold(value, query string) bool {
 	return strings.Contains(strings.ToLower(value), strings.ToLower(query))
 }
@@ -211,6 +221,9 @@ func Serve(ctx context.Context, addr, staticDir string) error {
 	if staticDir != "" {
 		mux.Handle("/", http.FileServer(http.Dir(staticDir)))
 	}
+	if addr == "" {
+		addr = ":http" // Matches http.Server's meaning of an empty address.
+	}
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -222,7 +235,9 @@ func serveListener(ctx context.Context, listener net.Listener, handler http.Hand
 	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	done := make(chan struct{})
 	defer close(done)
+	drained := make(chan struct{})
 	go func() {
+		defer close(drained)
 		select {
 		case <-ctx.Done():
 			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -233,6 +248,8 @@ func serveListener(ctx context.Context, listener net.Listener, handler http.Hand
 	}()
 	err := srv.Serve(listener)
 	if errors.Is(err, http.ErrServerClosed) {
+		// Serve returns as soon as shutdown starts, so let requests in progress finish.
+		<-drained
 		return nil
 	}
 	return err

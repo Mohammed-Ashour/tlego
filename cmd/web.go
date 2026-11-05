@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/Mohammed-Ashour/tlego/internal/catalog"
 	"github.com/Mohammed-Ashour/tlego/internal/elements"
@@ -19,14 +20,20 @@ import (
 
 // openBrowser is replaced in tests, so they never launch a real browser.
 var openBrowser = func(url string) error {
+	var command *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		return exec.Command("open", url).Start()
+		command = exec.Command("open", url)
 	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		command = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
 	default:
-		return exec.Command("xdg-open", url).Start()
+		command = exec.Command("xdg-open", url)
 	}
+	if err := command.Start(); err != nil {
+		return err
+	}
+	go func() { _ = command.Wait() }() // Reap it, so no zombie outlives the launcher.
+	return nil
 }
 
 func init() { RootCmd.Commands = append(RootCmd.Commands, newWebCommand()) }
@@ -49,7 +56,7 @@ func startWeb(ctx context.Context, c *cli.Command) error {
 			return err
 		}
 	}
-	ctx, stop := signal.NotifyContext(ctx, os.Interrupt)
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	ttl := c.Duration("cache-ttl")
 	return server.ServeApp(ctx, server.AppOptions{

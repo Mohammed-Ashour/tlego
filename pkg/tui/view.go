@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"strings"
@@ -268,7 +269,7 @@ func (m Model) detailPassesView() string {
 			pass.MaxTime.UTC().Format("15:04:05"),
 		))
 	}
-	track, err := orbit.PassTrack(m.currentSat, input.observer, m.passResult.passes[selected], 60)
+	track, err := orbit.PassTrack(context.Background(), m.currentSat, input.observer, m.passResult.passes[selected], 60)
 	if err != nil {
 		b.WriteString(strings.Join(rows, "\n"))
 		return b.String()

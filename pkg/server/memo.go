@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +19,9 @@ const (
 	refreshRetryAfter = 5 * time.Minute
 	// With nothing saved a caller is waiting, so the provider is tried again sooner.
 	loadRetryAfter = 30 * time.Second
+	// Enough for a page of tracks without crowding the provider.
+	maxProviderRequests   = 4
+	maxRememberedFailures = 256
 )
 
 // savedReader reads saved elements without a provider request.
@@ -54,6 +59,7 @@ type memoSource struct {
 	inFlight   map[string]chan struct{}
 	lastFailed map[string]time.Time
 	lastErrors map[string]error
+	slots      chan struct{}
 }
 
 // newMemoSource stops background refreshes when base is canceled.
@@ -62,6 +68,7 @@ func newMemoSource(base context.Context, source liveSource, ttl time.Duration) *
 		source: source, saved: source, ttl: ttl, base: base,
 		groups: map[string]memoEntry[[]elements.Record]{}, elements: map[string]memoEntry[elements.Record]{},
 		inFlight: map[string]chan struct{}{}, lastFailed: map[string]time.Time{}, lastErrors: map[string]error{},
+		slots: make(chan struct{}, maxProviderRequests),
 	}
 }
 
@@ -69,10 +76,26 @@ func (m *memoSource) isFresh(meta catalog.FetchMeta) bool {
 	return m.ttl == 0 || m.ttl > 0 && time.Since(meta.FetchedAt) <= m.ttl
 }
 
-// expired marks a saved result so the app can say that newer data is on its way.
-func expired(meta catalog.FetchMeta) catalog.FetchMeta {
-	meta.FromCache, meta.Stale = true, true
-	meta.Warning = fmt.Sprintf("Showing elements saved %s ago while newer ones load.", formatAge(time.Since(meta.FetchedAt)))
+// served marks a remembered result as coming from the cache, with its current age.
+func served(meta catalog.FetchMeta) catalog.FetchMeta {
+	meta.FromCache = true
+	meta.Age = time.Since(meta.FetchedAt)
+	return meta
+}
+
+// expired marks a saved result, saying why newer data is not shown. A warning from
+// the store already explains that a refresh failed, so it is kept.
+func expired(meta catalog.FetchMeta, loading bool) catalog.FetchMeta {
+	meta = served(meta)
+	meta.Stale = true
+	if meta.Warning != "" {
+		return meta
+	}
+	if loading {
+		meta.Warning = fmt.Sprintf("Showing elements saved %s ago while newer ones load.", formatAge(meta.Age))
+	} else {
+		meta.Warning = fmt.Sprintf("Showing elements saved %s ago because the latest refresh failed.", formatAge(meta.Age))
+	}
 	return meta
 }
 
@@ -93,9 +116,23 @@ func (m *memoSource) recentFailure(key string) error {
 	return nil
 }
 
+// loadOutcome is what a provider request produced. A store result can hold saved
+// data with a failed refresh, so it can carry both a value to keep and a failure.
+type loadOutcome struct {
+	store   func()
+	failure error
+}
+
+func outcome(meta catalog.FetchMeta, store func()) loadOutcome {
+	if meta.Stale {
+		return loadOutcome{store, errors.New(meta.Warning)}
+	}
+	return loadOutcome{store: store}
+}
+
 // load runs fetch once per key, detached from any one caller's context. A failure
 // is recorded, so background refreshes back off and waiting callers can report it.
-func (m *memoSource) load(key string, fetch func(context.Context) (func(), error)) <-chan struct{} {
+func (m *memoSource) load(key string, fetch func(context.Context) loadOutcome) <-chan struct{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if done, ok := m.inFlight[key]; ok {
@@ -106,16 +143,17 @@ func (m *memoSource) load(key string, fetch func(context.Context) (func(), error
 	go func() {
 		ctx, cancel := context.WithTimeout(m.base, refreshTimeout)
 		defer cancel()
-		store, err := fetch(ctx)
+		result := m.runLoad(ctx, fetch)
 		m.mu.Lock()
 		defer m.mu.Unlock()
-		if err != nil {
-			m.lastFailed[key] = time.Now()
-			m.lastErrors[key] = err
+		if result.store != nil {
+			result.store()
+		}
+		if result.failure != nil {
+			m.recordFailure(key, result.failure)
 		} else {
 			delete(m.lastFailed, key)
 			delete(m.lastErrors, key)
-			store()
 		}
 		delete(m.inFlight, key)
 		close(done)
@@ -123,14 +161,48 @@ func (m *memoSource) load(key string, fetch func(context.Context) (func(), error
 	return done
 }
 
-func (m *memoSource) refreshInBackground(key string, fetch func(context.Context) (func(), error)) {
+// runLoad contains panics, because this goroutine is outside net/http's recovery.
+func (m *memoSource) runLoad(ctx context.Context, fetch func(context.Context) loadOutcome) (result loadOutcome) {
+	defer func() {
+		if recover() != nil {
+			result = loadOutcome{failure: errors.New("the element request failed unexpectedly")}
+		}
+	}()
+	select {
+	case m.slots <- struct{}{}:
+		defer func() { <-m.slots }()
+	case <-ctx.Done():
+		return loadOutcome{failure: ctx.Err()}
+	}
+	return fetch(ctx)
+}
+
+func (m *memoSource) recordFailure(key string, err error) {
+	if _, known := m.lastFailed[key]; !known && len(m.lastFailed) >= maxRememberedFailures {
+		for old, at := range m.lastFailed {
+			if time.Since(at) >= refreshRetryAfter {
+				delete(m.lastFailed, old)
+				delete(m.lastErrors, old)
+			}
+		}
+		if len(m.lastFailed) >= maxRememberedFailures {
+			m.lastFailed, m.lastErrors = map[string]time.Time{}, map[string]error{}
+		}
+	}
+	m.lastFailed[key] = time.Now()
+	m.lastErrors[key] = err
+}
+
+// refreshInBackground reports whether newer data is on its way.
+func (m *memoSource) refreshInBackground(key string, fetch func(context.Context) loadOutcome) bool {
 	m.mu.Lock()
 	failed, hasFailed := m.lastFailed[key]
 	m.mu.Unlock()
 	if hasFailed && time.Since(failed) < refreshRetryAfter {
-		return
+		return false
 	}
 	m.load(key, fetch)
+	return true
 }
 
 func (m *memoSource) lastError(key string) error {
@@ -142,8 +214,41 @@ func (m *memoSource) lastError(key string) error {
 
 func (m *memoSource) FetchGroups() ([]catalog.Group, error) { return m.source.FetchGroups() }
 
+// SearchElements scans groups through the memo, so repeat searches make no provider
+// requests and failing groups back off. A deadline keeps partial results.
 func (m *memoSource) SearchElements(ctx context.Context, query string) (catalog.ElementSearchResult, error) {
-	return m.source.SearchElements(ctx, query)
+	groups, err := m.source.FetchGroups()
+	if err != nil {
+		return catalog.ElementSearchResult{}, err
+	}
+	result := catalog.ElementSearchResult{GroupsTotal: len(groups)}
+	seen := map[string]bool{}
+	for _, group := range groups {
+		if err := ctx.Err(); err != nil {
+			break
+		}
+		records, meta, err := m.FetchGroupElements(ctx, group.Name)
+		if err != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: %v", group.Name, err))
+			continue
+		}
+		result.GroupsCovered++
+		for _, record := range records {
+			key := canonicalElementID(record.CatalogID)
+			if !seen[key] && (containsFold(record.Name, query) || strings.Contains(record.CatalogID, query)) {
+				seen[key] = true
+				result.Records = append(result.Records, record)
+				result.Entries = append(result.Entries, catalog.ElementEntry{Record: record, Meta: meta})
+			}
+		}
+	}
+	if err := ctx.Err(); err != nil && (!errors.Is(err, context.DeadlineExceeded) || result.GroupsCovered == 0) {
+		return result, err
+	}
+	if result.GroupsCovered == 0 && result.GroupsTotal > 0 {
+		return result, errors.New("search could not fetch any satellite groups")
+	}
+	return result, nil
 }
 
 func (m *memoSource) storeElement(key string, entry memoEntry[elements.Record]) {
@@ -168,19 +273,20 @@ func canonicalElementID(id string) string {
 	return trimmed
 }
 
-func (m *memoSource) fetchElement(id, key string) func(context.Context) (func(), error) {
-	return func(ctx context.Context) (func(), error) {
-		record, meta, err := m.source.FetchElementByNorad(ctx, id)
+func (m *memoSource) fetchElement(key string) func(context.Context) loadOutcome {
+	return func(ctx context.Context) loadOutcome {
+		record, meta, err := m.source.FetchElementByNorad(ctx, key)
 		if err != nil {
-			return nil, err
+			return loadOutcome{failure: err}
 		}
-		return func() { m.storeElement(key, memoEntry[elements.Record]{record, meta}) }, nil
+		return outcome(meta, func() { m.storeElement(key, memoEntry[elements.Record]{record, meta}) })
 	}
 }
 
 func (m *memoSource) FetchElementByNorad(ctx context.Context, id string) (elements.Record, catalog.FetchMeta, error) {
 	key := canonicalElementID(id)
 	loadKey := "element:" + key
+	fetch := m.fetchElement(key)
 	m.mu.Lock()
 	entry, ok := m.elements[key]
 	m.mu.Unlock()
@@ -194,15 +300,15 @@ func (m *memoSource) FetchElementByNorad(ctx context.Context, id string) (elemen
 	}
 	if ok {
 		if m.isFresh(entry.meta) {
-			return entry.value, entry.meta, nil
+			return entry.value, served(entry.meta), nil
 		}
-		m.refreshInBackground(loadKey, m.fetchElement(id, key))
-		return entry.value, expired(entry.meta), nil
+		loading := m.refreshInBackground(loadKey, fetch)
+		return entry.value, expired(entry.meta, loading), nil
 	}
 	if err := m.recentFailure(loadKey); err != nil {
 		return elements.Record{}, catalog.FetchMeta{}, err
 	}
-	done := m.load(loadKey, m.fetchElement(id, key))
+	done := m.load(loadKey, fetch)
 	select {
 	case <-done:
 	case <-ctx.Done():
@@ -216,15 +322,36 @@ func (m *memoSource) FetchElementByNorad(ctx context.Context, id string) (elemen
 	return elements.Record{}, catalog.FetchMeta{}, m.lastError(loadKey)
 }
 
+func (m *memoSource) knownGroup(name string) (bool, error) {
+	groups, err := m.source.FetchGroups()
+	if err != nil {
+		return false, err
+	}
+	for _, group := range groups {
+		if strings.EqualFold(group.Name, name) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (m *memoSource) FetchGroupElements(ctx context.Context, name string) ([]elements.Record, catalog.FetchMeta, error) {
+	// Unknown names go no further, so they cannot reach the provider or fill the memo.
+	known, err := m.knownGroup(name)
+	if err != nil {
+		return nil, catalog.FetchMeta{}, err
+	}
+	if !known {
+		return nil, catalog.FetchMeta{}, requestError{http.StatusNotFound, fmt.Errorf("unknown satellite group: %s", name)}
+	}
 	key := strings.ToLower(name)
 	loadKey := "group:" + key
-	fetch := func(loadCtx context.Context) (func(), error) {
+	fetch := func(loadCtx context.Context) loadOutcome {
 		records, meta, err := m.source.FetchGroupElements(loadCtx, name)
 		if err != nil {
-			return nil, err
+			return loadOutcome{failure: err}
 		}
-		return func() { m.storeGroup(key, records, meta) }, nil
+		return outcome(meta, func() { m.storeGroup(key, records, meta) })
 	}
 	m.mu.Lock()
 	entry, ok := m.groups[key]
@@ -239,10 +366,10 @@ func (m *memoSource) FetchGroupElements(ctx context.Context, name string) ([]ele
 	}
 	if ok {
 		if m.isFresh(entry.meta) {
-			return entry.value, entry.meta, nil
+			return entry.value, served(entry.meta), nil
 		}
-		m.refreshInBackground(loadKey, fetch)
-		return entry.value, expired(entry.meta), nil
+		loading := m.refreshInBackground(loadKey, fetch)
+		return entry.value, expired(entry.meta, loading), nil
 	}
 	if err := m.recentFailure(loadKey); err != nil {
 		return nil, catalog.FetchMeta{}, err

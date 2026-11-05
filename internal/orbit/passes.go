@@ -30,7 +30,8 @@ const (
 	wgs84Flattening          = 1 / 298.257223563
 	wgs84EccentricitySquared = wgs84Flattening * (2 - wgs84Flattening)
 	maxPlanDuration          = 30 * 24 * time.Hour
-	maxPlanSamples           = 250000
+	// MaxPlanSamples limits the samples one pass plan may use.
+	MaxPlanSamples = 250000
 )
 
 func (o Observer) Validate() error {
@@ -81,8 +82,8 @@ func planPasses(ctx context.Context, at func(time.Time) (State, error), obs Obse
 	if duration%step != 0 {
 		samples++
 	}
-	if samples+1 > maxPlanSamples {
-		return nil, fmt.Errorf("pass plan would exceed %d samples", maxPlanSamples)
+	if samples+1 > MaxPlanSamples {
+		return nil, fmt.Errorf("pass plan would exceed %d samples", MaxPlanSamples)
 	}
 	start = start.UTC()
 	end := start.Add(duration)

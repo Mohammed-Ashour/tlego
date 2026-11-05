@@ -3,6 +3,9 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io/fs"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -176,6 +179,110 @@ func TestPassesStopWhenRequestIsCanceled(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	appHandler(t).ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/passes?norad_id=25544"+greenwich, nil).WithContext(ctx))
 	if recorder.Code == http.StatusOK {
+		t.Fatalf("status = %d", recorder.Code)
+	}
+}
+
+func TestServerRejectsOtherMethodsAndCrossSiteCalls(t *testing.T) {
+	handler := appHandler(t)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/api/v1/search?q=iss", nil))
+	if recorder.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST status = %d", recorder.Code)
+	}
+	crossSite := httptest.NewRequest(http.MethodGet, "/api/v1/search?q=iss", nil)
+	crossSite.Header.Set("Sec-Fetch-Site", "cross-site")
+	recorder = httptest.NewRecorder()
+	handler.ServeHTTP(recorder, crossSite)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("cross-site status = %d", recorder.Code)
+	}
+	sameOrigin := httptest.NewRequest(http.MethodGet, "/api/v1/search?q=iss", nil)
+	sameOrigin.Header.Set("Sec-Fetch-Site", "same-origin")
+	recorder = httptest.NewRecorder()
+	handler.ServeHTTP(recorder, sameOrigin)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("same-origin status = %d", recorder.Code)
+	}
+}
+
+func TestLoopbackHostsOnlyBlocksRebinding(t *testing.T) {
+	handler := loopbackHostsOnly(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	for host, want := range map[string]int{
+		"127.0.0.1:8080": http.StatusOK, "localhost:8080": http.StatusOK, "LOCALHOST": http.StatusOK, "[::1]:8080": http.StatusOK,
+		"evil.example": http.StatusForbidden, "evil.example:8080": http.StatusForbidden, "192.168.1.5:8080": http.StatusForbidden,
+	} {
+		request := httptest.NewRequest(http.MethodGet, "/", nil)
+		request.Host = host
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		if recorder.Code != want {
+			t.Errorf("Host %q: status %d, want %d", host, recorder.Code, want)
+		}
+	}
+}
+
+func TestAppURLOpensLoopbackForWildcardBinds(t *testing.T) {
+	for ip, want := range map[string]string{"0.0.0.0": "http://127.0.0.1:80", "::": "http://127.0.0.1:80", "127.0.0.1": "http://127.0.0.1:80", "::1": "http://[::1]:80"} {
+		if got := appURL(&net.TCPAddr{IP: net.ParseIP(ip), Port: 80}); got != want {
+			t.Errorf("%s: %s, want %s", ip, got, want)
+		}
+	}
+}
+
+func TestFarFutureTimesAreRejected(t *testing.T) {
+	handler := appHandler(t)
+	for _, path := range []string{
+		"/api/v1/report?norad_id=25544&time=9000-01-01T00:00:00Z",
+		"/api/v1/passes?norad_id=25544&start=9000-01-01T00:00:00Z" + greenwich,
+		"/api/v1/tonight?norad_id=25544&time=9000-01-01T00:00:00Z" + greenwich,
+		"/api/v1/track?norad_id=25544&start=9999-12-31T23:59:00Z&duration=168h",
+		"/api/v1/look?norad_id=25544&start=9000-01-01T00:00:00Z&end=9000-01-01T01:00:00Z" + greenwich,
+	} {
+		if status, body := request(t, handler, path); status != http.StatusBadRequest || !strings.Contains(body["error"].(map[string]any)["message"].(string), "five years") {
+			t.Errorf("%s: %d %v", path, status, body)
+		}
+	}
+}
+
+func TestOtherInputLimits(t *testing.T) {
+	handler := appHandler(t)
+	if status, _ := request(t, handler, "/api/v1/passes?norad_id=25544&alt=1e308"+greenwich); status != http.StatusBadRequest {
+		t.Errorf("huge altitude: %d", status)
+	}
+	if status, _ := request(t, handler, "/api/v1/search?q=%20"); status != http.StatusBadRequest {
+		t.Errorf("blank search: %d", status)
+	}
+	if status, _ := request(t, handler, "/api/v1/position?norad_id=999"); status != http.StatusNotFound {
+		t.Errorf("unknown local position: %d", status)
+	}
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/satellites?group=local+FILE", nil))
+	if recorder.Code != http.StatusOK {
+		t.Errorf("local group case: %d", recorder.Code)
+	}
+}
+
+func TestDistantEpochWarningOnPlanningRoutes(t *testing.T) {
+	_, body := request(t, appHandler(t), "/api/v1/tonight?norad_id=25544&time=2026-11-24T12:00:00Z"+greenwich)
+	warnings, _ := json.Marshal(body["warnings"])
+	if !strings.Contains(string(warnings), "distant_epoch") {
+		t.Fatalf("warnings = %s", warnings)
+	}
+}
+
+func TestFilesystemErrorsHideServerPaths(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	writeFailure(recorder, fmt.Errorf("saving: %w", &fs.PathError{Op: "mkdir", Path: "/secret/cache", Err: fs.ErrPermission}))
+	if strings.Contains(recorder.Body.String(), "/secret") {
+		t.Fatalf("body = %s", recorder.Body.String())
+	}
+}
+
+func TestDeadlineMapsToGatewayTimeout(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	writeFailure(recorder, context.DeadlineExceeded)
+	if recorder.Code != http.StatusGatewayTimeout {
 		t.Fatalf("status = %d", recorder.Code)
 	}
 }

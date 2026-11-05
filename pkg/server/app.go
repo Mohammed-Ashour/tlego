@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Mohammed-Ashour/tlego/internal/catalog"
@@ -22,7 +23,13 @@ const (
 	maxTrackWindow    = 7 * 24 * time.Hour
 	maxTrackSamples   = 20000
 	maxLookSamples    = 512
+	maxSearchResults  = 500
 	searchTimeout     = 60 * time.Second
+	// Deep-space propagation cost grows with distance from the epoch, so requests are
+	// limited in both time span and running time.
+	maxEpochDistance = 5 * 365 * 24 * time.Hour
+	computeTimeout   = 30 * time.Second
+	maxObserverAltKm = 100
 )
 
 func (a api) registerAppRoutes(mux *http.ServeMux) {
@@ -48,8 +55,16 @@ func badRequest(format string, args ...any) error {
 func writeFailure(w http.ResponseWriter, err error) {
 	status := http.StatusUnprocessableEntity
 	var failure requestError
-	if errors.As(err, &failure) {
+	var pathErr *fs.PathError
+	switch {
+	case errors.As(err, &failure):
 		status = failure.status
+	case errors.Is(err, context.DeadlineExceeded):
+		status = http.StatusGatewayTimeout
+	}
+	// Filesystem errors name server paths, which clients have no use for.
+	if errors.As(err, &pathErr) {
+		err = errors.New("the satellite cache could not be used")
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -72,6 +87,21 @@ type element struct {
 	prop       *orbit.Propagator
 	provenance output.Provenance
 	warnings   []output.Warning
+}
+
+// withinEpochRange rejects times too far from the elements to mean anything.
+func (e element) withinEpochRange(times ...time.Time) error {
+	for _, at := range times {
+		if at.Sub(e.provenance.ElementEpoch).Abs() > maxEpochDistance {
+			return badRequest("time %s is more than five years from the element epoch", at.Format(time.RFC3339))
+		}
+	}
+	return nil
+}
+
+// computeContext limits work done for one request.
+func computeContext(r *http.Request) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(r.Context(), computeTimeout)
 }
 
 func (a api) loadElement(r *http.Request) (element, error) {
@@ -173,6 +203,9 @@ func queryObserver(r *http.Request) (orbit.Observer, error) {
 	if err != nil {
 		return orbit.Observer{}, err
 	}
+	if alt > maxObserverAltKm {
+		return orbit.Observer{}, badRequest("alt must be at most %d km", maxObserverAltKm)
+	}
 	obs := orbit.Observer{Lat: lat, Lon: lon, Alt: alt}
 	if err := obs.Validate(); err != nil {
 		return orbit.Observer{}, requestError{http.StatusBadRequest, err}
@@ -188,6 +221,10 @@ func (a api) reportV1(w http.ResponseWriter, r *http.Request) {
 	}
 	loaded, err := a.loadElement(r)
 	if err != nil {
+		writeFailure(w, err)
+		return
+	}
+	if err := loaded.withinEpochRange(instant); err != nil {
 		writeFailure(w, err)
 		return
 	}
@@ -231,27 +268,29 @@ func (a api) passesV1(w http.ResponseWriter, r *http.Request) {
 		writeFailure(w, err)
 		return
 	}
+	if int64(duration/step)+2 > orbit.MaxPlanSamples {
+		writeFailure(w, badRequest("pass plan would exceed %d samples: use a longer step", orbit.MaxPlanSamples))
+		return
+	}
 	loaded, err := a.loadElement(r)
 	if err != nil {
 		writeFailure(w, err)
 		return
 	}
-	passes, err := orbit.PlanPassesElementsContext(r.Context(), loaded.prop, obs, start, duration, step)
-	if err != nil {
-		writeFailure(w, planningError(err))
+	if err := loaded.withinEpochRange(start, start.Add(duration)); err != nil {
+		writeFailure(w, err)
 		return
 	}
-	warnings := append(loaded.warnings, output.Warning{Code: "sampled_passes", Message: "Pass events are estimates, and a pass shorter than the sampling step can be missed."})
-	writeResult(w, "passes", output.PassPlanV1(loaded.record.CatalogID, obs, start, duration, step, passes), loaded.provenance, warnings)
-}
-
-// planningError reports budget and input failures, which planners return as
-// plain errors before propagating, as client errors.
-func planningError(err error) error {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return err
+	ctx, cancel := computeContext(r)
+	defer cancel()
+	passes, err := orbit.PlanPassesElementsContext(ctx, loaded.prop, obs, start, duration, step)
+	if err != nil {
+		writeFailure(w, err)
+		return
 	}
-	return requestError{http.StatusBadRequest, err}
+	warnings := append(loaded.warnings, output.DistantEpochWarning(loaded.provenance.ElementEpoch, start)...)
+	warnings = append(warnings, output.Warning{Code: "sampled_passes", Message: "Pass events are estimates, and a pass shorter than the sampling step can be missed."})
+	writeResult(w, "passes", output.PassPlanV1(loaded.record.CatalogID, obs, start, duration, step, passes), loaded.provenance, warnings)
 }
 
 func (a api) tonightV1(w http.ResponseWriter, r *http.Request) {
@@ -286,12 +325,19 @@ func (a api) tonightV1(w http.ResponseWriter, r *http.Request) {
 		writeFailure(w, err)
 		return
 	}
-	plan, err := orbit.PlanTonight(r.Context(), loaded.prop, obs, from, criteria)
+	if err := loaded.withinEpochRange(from); err != nil {
+		writeFailure(w, err)
+		return
+	}
+	ctx, cancel := computeContext(r)
+	defer cancel()
+	plan, err := orbit.PlanTonight(ctx, loaded.prop, obs, from, criteria)
 	if err != nil {
 		writeFailure(w, err)
 		return
 	}
-	warnings := append(loaded.warnings, output.Warning{Code: "estimated_visibility", Message: "Visibility is a geometric estimate. It does not consider weather, brightness or local obstructions."})
+	warnings := append(loaded.warnings, output.DistantEpochWarning(loaded.provenance.ElementEpoch, from)...)
+	warnings = append(warnings, output.Warning{Code: "estimated_visibility", Message: "Visibility is a geometric estimate. It does not consider weather, brightness or local obstructions."})
 	writeResult(w, "tonight", output.TonightV1(loaded.record.Name, loaded.record.CatalogID, obs, plan.Window, criteria, plan.Passes), loaded.provenance, warnings)
 }
 
@@ -334,11 +380,17 @@ func (a api) trackV1(w http.ResponseWriter, r *http.Request) {
 		writeFailure(w, err)
 		return
 	}
-	samples, err := orbit.Track(r.Context(), loaded.prop, start, duration, step, maxTrackSamples, observer)
+	if err := loaded.withinEpochRange(start, start.Add(duration)); err != nil {
+		writeFailure(w, err)
+		return
+	}
+	ctx, cancel := computeContext(r)
+	defer cancel()
+	samples, err := orbit.Track(ctx, loaded.prop, start, duration, step, maxTrackSamples, observer)
 	warnings := loaded.warnings
 	if err != nil {
 		// Decaying objects can stop propagating partway through a window.
-		if len(samples) < 2 || r.Context().Err() != nil {
+		if len(samples) < 2 || ctx.Err() != nil {
 			writeFailure(w, err)
 			return
 		}
@@ -381,7 +433,13 @@ func (a api) lookV1(w http.ResponseWriter, r *http.Request) {
 		writeFailure(w, err)
 		return
 	}
-	points, err := orbit.PassTrack(loaded.prop, obs, orbit.Pass{Start: start, End: end}, int(samples))
+	if err := loaded.withinEpochRange(start, end); err != nil {
+		writeFailure(w, err)
+		return
+	}
+	ctx, cancel := computeContext(r)
+	defer cancel()
+	points, err := orbit.PassTrack(ctx, loaded.prop, obs, orbit.Pass{Start: start, End: end}, int(samples))
 	if err != nil {
 		writeFailure(w, err)
 		return
@@ -392,7 +450,7 @@ func (a api) lookV1(w http.ResponseWriter, r *http.Request) {
 // searchV1 reports coverage alongside matches. A cold search can make many
 // provider requests, so the web app only runs it when asked.
 func (a api) searchV1(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query().Get("q")
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
 	if query == "" {
 		writeFailure(w, badRequest("provide q"))
 		return
@@ -404,15 +462,18 @@ func (a api) searchV1(w http.ResponseWriter, r *http.Request) {
 		writeFailure(w, requestError{http.StatusBadGateway, err})
 		return
 	}
-	satellites := make([]Satellite, 0, len(result.Records))
+	satellites := make([]Satellite, 0, min(len(result.Records), maxSearchResults))
 	for _, record := range result.Records {
+		if len(satellites) == maxSearchResults {
+			break
+		}
 		satellites = append(satellites, Satellite{record.Name, record.CatalogID})
 	}
 	warnings := result.Warnings
 	if warnings == nil {
 		warnings = []string{}
 	}
-	writeJSON(w, map[string]any{"satellites": satellites, "groups_covered": result.GroupsCovered, "groups_total": result.GroupsTotal, "warnings": warnings})
+	writeJSON(w, map[string]any{"satellites": satellites, "groups_covered": result.GroupsCovered, "groups_total": result.GroupsTotal, "truncated": len(result.Records) > maxSearchResults, "warnings": warnings})
 }
 
 const localFileFormat = "local-file"
@@ -427,7 +488,7 @@ func (s fileSource) FetchGroups() ([]catalog.Group, error) {
 }
 
 func (s fileSource) FetchGroupElements(_ context.Context, name string) ([]elements.Record, catalog.FetchMeta, error) {
-	if name != localGroupName {
+	if !strings.EqualFold(name, localGroupName) {
 		return nil, catalog.FetchMeta{}, requestError{http.StatusNotFound, fmt.Errorf("unknown satellite group: %s", name)}
 	}
 	return s.records, catalog.FetchMeta{Format: localFileFormat}, nil
@@ -476,15 +537,54 @@ func NewAppHandler(source elementSource, ui fs.FS) http.Handler {
 	return securityHeaders(mux)
 }
 
-// The app loads nothing from other origins, so a strict policy costs nothing.
+// The app loads nothing from other origins, so a strict policy costs nothing. The
+// server is read-only, and pages on other sites have no reason to call its API:
+// without this check, any website could spend the user's provider allowance.
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+			http.Error(w, "Cross-site requests are not allowed", http.StatusForbidden)
+			return
+		}
 		headers := w.Header()
 		headers.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 		headers.Set("X-Content-Type-Options", "nosniff")
 		headers.Set("Referrer-Policy", "no-referrer")
 		next.ServeHTTP(w, r)
 	})
+}
+
+// loopbackHostsOnly blocks DNS rebinding: a loopback server is only ever reached by
+// a loopback name, so any other Host header comes from a page pretending to be one.
+func loopbackHostsOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		if name, _, err := net.SplitHostPort(host); err == nil {
+			host = name
+		}
+		host = strings.Trim(host, "[]")
+		ip := net.ParseIP(host)
+		if !strings.EqualFold(host, "localhost") && (ip == nil || !ip.IsLoopback()) {
+			http.Error(w, "This server only answers on its loopback address", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// appURL gives an address a browser can open. A wildcard bind has no address of
+// its own, so it uses the loopback interface.
+func appURL(addr net.Addr) string {
+	tcp, ok := addr.(*net.TCPAddr)
+	if ok && tcp.IP.IsUnspecified() {
+		return fmt.Sprintf("http://127.0.0.1:%d", tcp.Port)
+	}
+	return "http://" + addr.String()
 }
 
 // ServeApp runs the web app until ctx is canceled.
@@ -498,7 +598,11 @@ func ServeApp(ctx context.Context, options AppOptions) error {
 		return err
 	}
 	if options.OnReady != nil {
-		options.OnReady("http://" + listener.Addr().String())
+		options.OnReady(appURL(listener.Addr()))
 	}
-	return serveListener(ctx, listener, NewAppHandler(source, options.UI))
+	handler := NewAppHandler(source, options.UI)
+	if tcp, ok := listener.Addr().(*net.TCPAddr); ok && tcp.IP.IsLoopback() {
+		handler = loopbackHostsOnly(handler)
+	}
+	return serveListener(ctx, listener, handler)
 }

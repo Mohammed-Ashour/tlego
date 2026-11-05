@@ -27,6 +27,7 @@ tlego web --file satellites.tle            # Local elements, no provider request
 
 - Your location stays in this browser's storage. It goes only to your TLEGO server, to calculate passes, and is never placed in the URL.
 - The app loads nothing from other sites, and a Content Security Policy enforces this. *Current position on a map* is a link you choose to follow.
+- The server only accepts GET and HEAD, refuses API calls from other websites, and on loopback answers only to loopback host names, which blocks DNS rebinding.
 - The server listens on loopback by default and has no authentication. Binding it elsewhere prints a warning: anyone who can reach it can use it and trigger provider requests. Use a reverse proxy with rate limits if you need that.
 
 ## Limits
@@ -35,21 +36,21 @@ tlego web --file satellites.tle            # Local elements, no provider request
 - The globe is a sphere. Day and night use the Sun's direction, without twilight or atmosphere modelling.
 - Visibility has the [same criteria and limits](visibility.md) as `tlego tonight`, including no weather or brightness.
 - The browser needs WebGL for the globe. Without it, the details and passes still work.
-- CelesTrak [limits repeat downloads](https://celestrak.org/usage-policy.php), and its responses can take a few seconds. Only the first request for data waits for it. A loaded group also provides all of its satellites, and expired data is shown at once while newer data loads in the background. Large groups such as Starlink take longer the first time.
+- CelesTrak [limits repeat downloads](https://celestrak.org/usage-policy.php), and its responses can take a few seconds. Only the first request for data waits for it. A loaded group also provides all of its satellites, expired data is shown at once while newer data loads in the background, and failed requests back off. Searching uses the same saved data. Large groups such as Starlink take longer the first time.
 
 ## API
 
-The server also exposes these JSON routes. All take `norad_id` except search. `lat`, `lon` and `alt` (km) describe an observer, and times are RFC3339. Versioned routes use the [v1 envelope](extensions.md), and failures return an `error` record with a 4xx or 5xx status.
+The server also exposes these JSON routes. All take `norad_id` except search. `lat`, `lon` and `alt` (km) describe an observer, and times are RFC3339. Versioned routes use the [v1 envelope](extensions.md), and failures return an `error` record with a 4xx or 5xx status. Times more than five years from the element epoch are rejected, and calculations stop after 30 seconds. Observer altitude can be at most 100 km. Search returns up to 500 results, and sets `truncated` when there are more.
 
 | Route | Parameters | Returns |
 |---|---|---|
 | `/api/v1/position` | `time` | Position |
 | `/api/v1/report` | `time` | Position and orbit estimates |
-| `/api/v1/passes` | observer (required), `start`, `duration` (default 24h, up to 168h), `step` (default 1m, at least 1s) | Passes |
+| `/api/v1/passes` | observer (required), `start`, `duration` (default 24h, up to 168h), `step` (default 1m, at least 1s, up to 250,000 samples per request) | Passes |
 | `/api/v1/tonight` | observer (required), `time`, `min_elevation`, `max_sun_elevation` | Visible passes in the next dark period |
 | `/api/v1/track` | `start`, `duration` (default 24h, up to 168h), `step` (default 1m), optional observer | Sampled path, up to 20,000 samples |
 | `/api/v1/look` | observer (required), `start`, `end`, `samples` (2 to 512) | Sky path |
-| `/api/v1/search` | `q` | Plain JSON: `satellites`, `groups_covered`, `groups_total`, `warnings` |
+| `/api/v1/search` | `q` | Plain JSON: `satellites`, `groups_covered`, `groups_total`, `truncated`, `warnings` |
 | `/api/satellite-groups`, `/api/satellites?group=` | | Plain JSON lists |
 
 ## Changing the app

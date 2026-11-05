@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	defaultTonightID  = "25544"
-	oldElementsWarnAt = 3 * 24 * time.Hour
+	defaultTonightID = "25544"
 )
 
 func init() { RootCmd.Commands = append(RootCmd.Commands, newTonightCommand()) }
@@ -115,14 +114,7 @@ func elementAgeWarnings(record elements.Record, at time.Time) []output.Warning {
 	if err != nil {
 		return nil
 	}
-	age := at.Sub(epoch)
-	if age < 0 {
-		age = -age
-	}
-	if age <= oldElementsWarnAt {
-		return nil
-	}
-	return []output.Warning{{Code: "distant_epoch", Message: fmt.Sprintf("Element epoch %s is %.0f days from the requested time, so predicted times may be well off.", epoch.UTC().Format(time.RFC3339), age.Hours()/24)}}
+	return output.DistantEpochWarning(epoch, at)
 }
 
 func writeTonight(w io.Writer, record elements.Record, obs orbit.Observer, window *orbit.DarkWindow, criteria orbit.Visibility, passes []orbit.VisiblePass, location *time.Location) {
