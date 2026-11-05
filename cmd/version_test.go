@@ -20,7 +20,7 @@ func TestResolveVersion(t *testing.T) {
 	}{
 		{"release stamp wins", "v0.3.0", module("v0.2.2"), true, "v0.3.0"},
 		{"go install uses the module version", "dev", module("v0.3.0"), true, "v0.3.0"},
-		{"checkout build stays dev", "dev", module("(devel)"), true, "dev"},
+		{"build without a module version stays dev", "dev", module("(devel)"), true, "dev"},
 		{"missing build info stays dev", "dev", nil, false, "dev"},
 		{"empty stamp stays dev", "", module(""), true, "dev"},
 	}

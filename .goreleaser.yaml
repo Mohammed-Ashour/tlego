@@ -39,27 +39,31 @@ changelog:
 
 release:
   prerelease: auto
+  # Lets a failed release job be re-run for the same tag.
+  replace_existing_artifacts: true
   footer: |
     Satellite elements come from [CelesTrak](https://celestrak.org/). Pass and visibility results are estimates.
 
-# Without TAP_GITHUB_TOKEN the manifests are still generated in dist/ and kept
-# as a workflow artifact, so a release never fails on the package manager step.
+# Without TAP_GITHUB_TOKEN the manifests are only generated in dist/ and kept as
+# a workflow artifact. With it, stable releases update the tap and bucket, and
+# prereleases are skipped ("auto"). A failed update fails the job after the
+# release is public; docs/releasing.md covers recovery.
 homebrew_casks:
   - name: tlego
     binaries: [tlego]
     repository:
       owner: Mohammed-Ashour
       name: homebrew-tap
-      token: '{{ index .Env "TAP_GITHUB_TOKEN" }}'
-    skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
     homepage: https://github.com/Mohammed-Ashour/tlego
     description: Track satellites and predict passes from your terminal
     license: MIT
     hooks:
       post:
         install_steps: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/tlego"]
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/tlego"]
           end
 
 scoops:
@@ -67,8 +71,8 @@ scoops:
     repository:
       owner: Mohammed-Ashour
       name: scoop-bucket
-      token: '{{ index .Env "TAP_GITHUB_TOKEN" }}'
-    skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}false{{ else }}true{{ end }}'
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
     homepage: https://github.com/Mohammed-Ashour/tlego
     description: Track satellites and predict passes from your terminal
     license: MIT
