@@ -22,7 +22,7 @@ func appHandler(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 	ui := fstest.MapFS{"index.html": {Data: []byte("<html>app</html>")}}
-	return NewAppHandler(fileSource{records}, ui)
+	return newAppHandler(fileSource{records}, ui)
 }
 
 func request(t *testing.T, handler http.Handler, path string) (int, map[string]any) {
@@ -115,6 +115,9 @@ func TestTrackEndpointIncludesObserverOnlyWhenAsked(t *testing.T) {
 	}
 	data := body["data"].(map[string]any)
 	samples := data["samples"].([]any)
+	if data["step_seconds"] != 60.0 {
+		t.Fatalf("step_seconds = %v", data["step_seconds"])
+	}
 	if len(samples) != 61 || data["frame"] != "TEME" || data["period_minutes"].(float64) < 90 {
 		t.Fatalf("samples=%d data frame=%v period=%v", len(samples), data["frame"], data["period_minutes"])
 	}

@@ -51,12 +51,14 @@ ul { list-style: none; }
 .note:empty { display: none; }
 
 .field { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; color: var(--muted); font-size: 11px; }
-.field select, .field input { width: 100%; min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 4px; background: var(--raised); color: var(--ink); font-size: 13px; }
+.field input::placeholder { color: #9aa8b3; }
+.field select, .field input { width: 100%; min-height: 34px; padding: 0 9px; border: 1px solid rgba(180, 199, 215, .36); border-radius: 4px; background: var(--raised); color: var(--ink); font-size: 13px; }
 .catalog-actions { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .catalog-actions:empty { display: none; }
 #catalog-status { margin-top: 8px; }
 
 .tracked-list { margin-top: 8px; }
+.tracked-retry { grid-column: 1 / -1; justify-self: start; min-height: 26px; margin: 0 0 6px 27px; }
 .tracked-row { display: grid; grid-template-columns: minmax(0, 1fr) 30px; border-radius: 4px; }
 .tracked-row.is-selected { background: rgba(166, 195, 202, .1); }
 .tracked-select { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 9px; align-items: center; min-height: 34px; padding: 4px 8px; border: 0; background: transparent; text-align: left; cursor: pointer; }
@@ -161,10 +163,18 @@ ul { list-style: none; }
   .time-current { flex: 1; min-width: 0; }
   .catalog-list { max-height: 50vh; }
 }
+@media (max-height: 520px) and (max-width: 1040px) {
+  .app { grid-template-rows: 52px 80dvh auto auto auto; }
+  .headline-sub { display: none; }
+}
 @media (max-width: 560px) {
   .data-status { display: none; }
+  .topbar-actions { min-width: 0; }
+  .topbar-actions .text-button { padding: 0 8px; }
+  .brand { letter-spacing: .1em; }
+  .pick-hint { top: auto; bottom: 8px; width: calc(100% - 16px); }
   .topbar { justify-content: space-between; gap: 8px; padding: 0 10px; }
-  .observer-button { max-width: 150px; }
+  .observer-button { max-width: 130px; }
   .headline { top: 8px; left: 8px; right: 8px; max-width: none; padding: 8px 10px; }
   .headline-main { font-size: 14px; }
 }

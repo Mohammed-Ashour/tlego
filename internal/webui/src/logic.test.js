@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   annotatePasses, buildUrlState, canonicalId, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCountdown, formatDay, formatDuration,
-  lookAt, MAX_TRACKED, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, providerMessage, readStoredObserver, sunlitAt, trailRange, validId, windowFrom,
+  lookAt, MAX_TRACKED, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, trailRange, validId, windowFrom,
 } from './logic.js';
 
 test('compass points cover the circle and wrap', () => {
@@ -59,6 +59,8 @@ test('stored observers survive bad data', () => {
   assert.equal(readStoredObserver(storage('nonsense')), null);
   assert.equal(readStoredObserver(storage(null)), null);
   assert.equal(readStoredObserver(storage('{"lat":500,"lon":2}')), null);
+  assert.equal(readStoredObserver(storage('{"lat":null,"lon":null}')), null);
+  assert.equal(readStoredObserver(storage('{"lat":true,"lon":false}')), null);
 });
 
 test('filtering matches names and IDs', () => {
@@ -112,8 +114,10 @@ test('durations and countdowns read naturally', () => {
   assert.equal(formatDuration(125000), '2 min 5 s');
   assert.equal(formatDuration(3 * 3600000 + 60000), '3 h 1 min');
   assert.equal(formatDuration(72 * 3600000), '3 days');
-  assert.equal(formatCountdown(1000 + 60000, 1000), 'in 1 min 0 s');
-  assert.equal(formatCountdown(1000, 61000), '1 min 0 s ago');
+  assert.equal(formatCountdown(61000, 1000), 'in 1 min');
+  assert.equal(formatCountdown(31000, 1000), 'in under a minute');
+  assert.equal(formatCountdown(1000 + 3 * 3600000 + 300000, 1000), 'in 3 h 5 min');
+  assert.equal(formatCountdown(1000, 61000), 'now');
 });
 
 test('times format in UTC on request', () => {
@@ -139,4 +143,33 @@ test('windows lead the clock and refresh before running out', () => {
 test('rate limits get a helpful message and other errors pass through', () => {
   assert.match(providerMessage('unexpected status: 403 Forbidden'), /limiting downloads/);
   assert.equal(providerMessage('NORAD ID 99999 is not in the local file'), 'NORAD ID 99999 is not in the local file');
+});
+
+test('storage failures are contained', () => {
+  const blocked = safeStorage(() => { throw new Error('SecurityError'); });
+  assert.equal(blocked.getItem('x'), null);
+  assert.doesNotThrow(() => blocked.setItem('x', '1'));
+  assert.doesNotThrow(() => blocked.removeItem('x'));
+  const full = safeStorage(() => ({ setItem() { throw new Error('quota'); } }));
+  assert.doesNotThrow(() => full.setItem('x', '1'));
+  const values = new Map();
+  const working = safeStorage(() => ({ getItem: (k) => values.get(k), setItem: (k, v) => values.set(k, v) }));
+  working.setItem('x', '1');
+  assert.equal(working.getItem('x'), '1');
+});
+
+test('connection failures get a clear message', () => {
+  assert.match(providerMessage('Failed to fetch'), /could not be reached/);
+});
+
+test('short coordinates round and never show a negative zero', () => {
+  assert.equal(shortCoordinate(49.96, 'N', 'S'), '50.0° N');
+  assert.equal(shortCoordinate(-0.0004, 'E', 'W'), '0.0° E');
+  assert.equal(shortCoordinate(-12.34, 'E', 'W'), '12.3° W');
+});
+
+test('passes match across a changed clipped start', () => {
+  const pass = (start, end) => ({ start: new Date(start).toISOString(), end: new Date(end).toISOString() });
+  assert.ok(passesOverlap(pass(100, 500), pass(200, 500)));
+  assert.ok(!passesOverlap(pass(100, 200), pass(300, 400)));
 });

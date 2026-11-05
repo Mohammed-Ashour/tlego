@@ -9,9 +9,28 @@ export function compassPoint(azimuth) {
   return COMPASS[Math.floor(wrap(azimuth, 360) / 22.5 + 0.5) % COMPASS.length];
 }
 
-// CelesTrak answers 403 when a data set was downloaded too recently.
+// Turns failures into something a user can act on. CelesTrak answers 403 when a
+// data set was downloaded too recently.
 export function providerMessage(message) {
-  return /\b403\b/.test(message) ? 'CelesTrak is limiting downloads of this data for now. Try again later.' : message;
+  if (/\b403\b/.test(message)) return 'CelesTrak is limiting downloads of this data for now. Try again later.';
+  if (/Failed to fetch|NetworkError|Load failed/.test(message)) return 'The TLEGO server could not be reached.';
+  return message;
+}
+
+// Storage can be missing or throw, for example when site data is blocked.
+export function safeStorage(getStorage) {
+  const attempt = (action, fallback) => {
+    try {
+      return action(getStorage());
+    } catch {
+      return fallback;
+    }
+  };
+  return {
+    getItem: (key) => attempt((storage) => storage.getItem(key), null),
+    setItem: (key, value) => attempt((storage) => storage.setItem(key, value)),
+    removeItem: (key) => attempt((storage) => storage.removeItem(key)),
+  };
 }
 
 export function validId(value) {
@@ -64,8 +83,9 @@ export function parseObserver({ lat, lon, alt }) {
 
 export function readStoredObserver(storage) {
   try {
-    const parsed = parseObserver(JSON.parse(storage.getItem('tlego.observer')) ?? {});
-    return parsed.observer ?? null;
+    const stored = JSON.parse(storage.getItem('tlego.observer'));
+    if (typeof stored?.lat !== 'number' || typeof stored?.lon !== 'number') return null;
+    return parseObserver(stored).observer ?? null;
   } catch {
     return null;
   }
@@ -142,9 +162,24 @@ export function formatDuration(milliseconds) {
   return `${total} s`;
 }
 
+// Countdowns update every few seconds, so seconds would only look wrong.
 export function formatCountdown(target, now) {
   const difference = target - now;
-  return difference >= 0 ? `in ${formatDuration(difference)}` : `${formatDuration(-difference)} ago`;
+  if (difference <= 0) return 'now';
+  if (difference < 60000) return 'in under a minute';
+  const minutes = Math.round(difference / 60000);
+  if (minutes < 60) return `in ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `in ${hours} h ${minutes % 60} min`;
+}
+
+export function passesOverlap(a, b) {
+  return Date.parse(a.start) <= Date.parse(b.end) && Date.parse(a.end) >= Date.parse(b.start);
+}
+
+export function shortCoordinate(value, positive, negative) {
+  const rounded = Math.abs(value).toFixed(1);
+  return `${rounded}° ${value >= 0 || Number(rounded) === 0 ? positive : negative}`;
 }
 
 export function formatClock(time, utc) {

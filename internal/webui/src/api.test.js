@@ -47,3 +47,8 @@ test('tracks of different satellites do not cancel each other', async () => {
   await Promise.all([api.track('1', 0, null), api.track('2', 0, null)]);
   assert.ok(signals.every((signal) => !signal.aborted));
 });
+
+test('HTML and very long error bodies are not shown', async () => {
+  await assert.rejects(createApi(async () => reply(500, '<html>proxy error</html>')).groups(), /Request failed \(500\)/);
+  await assert.rejects(createApi(async () => reply(500, 'x'.repeat(500))).groups(), /Request failed \(500\)/);
+});

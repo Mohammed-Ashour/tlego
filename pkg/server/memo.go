@@ -138,6 +138,13 @@ func (m *memoSource) load(key string, fetch func(context.Context) loadOutcome) <
 	if done, ok := m.inFlight[key]; ok {
 		return done
 	}
+	// An earlier load may have finished since the caller looked, so check again
+	// under the lock rather than asking the provider a second time.
+	if m.holdsFresh(key) {
+		done := make(chan struct{})
+		close(done)
+		return done
+	}
 	done := make(chan struct{})
 	m.inFlight[key] = done
 	go func() {
@@ -175,6 +182,18 @@ func (m *memoSource) runLoad(ctx context.Context, fetch func(context.Context) lo
 		return loadOutcome{failure: ctx.Err()}
 	}
 	return fetch(ctx)
+}
+
+func (m *memoSource) holdsFresh(key string) bool {
+	if name, ok := strings.CutPrefix(key, "element:"); ok {
+		entry, found := m.elements[name]
+		return found && m.isFresh(entry.meta)
+	}
+	if name, ok := strings.CutPrefix(key, "group:"); ok {
+		entry, found := m.groups[name]
+		return found && m.isFresh(entry.meta)
+	}
+	return false
 }
 
 func (m *memoSource) recordFailure(key string, err error) {

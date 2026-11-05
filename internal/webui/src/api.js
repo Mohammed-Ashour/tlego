@@ -24,7 +24,10 @@ export function createApi(fetchJSON = globalThis.fetch?.bind(globalThis)) {
         // Legacy routes report failures as plain text.
       }
       if (!response.ok) {
-        throw new ApiError(body?.error?.message || text.trim() || `Request failed (${response.status}).`, response.status);
+        // A proxy's HTML error page is not a message.
+        const plain = text.trim();
+        const usable = plain.length < 200 && !plain.startsWith('<') ? plain : '';
+        throw new ApiError(body?.error?.message || usable || `Request failed (${response.status}).`, response.status);
       }
       if (body === null) throw new ApiError('The server returned an unreadable response.', response.status);
       return body;
@@ -33,16 +36,17 @@ export function createApi(fetchJSON = globalThis.fetch?.bind(globalThis)) {
     }
   }
 
+  const wholeSeconds = (time) => new Date(time).toISOString().replace(/\.\d+Z$/, 'Z');
   const observerParams = (observer) => (observer ? { lat: observer.lat, lon: observer.lon, alt: observer.alt } : {});
 
   return {
     groups: () => get('/api/satellite-groups'),
     satellites: (group) => get('/api/satellites', { group }, 'satellites'),
     search: (q) => get('/api/v1/search', { q }, 'satellites'),
-    track: (id, start, observer) => get('/api/v1/track', { norad_id: id, start: new Date(start).toISOString().replace(/\.\d+Z$/, 'Z'), duration: '25h', step: '60s', ...observerParams(observer) }, `track:${id}`),
+    track: (id, start, observer) => get('/api/v1/track', { norad_id: id, start: wholeSeconds(start), duration: '25h', step: '60s', ...observerParams(observer) }, `track:${id}`),
     report: (id) => get('/api/v1/report', { norad_id: id }, 'report'),
-    passes: (id, observer) => get('/api/v1/passes', { norad_id: id, duration: '48h', step: '30s', ...observerParams(observer) }, 'passes'),
-    tonight: (id, observer) => get('/api/v1/tonight', { norad_id: id, ...observerParams(observer) }, 'tonight'),
+    passes: (id, observer, start) => get('/api/v1/passes', { norad_id: id, start: wholeSeconds(start), duration: '48h', step: '30s', ...observerParams(observer) }, 'passes'),
+    tonight: (id, observer, time) => get('/api/v1/tonight', { norad_id: id, time: typeof time === 'number' ? wholeSeconds(time) : time, ...observerParams(observer) }, 'tonight'),
     look: (id, observer, start, end) => get('/api/v1/look', { norad_id: id, start, end, samples: 64, ...observerParams(observer) }, 'look'),
   };
 }

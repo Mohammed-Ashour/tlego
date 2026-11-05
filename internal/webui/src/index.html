@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>TLEGO</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -33,7 +34,7 @@
       <div id="scene" class="scene"></div>
       <div id="sat-label" class="sat-label" hidden></div>
       <section id="headline" class="headline" aria-live="polite"></section>
-      <p id="pick-hint" class="pick-hint" hidden>Click your location on the globe, or press Escape to cancel.</p>
+      <p id="pick-hint" class="pick-hint" role="status" hidden>Click your location on the globe, or press Escape to cancel.</p>
       <div id="scene-error" class="scene-error" role="alert" hidden></div>
       <div class="camera-tools" aria-label="Camera controls">
         <button id="camera-follow" class="icon-button" type="button" aria-pressed="false" aria-label="Follow the selected satellite" title="Follow the selected satellite">◎</button>
@@ -77,7 +78,7 @@
         <input id="time-slider" type="range" min="0" max="90000" step="1" value="3600" aria-label="Timeline position">
         <div class="scrubber-labels"><span id="time-start"></span><span id="time-end"></span></div>
       </div>
-      <output id="time-current" class="time-current" for="time-slider"></output>
+      <div id="time-current" class="time-current"></div>
     </footer>
   </div>
 

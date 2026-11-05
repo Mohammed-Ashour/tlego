@@ -47,11 +47,21 @@ These commands fetch live data when a usable cache is unavailable. To see the in
 tlego web
 ```
 
-![The web app showing the ISS and Tiangong on a sunlit globe, with a pass on a sky plot](assets/web-app.png)
+![The web app showing the ISS on a sunlit globe, with a pass on a sky plot](assets/web-app.png)
 
-This starts a local server and opens your browser. Track up to eight satellites on a globe with real day and night, set your location to see where to look, and scrub through the next day. Passes show a sky plot and mark the ones you can see. Everything is in the binary, so it needs no Node and loads nothing from other sites. To try it without provider access, run `go run . web --file examples/tui-demo/iss.tle` from a checkout.
+This starts a local server and opens your browser. Everything is in the binary, so it needs no Node and loads nothing from other sites.
 
-The [web app guide](docs/web-app.md) covers the options, privacy and the API.
+| Want to… | Do this |
+|---|---|
+| Follow satellites | Add up to eight from a group, a filter or a NORAD ID, and watch them on a globe with real day and night |
+| See where to look | Set your location to get direction and elevation, and a line to the satellite while it is up |
+| Find a pass | Open Passes for the next 48 hours, with a countdown, sky plots and a badge on the ones you can see |
+| Look ahead | Scrub or play through the next day, then press Live to return |
+| Share a view | Send the URL, which holds the satellites but never your location |
+
+Use `tlego web --no-open --addr 127.0.0.1:9000` to choose the address yourself. To try it without provider access, run `go run . web --file examples/tui-demo/iss.tle` from a checkout.
+
+The first load of a group waits for CelesTrak. After that, its satellites appear at once. The [web app guide](docs/web-app.md) covers the options, privacy, limits and the JSON API.
 
 ## See the ISS tonight
 
@@ -226,6 +236,6 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) for the current package boundaries, [the
 
 ## Data, dependencies and license
 
-Satellite elements come from [CelesTrak](https://celestrak.org/). Propagation uses [go-satellite-v2](https://github.com/Mohammed-Ashour/go-satellite-v2); the TUI uses [Bubble Tea](https://github.com/charmbracelet/bubbletea), and commands use [urfave/cli](https://github.com/urfave/cli).
+Satellite elements come from [CelesTrak](https://celestrak.org/). Propagation uses [go-satellite-v2](https://github.com/Mohammed-Ashour/go-satellite-v2); the TUI uses [Bubble Tea](https://github.com/charmbracelet/bubbletea), commands use [urfave/cli](https://github.com/urfave/cli), and the web app and orbit viewer use [Three.js](https://threejs.org/) and [Natural Earth](https://www.naturalearthdata.com/) outlines.
 
 TLEGO is available under the [MIT license](LICENSE.md).

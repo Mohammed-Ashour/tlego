@@ -57,7 +57,7 @@ homebrew_casks:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
     homepage: https://github.com/Mohammed-Ashour/tlego
-    description: Track satellites and predict passes from your terminal
+    description: Track satellites and predict passes in your browser or terminal
     license: MIT
     hooks:
       post:
@@ -74,5 +74,5 @@ scoops:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
     homepage: https://github.com/Mohammed-Ashour/tlego
-    description: Track satellites and predict passes from your terminal
+    description: Track satellites and predict passes in your browser or terminal
     license: MIT

@@ -21,3 +21,5 @@ Commit viewer.bundle.js alongside source changes. CI rebuilds it and rejects a s
 - esbuild 0.25.11 is a build-only dependency pinned in package-lock.json.
 
 The coastline file is included in the bundle. It is not fetched by the generated viewer. Application data uses JSON serialization and DOM textContent; never build markup from a satellite name.
+
+The web app in `internal/webui` imports `viewer-state.js` and `earth-land.json`. If you change either, rebuild it there too.

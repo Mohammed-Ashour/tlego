@@ -157,9 +157,13 @@ func TestCancelledRequestStillFillsTheCache(t *testing.T) {
 		_, _, err := memo.FetchElementByNorad(ctx, "25544")
 		result <- err
 	}()
+	deadline := time.Now().Add(10 * time.Second)
 	for {
 		if _, calls := live.counts(); calls == 1 {
 			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the provider request never started")
 		}
 		time.Sleep(time.Millisecond)
 	}

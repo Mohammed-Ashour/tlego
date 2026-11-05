@@ -19,7 +19,7 @@ tlego web --file satellites.tle            # Local elements, no provider request
 
 - **Track:** add up to eight satellites from a group, by filtering, or by typing a NORAD ID. Filtering is local. *Search all groups* can make up to 44 provider requests on a cold cache, so it only runs when you press it.
 - **Locate:** set your location by typing it, using the browser's location, or clicking the globe. *Now* then shows the direction and elevation, and a line joins you to the satellite while it is above your horizon.
-- **Passes:** see the next 48 hours, with the next visible pass highlighted. Select a pass for its sky plot, where the white stretch is the visible part, then use *Show on globe* to jump to its peak.
+- **Passes:** see the next 48 hours, with a countdown to the next visible pass and a badge on each visible one. Select a pass for its sky plot, where the white stretch is the visible part, then use *Show on globe* to jump to its peak.
 - **Time:** *Live* follows the clock. The slider and playback speeds cover about 25 hours, starting an hour ago. Times can be local or UTC.
 - **Share:** the URL holds the tracked satellites and the selection, so you can bookmark or send it.
 
@@ -40,25 +40,19 @@ tlego web --file satellites.tle            # Local elements, no provider request
 
 ## API
 
-The server also exposes these JSON routes. All take `norad_id` except search. `lat`, `lon` and `alt` (km) describe an observer, and times are RFC3339. Versioned routes use the [v1 envelope](extensions.md), and failures return an `error` record with a 4xx or 5xx status. Times more than five years from the element epoch are rejected, and calculations stop after 30 seconds. Observer altitude can be at most 100 km. Search returns up to 500 results, and sets `truncated` when there are more.
+The server also exposes these JSON routes. The `/api/v1` routes other than search take `norad_id`. `lat`, `lon` and `alt` (km) describe an observer, and times are RFC3339. Versioned routes use the [v1 envelope](extensions.md), and failures return an `error` record with a 4xx or 5xx status. Times more than five years from the element epoch are rejected, and calculations stop after 30 seconds. Observer altitude can be at most 100 km. Search returns up to 500 results, and sets `truncated` when there are more.
 
 | Route | Parameters | Returns |
 |---|---|---|
 | `/api/v1/position` | `time` | Position |
 | `/api/v1/report` | `time` | Position and orbit estimates |
-| `/api/v1/passes` | observer (required), `start`, `duration` (default 24h, up to 168h), `step` (default 1m, at least 1s, up to 250,000 samples per request) | Passes |
-| `/api/v1/tonight` | observer (required), `time`, `min_elevation`, `max_sun_elevation` | Visible passes in the next dark period |
-| `/api/v1/track` | `start`, `duration` (default 24h, up to 168h), `step` (default 1m), optional observer | Sampled path, up to 20,000 samples |
-| `/api/v1/look` | observer (required), `start`, `end`, `samples` (2 to 512) | Sky path |
+| `/api/v1/passes` | observer (required), `start`, `duration` (default 24h, 1m to 168h), `step` (default 1m, 1s to 1h, up to 250,000 samples per request) | Passes |
+| `/api/v1/tonight` | observer (required), `time`, `min_elevation` (default 10), `max_sun_elevation` (default -6) | Visible passes in the next dark period |
+| `/api/v1/track` | `start`, `duration` (default 24h, 1m to 168h), `step` (default 1m, 1s to 1h), optional observer | Sampled path, up to 20,000 samples |
+| `/api/v1/look` | observer (required), `start` and `end` (both required in practice), `samples` (default 60, 2 to 512) | Sky path |
 | `/api/v1/search` | `q` | Plain JSON: `satellites`, `groups_covered`, `groups_total`, `truncated`, `warnings` |
 | `/api/satellite-groups`, `/api/satellites?group=` | | Plain JSON lists |
 
 ## Changing the app
 
-The source is in `internal/webui/src`, using plain JavaScript modules and Three.js. Run these in `internal/webui`, and commit `dist` with your change. CI checks it matches.
-
-```bash
-npm ci
-npm test
-npm run build
-```
+The source is in `internal/webui/src`, using plain JavaScript modules and Three.js. [Its README](../internal/webui/README.md) covers building it.

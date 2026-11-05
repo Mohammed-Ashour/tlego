@@ -316,8 +316,11 @@ func TestCachedReadsNeverContactTheProvider(t *testing.T) {
 	if records, _, ok := store.CachedGroupElements("space stations"); !ok || len(records) != 1 {
 		t.Fatalf("records=%d ok=%t", len(records), ok)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "elements", "norad", "99.json"), payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if _, _, ok := store.CachedElementByNorad("99"); ok {
-		t.Fatal("found a mismatched ID")
+		t.Fatal("accepted a saved file holding another satellite")
 	}
 	if err := os.WriteFile(filepath.Join(dir, "elements", "norad", "25544.json"), []byte("{"), 0o600); err != nil {
 		t.Fatal(err)

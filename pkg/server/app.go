@@ -529,8 +529,8 @@ type AppOptions struct {
 	OnReady func(url string)
 }
 
-// NewAppHandler combines the JSON API with the web app's static files.
-func NewAppHandler(source elementSource, ui fs.FS) http.Handler {
+// newAppHandler combines the JSON API with the web app's static files.
+func newAppHandler(source elementSource, ui fs.FS) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", newHandler(source))
 	mux.Handle("/", http.FileServerFS(ui))
@@ -600,7 +600,7 @@ func ServeApp(ctx context.Context, options AppOptions) error {
 	if options.OnReady != nil {
 		options.OnReady(appURL(listener.Addr()))
 	}
-	handler := NewAppHandler(source, options.UI)
+	handler := newAppHandler(source, options.UI)
 	if tcp, ok := listener.Addr().(*net.TCPAddr); ok && tcp.IP.IsLoopback() {
 		handler = loopbackHostsOnly(handler)
 	}

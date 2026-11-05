@@ -174,8 +174,10 @@ export function createGlobe(container, { onPick, onSelect }) {
       }
     }
     if (following && bodies.has(selected)) {
-      const direction = bodies.get(selected).marker.position.clone().normalize();
-      camera.position.copy(direction.multiplyScalar(camera.position.length()));
+      const target = bodies.get(selected).marker.position;
+      // Stay beyond the satellite, so it remains in front of the camera.
+      const distance = Math.max(camera.position.length(), target.length() * 1.3);
+      camera.position.copy(target.clone().normalize().multiplyScalar(distance));
     }
     highlight();
   }
@@ -200,6 +202,7 @@ export function createGlobe(container, { onPick, onSelect }) {
   function screenPosition(worldPosition) {
     const rect = canvas.getBoundingClientRect();
     const projected = worldPosition.clone().project(camera);
+    if (projected.z > 1) return null; // Behind the camera.
     return { x: (projected.x + 1) / 2 * rect.width, y: (1 - projected.y) / 2 * rect.height };
   }
 
@@ -247,6 +250,7 @@ export function createGlobe(container, { onPick, onSelect }) {
     for (const [id, body] of bodies) {
       if (hidden(body.marker.position)) continue;
       const position = screenPosition(body.marker.position);
+      if (!position) continue;
       const distance = Math.hypot(position.x - x, position.y - y);
       if (distance < bestDistance) {
         best = id;

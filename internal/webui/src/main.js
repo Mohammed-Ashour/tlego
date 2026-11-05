@@ -2,7 +2,7 @@ import { createApi, isAbort } from './api.js';
 import { createGlobe } from './globe.js';
 import {
   annotatePasses, buildUrlState, canonicalId, clamp, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
-  lookAt, MAX_TRACKED, needsNewWindow, nextColor, parseObserver, parseUrlState, providerMessage, readStoredObserver, sunlitAt, validId, windowFrom, zoneLabel,
+  lookAt, MAX_TRACKED, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
 } from './logic.js';
 import { sampleAt } from '../../../pkg/templates/viewer-state.js';
 import { renderSky } from './sky.js';
@@ -10,15 +10,19 @@ import { renderSky } from './sky.js';
 const LIST_LIMIT = 200;
 const PASS_REFRESH_MS = 10 * 60000;
 const DEFAULT_ID = '25544';
+const TRACK_RETRY_MS = 60000;
+const COUNTDOWN_REFRESH_MS = 15000;
+const PLAN_HOURS = 48;
 const GROUP_HEAD_START_MS = 1500;
 const byId = (id) => document.getElementById(id);
 const api = createApi();
+const storage = safeStorage(() => window.localStorage);
 
 const state = {
   tracked: new Map(),
   selected: null,
-  observer: readStoredObserver(localStorage),
-  utc: localStorage.getItem('tlego.utc') === '1',
+  observer: readStoredObserver(storage),
+  utc: storage.getItem('tlego.utc') === '1',
   window: windowFrom(Date.now()),
   time: Date.now(),
   live: true,
@@ -38,6 +42,19 @@ const state = {
 
 let globe = null;
 let lastDomUpdate = 0;
+let lastCountdown = 0;
+let frameFailed = false;
+
+// Rerendering a list replaces its rows, so keyboard focus moves to the row with the
+// same data-focus key, or to the fallback if that row is gone.
+function keepFocus(container, render, fallback) {
+  const active = document.activeElement;
+  const key = active && container.contains(active) ? active.dataset.focus : null;
+  render();
+  if (!key) return;
+  const next = [...container.querySelectorAll('[data-focus]')].find((node) => node.dataset.focus === key);
+  (next ?? fallback)?.focus({ preventScroll: true });
+}
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -67,30 +84,34 @@ function dayAndClock(time) {
 async function loadTrack(entry) {
   entry.error = null;
   entry.loading = true;
+  clearTimeout(entry.retryTimer);
+  entry.request = (entry.request ?? 0) + 1;
+  const request = entry.request;
   renderTracked();
   try {
     const result = await api.track(entry.id, state.window.start, state.observer);
+    if (state.tracked.get(entry.id) !== entry) return;
     entry.track = result.data;
     entry.name = result.data.name || entry.name;
     entry.provenance = result.provenance;
     entry.warnings = result.warnings;
-    entry.loading = false;
-    if (state.tracked.get(entry.id) !== entry) return;
-    if (entry.id === state.selected) renderHeadline();
+    entry.lookStale = false;
     globe?.setTrack(entry.id, result.data, entry.color);
     globe?.select(state.selected);
     if (entry.framePending) {
       entry.framePending = false;
-      globe?.home(entry.id);
+      if (entry.id === state.selected) globe?.home(entry.id);
     }
   } catch (error) {
     if (isAbort(error)) return;
+    // Keep any track already shown: a passing failure should not lose the satellite.
     entry.error = providerMessage(error.message);
-    entry.track = null;
-    globe?.removeTrack(entry.id);
+    entry.retryTimer = setTimeout(() => {
+      if (state.tracked.get(entry.id) === entry && entry.error) loadTrack(entry);
+    }, TRACK_RETRY_MS);
   } finally {
-    entry.loading = false;
-    if (state.tracked.get(entry.id) === entry) {
+    if (entry.request === request) entry.loading = false;
+    if (state.tracked.get(entry.id) === entry && entry.request === request) {
       renderTracked();
       renderCatalog();
       renderInspector();
@@ -116,6 +137,7 @@ function addSatellite(id, name, { selectIt = true } = {}) {
 }
 
 function removeSatellite(id) {
+  clearTimeout(state.tracked.get(id)?.retryTimer);
   state.tracked.delete(id);
   globe?.removeTrack(id);
   if (state.selected === id) select(trackedIds()[0] ?? null);
@@ -169,8 +191,10 @@ function setCatalogStatus(message, className = '') {
 async function loadGroups() {
   try {
     state.groups = await api.groups();
+    if (!Array.isArray(state.groups)) throw new Error('The server returned an unexpected response.');
   } catch (error) {
-    if (!isAbort(error)) setCatalogStatus(`Could not load satellite groups: ${error.message}`, 'is-error');
+    state.groups = [];
+    if (!isAbort(error)) setCatalogStatus(`Could not load satellite groups: ${providerMessage(error.message)}`, 'is-error');
     return;
   }
   const select = byId('group-select');
@@ -208,7 +232,7 @@ async function searchAllGroups(query) {
   setCatalogStatus('Searching every group. The first search can take up to a minute.');
   try {
     const result = await api.search(query);
-    state.items = result.satellites;
+    state.items = result.satellites ?? [];
     const partial = result.groups_covered < result.groups_total;
     setCatalogStatus(
       partial ? `Searched ${result.groups_covered} of ${result.groups_total} groups, so more matches may exist.` : `${result.satellites.length} matches across all groups.`,
@@ -216,7 +240,7 @@ async function searchAllGroups(query) {
     );
   } catch (error) {
     if (isAbort(error)) return;
-    setCatalogStatus(`Search failed: ${error.message}`, 'is-error');
+    setCatalogStatus(`Search failed: ${providerMessage(error.message)}`, 'is-error');
   }
   renderCatalog();
 }
@@ -225,6 +249,8 @@ function renderCatalog() {
   const query = byId('filter-input').value;
   const matches = state.isSearchResult ? state.items : filterSatellites(state.items, query);
   const list = byId('catalog-list');
+  const full = state.tracked.size >= MAX_TRACKED;
+  keepFocus(list, () => {
   list.replaceChildren(...matches.slice(0, LIST_LIMIT).map((item) => {
     const id = canonicalId(item.norad_id);
     const isTracked = state.tracked.has(id);
@@ -232,8 +258,9 @@ function renderCatalog() {
     const button = element('button', 'catalog-row');
     button.type = 'button';
     button.setAttribute('aria-pressed', String(isTracked));
-    button.disabled = !isTracked && state.tracked.size >= MAX_TRACKED;
-    button.title = isTracked ? `Stop tracking ${item.name}` : `Track ${item.name}`;
+    button.disabled = !isTracked && full;
+    button.dataset.focus = `catalog:${id}`;
+    button.title = isTracked ? `Stop tracking ${item.name}` : full ? `You can track up to ${MAX_TRACKED} satellites` : `Track ${item.name}`;
     const mark = element('span', 'catalog-mark', isTracked ? '✓' : '+');
     mark.setAttribute('aria-hidden', 'true');
     button.append(mark, element('span', 'catalog-name', item.name), element('span', 'catalog-id', item.norad_id));
@@ -244,6 +271,8 @@ function renderCatalog() {
   if (matches.length > LIST_LIMIT) {
     list.append(element('li', 'note', `Showing ${LIST_LIMIT} of ${matches.length}. Filter to narrow the list.`));
   }
+  if (full) list.prepend(element('li', 'note', `You can track up to ${MAX_TRACKED} satellites. Remove one to add another.`));
+  }, byId('filter-input'));
   const actions = byId('catalog-actions');
   actions.replaceChildren();
   const trimmed = query.trim();
@@ -268,11 +297,12 @@ function renderTracked() {
     list.replaceChildren(element('li', 'note', 'Nothing yet. Pick a satellite below.'));
     return;
   }
-  list.replaceChildren(...[...state.tracked.values()].map((entry) => {
+  keepFocus(list, () => list.replaceChildren(...[...state.tracked.values()].map((entry) => {
     const row = element('li', `tracked-row${entry.id === state.selected ? ' is-selected' : ''}`);
     const choose = element('button', 'tracked-select');
     choose.type = 'button';
     choose.setAttribute('aria-current', String(entry.id === state.selected));
+    choose.dataset.focus = `tracked:${entry.id}`;
     const dot = element('span', 'dot');
     dot.style.setProperty('--color', entry.color);
     choose.append(dot, element('span', 'tracked-name', entry.loading && !entry.track ? `${entry.name} · loading` : entry.name));
@@ -281,11 +311,20 @@ function renderTracked() {
     const remove = element('button', 'row-action', '×');
     remove.type = 'button';
     remove.setAttribute('aria-label', `Stop tracking ${entry.name}`);
+    remove.dataset.focus = `remove:${entry.id}`;
     remove.title = `Stop tracking ${entry.name}`;
     remove.addEventListener('click', () => removeSatellite(entry.id));
     row.append(choose, remove);
+    if (entry.error) {
+      const retry = element('button', 'text-button tracked-retry', 'Try again');
+      retry.type = 'button';
+      retry.dataset.focus = `retry:${entry.id}`;
+      retry.setAttribute('aria-label', `Try loading ${entry.name} again`);
+      retry.addEventListener('click', () => loadTrack(entry));
+      row.append(retry);
+    }
     return row;
-  }));
+  })), byId('filter-input'));
 }
 
 // Inspector
@@ -317,7 +356,14 @@ function renderNow() {
     note.className = `note${entry?.error ? ' is-error' : ''}`;
     return;
   }
-  const time = clamp(state.time, Date.parse(samples[0].time), Date.parse(samples.at(-1).time));
+  const lastSample = Date.parse(samples.at(-1).time);
+  if (state.time > lastSample + 60000 && entry.warnings?.some((warning) => warning.code === 'propagation_stopped')) {
+    setReadouts(byId('now-readouts'), []);
+    note.textContent = `This orbit cannot be predicted past ${dayAndClock(lastSample)}. The satellite may have decayed.`;
+    note.className = 'note is-warning';
+    return;
+  }
+  const time = clamp(state.time, Date.parse(samples[0].time), lastSample);
   const point = sampleAt(samples, time);
   const rows = [
     ['Latitude', formatCoordinate(point.latitude_deg, 'N', 'S')],
@@ -326,19 +372,26 @@ function renderNow() {
     ['Speed', `${point.speed_km_s.toFixed(3)} km/s`],
     ['Sunlight', sunlitAt(samples, time) ? 'Sunlit' : 'In Earth’s shadow'],
   ];
-  const look = lookAt(samples, time);
+  const look = entry.lookStale ? null : lookAt(samples, time);
   if (look) {
     rows.push(['Direction', `${compassPoint(look.azimuth)} (${look.azimuth.toFixed(1)}°)`]);
     rows.push(['Elevation', `${look.elevation.toFixed(1)}°`, look.elevation > 0 ? 'is-good' : '']);
   }
   setReadouts(byId('now-readouts'), rows);
-  const age = elementAgeDays(entry.provenance.element_epoch, time);
+  const age = entry.provenance ? elementAgeDays(entry.provenance.element_epoch, time) : 0;
   const messages = [];
-  if (!look) messages.push('Set your location to see where to look.');
+  if (!state.observer) messages.push('Set your location to see where to look.');
   if (Math.abs(age) > 3) messages.push(`These elements are ${Math.abs(age).toFixed(0)} days from the displayed time, so positions may be well off.`);
   for (const warning of entry.warnings ?? []) messages.push(warning.message);
   note.textContent = messages.join(' ');
   note.className = `note${Math.abs(age) > 3 || entry.warnings?.length ? ' is-warning' : ''}`;
+}
+
+// The line follows the marker, so it updates with the scene rather than the readouts.
+function updateSightLine() {
+  const entry = selectedEntry();
+  const samples = entry?.track?.samples;
+  const look = samples?.length && !entry.lookStale && state.time <= Date.parse(samples.at(-1).time) ? lookAt(samples, state.time) : null;
   globe?.setSightLine(Boolean(look && look.elevation > 0));
 }
 
@@ -354,12 +407,35 @@ function locationPrompt(container) {
 }
 
 function nextVisible() {
-  const passes = state.plan?.tonight?.passes ?? [];
+  const passes = state.plan?.visible ?? [];
   return passes.find((pass) => Date.parse(pass.end.at) > Date.now()) ?? null;
+}
+
+function passSummary() {
+  const { tonight } = state.plan;
+  const visible = nextVisible();
+  const summary = element('div', `pass-summary${visible ? ' is-visible' : ''}`);
+  summary.id = 'pass-summary';
+  if (visible) {
+    const start = Date.parse(visible.start.at);
+    summary.append(
+      element('strong', '', Date.now() >= start ? 'Visible now' : `Visible ${formatCountdown(start, Date.now())}`),
+      element('span', '', `${dayAndClock(start)}, up to ${Math.round(visible.peak.elevation_deg)}° in the ${compassPoint(visible.peak.azimuth_deg)}.`),
+    );
+  } else if (!tonight.dark_start) {
+    summary.append(element('strong', '', 'No dark sky soon'), element('span', '', 'The Sun stays too high for the next 24 hours.'));
+  } else {
+    summary.append(element('strong', '', `No visible passes in the next ${PLAN_HOURS} hours`), element('span', '', `The next dark sky starts ${dayAndClock(Date.parse(tonight.dark_start))}.`));
+  }
+  return summary;
 }
 
 function renderPasses() {
   const container = byId('passes-content');
+  keepFocus(container, () => renderPassesContent(container));
+}
+
+function renderPassesContent(container) {
   container.replaceChildren();
   const entry = selectedEntry();
   if (!entry) {
@@ -370,7 +446,7 @@ function renderPasses() {
     locationPrompt(container);
     return;
   }
-  if (state.planError) {
+  if (state.planError && !state.plan) {
     container.append(element('p', 'note is-error', state.planError));
     const retry = element('button', 'text-button', 'Try again');
     retry.type = 'button';
@@ -382,33 +458,19 @@ function renderPasses() {
     container.append(element('p', 'note', 'Calculating passes…'));
     return;
   }
-  const { tonight, passes } = state.plan;
-  const visible = nextVisible();
-  const summary = element('div', `pass-summary${visible ? ' is-visible' : ''}`);
-  if (visible) {
-    const start = Date.parse(visible.start.at);
-    summary.append(
-      element('strong', '', `Visible ${formatCountdown(start, Date.now())}`),
-      element('span', '', `${dayAndClock(start)}, up to ${Math.round(visible.peak.elevation_deg)}° in the ${compassPoint(visible.peak.azimuth_deg)}.`),
-    );
-  } else if (!tonight.dark_start) {
-    summary.append(element('strong', '', 'No dark sky soon'), element('span', '', 'The Sun stays too high for the next 24 hours.'));
-  } else {
-    summary.append(
-      element('strong', '', 'No visible passes tonight'),
-      element('span', '', `Checked ${dayAndClock(Date.parse(tonight.dark_start))} to ${dayAndClock(Date.parse(tonight.dark_end))}.`),
-    );
-  }
-  container.append(summary, element('h2', 'eyebrow section-title', `Next 48 hours · ${zoneLabel(state.utc)} time`));
+  const { visible, passes } = state.plan;
+  if (state.planError) container.append(element('p', 'note is-warning', `Could not update this list: ${state.planError}`));
+  container.append(passSummary(), element('h2', 'eyebrow section-title', `Next ${PLAN_HOURS} hours · ${zoneLabel(state.utc)} time`));
   if (!passes.length) {
     container.append(element('p', 'note', 'No passes above your horizon in this period.'));
     return;
   }
-  const rows = annotatePasses(passes, tonight.passes);
+  const rows = annotatePasses(passes, visible);
   for (const pass of rows.slice(0, 40)) {
-    const isActive = state.activePass?.pass.start === pass.start;
+    const isActive = Boolean(state.activePass && passesOverlap(state.activePass.pass, pass));
     const button = element('button', 'pass-row');
     button.type = 'button';
+    button.dataset.focus = `pass:${pass.maximum_at}`;
     button.setAttribute('aria-pressed', String(isActive));
     const start = Date.parse(pass.start);
     const end = Date.parse(pass.end);
@@ -428,6 +490,7 @@ function renderPasses() {
 function renderActivePass() {
   const box = element('div', 'sky');
   const { pass, points, error } = state.activePass;
+
   if (error) {
     box.append(element('p', 'note is-error', error));
     return box;
@@ -441,8 +504,10 @@ function renderActivePass() {
   const actions = element('div', 'sky-actions');
   const jump = element('button', 'text-button', 'Show on globe');
   jump.type = 'button';
+  jump.dataset.focus = 'show-on-globe';
   jump.addEventListener('click', () => {
     jumpTo(Date.parse(pass.maximum_at));
+    document.querySelector('.viewport').scrollIntoView({ block: 'nearest' });
   });
   actions.append(jump);
   box.append(plot, actions);
@@ -450,7 +515,7 @@ function renderActivePass() {
 }
 
 async function choosePass(pass) {
-  if (state.activePass?.pass.start === pass.start) {
+  if (state.activePass && passesOverlap(state.activePass.pass, pass)) {
     state.activePass = null;
     renderPasses();
     return;
@@ -460,13 +525,13 @@ async function choosePass(pass) {
   const id = state.selected;
   try {
     const result = await api.look(id, state.observer, pass.start, pass.end);
-    if (state.activePass?.pass.start === pass.start && state.selected === id) {
+    if (state.activePass?.pass === pass && state.selected === id) {
       state.activePass.points = result.data.points;
       renderPasses();
     }
   } catch (error) {
-    if (isAbort(error) || state.activePass?.pass.start !== pass.start) return;
-    state.activePass.error = error.message;
+    if (isAbort(error) || state.activePass?.pass !== pass) return;
+    state.activePass.error = providerMessage(error.message);
     renderPasses();
   }
 }
@@ -483,13 +548,28 @@ async function refreshPlan(force = false) {
   state.planAt = Date.now();
   state.planError = null;
   try {
-    const [tonight, passes] = await Promise.all([api.tonight(id, state.observer), api.passes(id, state.observer)]);
+    const passesRequest = api.passes(id, state.observer, Date.now());
+    // Awaited below. This stops an early failure above counting as unhandled.
+    passesRequest.catch(() => {});
+    const tonight = await api.tonight(id, state.observer, Date.now());
+    // Each answer covers one dark period, so keep asking until the list's end.
+    const visible = [...tonight.data.passes];
+    let night = tonight.data;
+    const horizon = Date.now() + PLAN_HOURS * 3600000;
+    while (night.dark_end && !night.dark_end_clipped && Date.parse(night.dark_end) < horizon) {
+      const next = await api.tonight(id, state.observer, night.dark_end);
+      if (state.planFor !== key) return;
+      visible.push(...next.data.passes);
+      night = next.data;
+    }
+    const passes = await passesRequest;
     if (state.planFor !== key) return;
-    state.plan = { tonight: tonight.data, passes: passes.data.passes };
+    state.plan = { tonight: tonight.data, visible, passes: passes.data.passes };
+    if (state.activePass && !state.plan.passes.some((pass) => passesOverlap(state.activePass.pass, pass))) state.activePass = null;
   } catch (error) {
     if (isAbort(error) || state.planFor !== key) return;
-    state.plan = null;
-    state.planError = error.message;
+    // A previous list stays useful, so it remains with a warning.
+    state.planError = providerMessage(error.message);
   }
   renderPasses();
   renderHeadline();
@@ -507,7 +587,7 @@ async function refreshReport() {
     state.report = result;
   } catch (error) {
     if (isAbort(error) || state.selected !== id) return;
-    state.report = { error: error.message };
+    state.report = { error: providerMessage(error.message) };
   }
   renderOrbit();
 }
@@ -586,6 +666,7 @@ function renderHeadline() {
     headline.append(element('p', 'headline-title', 'See it yourself'), element('p', 'headline-main', 'When can you see it?'));
     const button = element('button', 'text-button', 'Set your location');
     button.type = 'button';
+    button.dataset.focus = 'headline-location';
     button.addEventListener('click', openObserverDialog);
     headline.append(button);
     return;
@@ -594,14 +675,15 @@ function renderHeadline() {
   const visible = nextVisible();
   if (visible) {
     const start = Date.parse(visible.start.at);
+    const started = Date.now() >= start;
     headline.append(
-      element('p', 'headline-title', `Next visible pass · ${entry.name}`),
-      element('p', 'headline-main', `${dayAndClock(start).slice(0, -3)} · ${formatCountdown(start, Date.now())}`),
+      element('p', 'headline-title', `${started ? 'Visible now' : 'Next visible pass'} · ${entry.name}`),
+      element('p', 'headline-main', `${dayAndClock(start).slice(0, -3)}${started ? '' : ` · ${formatCountdown(start, Date.now())}`}`),
       element('p', 'headline-sub', `Up to ${Math.round(visible.peak.elevation_deg)}° in the ${compassPoint(visible.peak.azimuth_deg)}, starting in the ${compassPoint(visible.start.azimuth_deg)}.`),
     );
     return;
   }
-  headline.append(element('p', 'headline-title', entry.name), element('p', 'headline-main', 'No visible passes tonight'));
+  headline.append(element('p', 'headline-title', entry.name), element('p', 'headline-main', state.plan.tonight.dark_start ? `No visible passes in the next ${PLAN_HOURS} hours` : 'No dark sky soon'));
 }
 
 function renderStatus() {
@@ -627,7 +709,7 @@ function renderObserverLabel() {
   const button = byId('observer-open');
   button.classList.toggle('is-set', Boolean(state.observer));
   byId('observer-label').textContent = state.observer
-    ? `${formatCoordinate(state.observer.lat, 'N', 'S').replace(/(\.\d)\d+/, '$1')}, ${formatCoordinate(state.observer.lon, 'E', 'W').replace(/(\.\d)\d+/, '$1')}`
+    ? `${shortCoordinate(state.observer.lat, 'N', 'S')}, ${shortCoordinate(state.observer.lon, 'E', 'W')}`
     : 'Set location';
 }
 
@@ -664,10 +746,16 @@ function jumpTo(time) {
   setLive(false);
   setPlaying(false);
   state.time = time;
-  if (time < state.window.start || time > state.window.end) setWindowAround(time);
+  if (time < state.window.start || time > state.window.end) {
+    // The camera can only frame the satellite once its new track has arrived.
+    const entry = selectedEntry();
+    if (entry) entry.framePending = true;
+    setWindowAround(time);
+  } else {
+    globe?.update(state.time);
+    globe?.home();
+  }
   renderTimeline();
-  globe?.update(state.time);
-  globe?.home();
 }
 
 function renderTimeline() {
@@ -693,6 +781,14 @@ function renderLabel() {
   label.style.top = `${position.y}px`;
 }
 
+// Only text changes here, so focus and scroll position are left alone.
+function renderCountdowns() {
+  if (!state.plan) return;
+  const headline = byId('headline');
+  if (!headline.contains(document.activeElement)) renderHeadline();
+  byId('pass-summary')?.replaceWith(passSummary());
+}
+
 function frame(timestamp, previous) {
   const delta = previous ? Math.min(timestamp - previous, 1000) : 0;
   if (state.live) {
@@ -705,15 +801,26 @@ function frame(timestamp, previous) {
       setPlaying(false);
     }
   }
-  if (globe) {
-    globe.update(state.time);
-    globe.render(delta / 1000);
-    renderLabel();
-  }
-  if (timestamp - lastDomUpdate > 250) {
-    lastDomUpdate = timestamp;
-    renderTimeline();
-    if (state.tab === 'now') renderNow();
+  // One bad update must not stop the clock and globe for good.
+  try {
+    if (globe) {
+      globe.update(state.time);
+      updateSightLine();
+      globe.render(delta / 1000);
+      renderLabel();
+    }
+    if (timestamp - lastDomUpdate > 250) {
+      lastDomUpdate = timestamp;
+      renderTimeline();
+      if (state.tab === 'now') renderNow();
+    }
+    if (timestamp - lastCountdown > COUNTDOWN_REFRESH_MS) {
+      lastCountdown = timestamp;
+      renderCountdowns();
+    }
+  } catch (error) {
+    if (!frameFailed) console.error(error);
+    frameFailed = true;
   }
   requestAnimationFrame((next) => frame(next, timestamp));
 }
@@ -722,9 +829,11 @@ function frame(timestamp, previous) {
 
 function saveObserver(observer) {
   state.observer = observer;
-  if (observer) localStorage.setItem('tlego.observer', JSON.stringify(observer));
-  else localStorage.removeItem('tlego.observer');
+  if (observer) storage.setItem('tlego.observer', JSON.stringify(observer));
+  else storage.removeItem('tlego.observer');
   globe?.setObserver(observer);
+  // Directions in the current tracks belong to the old location.
+  for (const entry of state.tracked.values()) entry.lookStale = true;
   state.plan = null;
   state.planFor = null;
   state.planError = null;
@@ -736,6 +845,7 @@ function saveObserver(observer) {
 }
 
 function openObserverDialog() {
+  setPicking(false);
   byId('observer-lat').value = state.observer?.lat ?? '';
   byId('observer-lon').value = state.observer?.lon ?? '';
   byId('observer-alt').value = state.observer?.alt || '';
@@ -752,6 +862,10 @@ function wireObserver() {
   const dialog = byId('observer-dialog');
   byId('observer-open').addEventListener('click', openObserverDialog);
   byId('observer-cancel').addEventListener('click', () => dialog.close());
+  // The button that opened the dialog may be replaced while it is open.
+  dialog.addEventListener('close', () => {
+    if (!document.activeElement || document.activeElement === document.body) byId('observer-open').focus();
+  });
   byId('observer-clear').addEventListener('click', () => {
     saveObserver(null);
     dialog.close();
@@ -792,8 +906,10 @@ function wireObserver() {
   if (!globe) pick.disabled = true;
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !byId('pick-hint').hidden) {
+      event.preventDefault();
       setPicking(false);
-      openObserverDialog();
+      // Opened after this key press, so the same Escape does not close it again.
+      setTimeout(openObserverDialog);
     }
   });
 }
@@ -811,6 +927,7 @@ function wireTabs() {
       if (active && focus) button.focus();
     }
     if (name === 'passes') refreshPlan();
+    if (name === 'orbit') refreshReport();
   };
   tabs.forEach((name, index) => {
     const button = byId(`tab-${name}`);
@@ -848,7 +965,7 @@ function wireControls() {
   renderZone();
   zone.addEventListener('click', () => {
     state.utc = !state.utc;
-    localStorage.setItem('tlego.utc', state.utc ? '1' : '0');
+    storage.setItem('tlego.utc', state.utc ? '1' : '0');
     renderZone();
     renderSliderLabels();
     renderTimeline();
@@ -916,6 +1033,7 @@ async function start() {
   renderInspector();
   renderTimeline();
   requestAnimationFrame((timestamp) => frame(timestamp, 0));
+  setInterval(() => refreshPlan(), 60000);
 
   const initial = parseUrlState(location.search);
   // A group's response provides all of its satellites, so give it a moment to
@@ -931,7 +1049,6 @@ async function start() {
     const first = state.items.find((item) => canonicalId(item.norad_id) === DEFAULT_ID) ?? state.items[0];
     if (first) addSatellite(first.norad_id, first.name);
   }
-  setInterval(() => refreshPlan(), 60000);
 }
 
 start();

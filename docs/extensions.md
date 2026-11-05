@@ -22,7 +22,7 @@ tlego passes --file examples/tui-demo/iss.tle \
 
 Use a catalog ID instead of `--file` for live retrieval. `--file -` reads a single satellite from stdin. Local inputs make no provider request. `viz --file` also supports multiple records. `--cache-dir` and `--cache-ttl` configure CLI retrieval; the default is the platform user cache with a 12-hour TTL. Retrieval time measures cache freshness, while the separate element epoch measures the age of the underlying orbital elements.
 
-[JSON Schema](schema-v1.json) defines the transport records. [Fixtures](fixtures/) include position, report, pass and error documents plus an intentionally invalid position. The schema permits unknown fields for compatible additions. Consumers must ignore unknown fields and warning codes. Breaking changes require a different major version and explicit selection. This host currently accepts exactly `1.0`.
+[JSON Schema](schema-v1.json) defines the transport records. [Fixtures](fixtures/) include position, report, pass, tonight, track, look and error documents plus an intentionally invalid position. The schema permits unknown fields for compatible additions. Consumers must ignore unknown fields and warning codes. Breaking changes require a different major version and explicit selection. This host currently accepts exactly `1.0`.
 
 - Catalog IDs are decimal strings with one to nine digits. The element reader accepts legacy TLE and GP JSON. GP reports preserve the original object in `element_data`, leave `tle` empty and identify `source_format: "gp-json"`. See [GP JSON support](gp-elements.md).
 - Timestamps are RFC3339 UTC with `Z`. Propagation uses whole seconds; `evaluated_at` identifies the instant actually calculated.
