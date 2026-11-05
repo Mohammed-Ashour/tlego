@@ -35,7 +35,7 @@ tlego web --file satellites.tle            # Local elements, no provider request
 - The globe is a sphere. Day and night use the Sun's direction, without twilight or atmosphere modelling.
 - Visibility has the [same criteria and limits](visibility.md) as `tlego tonight`, including no weather or brightness.
 - The browser needs WebGL for the globe. Without it, the details and passes still work.
-- CelesTrak [limits repeat downloads](https://celestrak.org/usage-policy.php). The shared cache keeps normal use within this, and large groups such as Starlink take longer to load the first time.
+- CelesTrak [limits repeat downloads](https://celestrak.org/usage-policy.php), and its responses can take a few seconds. Only the first request for data waits for it. A loaded group also provides all of its satellites, and expired data is shown at once while newer data loads in the background. Large groups such as Starlink take longer the first time.
 
 ## API
 

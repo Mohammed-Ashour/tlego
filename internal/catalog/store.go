@@ -573,3 +573,49 @@ func ParseTLE(contents []byte) ([]tle.TLE, error) {
 func parseTLE(contents []byte, expectedID string) ([]tle.TLE, error) {
 	return elements.ParseTLE(contents, expectedID)
 }
+
+// CachedElementByNorad reads one saved record without any provider request or
+// freshness check. It reports false when nothing usable is saved.
+func (s *Store) CachedElementByNorad(id string) (elements.Record, FetchMeta, bool) {
+	if ValidateNoradID(id) != nil || s.cacheErr != nil {
+		return elements.Record{}, FetchMeta{}, false
+	}
+	records, meta, ok := s.readSaved(filepath.Join(s.cacheDir, "elements", "norad", id+".json"))
+	if !ok || len(records) != 1 || canonicalNoradID(records[0].CatalogID) != canonicalNoradID(id) {
+		return elements.Record{}, FetchMeta{}, false
+	}
+	return records[0], meta, true
+}
+
+// CachedGroupElements reads a saved group without any provider request or freshness check.
+func (s *Store) CachedGroupElements(name string) ([]elements.Record, FetchMeta, bool) {
+	if s.cacheErr != nil {
+		return nil, FetchMeta{}, false
+	}
+	config, err := ReadCelestrakConfig()
+	if err != nil {
+		return nil, FetchMeta{}, false
+	}
+	for _, group := range config.SatelliteGroups {
+		if strings.EqualFold(group.Name, name) {
+			return s.readSaved(filepath.Join(s.cacheDir, "elements", "groups", safeFileName(group.Name)+".json"))
+		}
+	}
+	return nil, FetchMeta{}, false
+}
+
+func (s *Store) readSaved(path string) ([]elements.Record, FetchMeta, bool) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, FetchMeta{}, false
+	}
+	contents, err := readBounded(path)
+	if err != nil {
+		return nil, FetchMeta{}, false
+	}
+	records, err := elements.ParseGPJSON(contents)
+	if err != nil {
+		return nil, FetchMeta{}, false
+	}
+	return records, FetchMeta{Path: path, Format: "gp-json", FetchedAt: info.ModTime(), Age: time.Since(info.ModTime()), FromCache: true}, true
+}

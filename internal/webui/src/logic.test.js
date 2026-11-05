@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   annotatePasses, buildUrlState, canonicalId, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCountdown, formatDay, formatDuration,
-  lookAt, MAX_TRACKED, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, readStoredObserver, sunlitAt, trailRange, validId, windowFrom,
+  lookAt, MAX_TRACKED, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, providerMessage, readStoredObserver, sunlitAt, trailRange, validId, windowFrom,
 } from './logic.js';
 
 test('compass points cover the circle and wrap', () => {
@@ -134,4 +134,9 @@ test('windows lead the clock and refresh before running out', () => {
   assert.equal(needsNewWindow(window, 20 * 3600000), false);
   assert.equal(needsNewWindow(window, 33 * 3600000), true);
   assert.equal(needsNewWindow(window, 8 * 3600000), true);
+});
+
+test('rate limits get a helpful message and other errors pass through', () => {
+  assert.match(providerMessage('unexpected status: 403 Forbidden'), /limiting downloads/);
+  assert.equal(providerMessage('NORAD ID 99999 is not in the local file'), 'NORAD ID 99999 is not in the local file');
 });

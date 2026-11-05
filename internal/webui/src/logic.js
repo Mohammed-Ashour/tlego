@@ -9,6 +9,11 @@ export function compassPoint(azimuth) {
   return COMPASS[Math.floor(wrap(azimuth, 360) / 22.5 + 0.5) % COMPASS.length];
 }
 
+// CelesTrak answers 403 when a data set was downloaded too recently.
+export function providerMessage(message) {
+  return /\b403\b/.test(message) ? 'CelesTrak is limiting downloads of this data for now. Try again later.' : message;
+}
+
 export function validId(value) {
   return /^\d{1,9}$/.test(value) && Number(value) >= 1;
 }

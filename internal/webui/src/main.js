@@ -2,7 +2,7 @@ import { createApi, isAbort } from './api.js';
 import { createGlobe } from './globe.js';
 import {
   annotatePasses, buildUrlState, canonicalId, clamp, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
-  lookAt, MAX_TRACKED, needsNewWindow, nextColor, parseObserver, parseUrlState, readStoredObserver, sunlitAt, validId, windowFrom, zoneLabel,
+  lookAt, MAX_TRACKED, needsNewWindow, nextColor, parseObserver, parseUrlState, providerMessage, readStoredObserver, sunlitAt, validId, windowFrom, zoneLabel,
 } from './logic.js';
 import { sampleAt } from '../../../pkg/templates/viewer-state.js';
 import { renderSky } from './sky.js';
@@ -10,6 +10,7 @@ import { renderSky } from './sky.js';
 const LIST_LIMIT = 200;
 const PASS_REFRESH_MS = 10 * 60000;
 const DEFAULT_ID = '25544';
+const GROUP_HEAD_START_MS = 1500;
 const byId = (id) => document.getElementById(id);
 const api = createApi();
 
@@ -73,7 +74,9 @@ async function loadTrack(entry) {
     entry.name = result.data.name || entry.name;
     entry.provenance = result.provenance;
     entry.warnings = result.warnings;
+    entry.loading = false;
     if (state.tracked.get(entry.id) !== entry) return;
+    if (entry.id === state.selected) renderHeadline();
     globe?.setTrack(entry.id, result.data, entry.color);
     globe?.select(state.selected);
     if (entry.framePending) {
@@ -82,7 +85,7 @@ async function loadTrack(entry) {
     }
   } catch (error) {
     if (isAbort(error)) return;
-    entry.error = error.message;
+    entry.error = providerMessage(error.message);
     entry.track = null;
     globe?.removeTrack(entry.id);
   } finally {
@@ -96,10 +99,10 @@ async function loadTrack(entry) {
   }
 }
 
-function addSatellite(id, name) {
+function addSatellite(id, name, { selectIt = true } = {}) {
   const key = canonicalId(id);
   if (state.tracked.has(key)) {
-    select(key);
+    if (selectIt) select(key);
     return;
   }
   if (state.tracked.size >= MAX_TRACKED) {
@@ -108,7 +111,7 @@ function addSatellite(id, name) {
   }
   const entry = { id: key, name: name || `NORAD ${key}`, color: nextColor([...state.tracked.values()].map((item) => item.color)), track: null, error: null, loading: true, framePending: true };
   state.tracked.set(key, entry);
-  select(key);
+  if (selectIt) select(key);
   loadTrack(entry);
 }
 
@@ -193,7 +196,7 @@ async function loadGroup(name) {
     setCatalogStatus('');
   } catch (error) {
     if (isAbort(error)) return;
-    setCatalogStatus(`Could not load ${name}: ${error.message}`, 'is-error');
+    setCatalogStatus(`Could not load ${name}: ${providerMessage(error.message)}`, 'is-error');
   }
   renderCatalog();
 }
@@ -575,6 +578,10 @@ function renderHeadline() {
   headline.replaceChildren();
   const entry = selectedEntry();
   if (!entry) return;
+  if (entry.loading && !entry.track) {
+    headline.append(element('p', 'headline-title', entry.name), element('p', 'headline-main', 'Fetching its orbit…'), element('p', 'headline-sub', 'The first request can take a few seconds. After that it is saved.'));
+    return;
+  }
   if (!state.observer) {
     headline.append(element('p', 'headline-title', 'See it yourself'), element('p', 'headline-main', 'When can you see it?'));
     const button = element('button', 'text-button', 'Set your location');
@@ -607,7 +614,7 @@ function renderStatus() {
   }
   const { provenance } = entry;
   if (provenance.cache_status === 'stale') {
-    node.textContent = 'Using saved data because the latest refresh failed.';
+    node.textContent = entry.warnings?.[0]?.message ?? 'Showing saved elements.';
     node.classList.add('is-warning');
     return;
   }
@@ -911,9 +918,15 @@ async function start() {
   requestAnimationFrame((timestamp) => frame(timestamp, 0));
 
   const initial = parseUrlState(location.search);
-  for (const id of initial.ids) addSatellite(id);
-  if (initial.selected) select(initial.selected);
-  await loadGroups();
+  // A group's response provides all of its satellites, so give it a moment to
+  // arrive before asking the server for each one separately.
+  const groupsLoaded = loadGroups();
+  if (initial.ids.length) {
+    await Promise.race([groupsLoaded, new Promise((resolve) => setTimeout(resolve, GROUP_HEAD_START_MS))]);
+    for (const id of initial.ids) addSatellite(id, undefined, { selectIt: false });
+    select(initial.selected);
+  }
+  await groupsLoaded;
   if (!initial.ids.length && !state.tracked.size) {
     const first = state.items.find((item) => canonicalId(item.norad_id) === DEFAULT_ID) ?? state.items[0];
     if (first) addSatellite(first.norad_id, first.name);

@@ -434,10 +434,7 @@ func (s fileSource) FetchGroupElements(_ context.Context, name string) ([]elemen
 }
 
 func (s fileSource) FetchElementByNorad(_ context.Context, id string) (elements.Record, catalog.FetchMeta, error) {
-	key := id
-	for len(key) > 1 && key[0] == '0' {
-		key = key[1:]
-	}
+	key := canonicalElementID(id)
 	for _, record := range s.records {
 		if record.CatalogID == key {
 			return record, catalog.FetchMeta{Format: localFileFormat}, nil
@@ -492,7 +489,7 @@ func securityHeaders(next http.Handler) http.Handler {
 
 // ServeApp runs the web app until ctx is canceled.
 func ServeApp(ctx context.Context, options AppOptions) error {
-	var source elementSource = catalog.NewStore(options.CacheDir, options.CacheTTL)
+	var source elementSource = newMemoSource(ctx, catalog.NewStore(options.CacheDir, options.CacheTTL), options.CacheTTL)
 	if options.Records != nil {
 		source = fileSource{options.Records}
 	}
