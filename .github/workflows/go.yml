@@ -52,6 +52,7 @@ jobs:
           brew tap-new --no-git local/check
           mkdir -p "$(brew --repository)/Library/Taps/local/homebrew-check/Casks"
           cp dist/homebrew/Casks/tlego.rb "$(brew --repository)/Library/Taps/local/homebrew-check/Casks/tlego.rb"
+          brew trust local/check || true
           brew info --cask local/check/tlego
 
   viewer:
