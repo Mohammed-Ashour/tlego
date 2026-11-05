@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"strings"
 	"time"
 
@@ -216,7 +217,8 @@ func (m Model) detailGroundTrackView() string {
 	if len(points) == 0 {
 		points = buildTrail(m.currentSat, time.Now(), 90*time.Minute, 5*time.Minute)
 	}
-	return renderWorldMap(points, width, height)
+	now := time.Now()
+	return renderWorldMapShaded(points, width, height, orbit.NightMask(now)) + "\nDots mark night at " + now.UTC().Format("15:04 UTC") + ". @ is the satellite, * its recent track."
 }
 
 func (m Model) detailPassesView() string {
@@ -232,29 +234,70 @@ func (m Model) detailPassesView() string {
 	if m.passResult.input.start.IsZero() {
 		return "No passes found. Press p to calculate."
 	}
+	input := m.passResult.input
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Observer: %.4f, %.4f, %.2f km | Window: %s to %s | Step: %s\n", m.passResult.input.observer.Lat, m.passResult.input.observer.Lon, m.passResult.input.observer.Alt, m.passResult.input.start.Format(time.RFC3339), m.passResult.input.start.Add(m.passResult.input.duration).Format(time.RFC3339), m.passResult.input.step))
+	shortUTC := "01-02 15:04"
+	b.WriteString(fmt.Sprintf("Observer %.4f, %.4f, %.2f km | %s to %s UTC | step %s\n", input.observer.Lat, input.observer.Lon, input.observer.Alt, input.start.UTC().Format(shortUTC), input.start.Add(input.duration).UTC().Format(shortUTC), input.step))
 	if len(m.passResult.passes) == 0 {
 		b.WriteString("No passes found in this window.")
 		return b.String()
 	}
-	b.WriteString("Sampled passes (* means clipped window):\n")
+	selected := m.passIndex % len(m.passResult.passes)
+	b.WriteString("Passes in UTC (* clipped by the window, n selects the next one):\n")
+	var rows []string
 	for i, pass := range m.passResult.passes {
 		if i >= 6 {
 			break
 		}
-		clipped := ""
-		if pass.StartClipped || pass.EndClipped {
-			clipped = " *"
+		cursor, clipped := " ", " "
+		if i == selected {
+			cursor = ">"
 		}
-		b.WriteString(fmt.Sprintf(
-			"- %s to %s | max %.1f° at %s%s\n",
-			pass.Start.Format(time.RFC3339),
-			pass.End.Format(time.RFC3339),
+		if pass.StartClipped || pass.EndClipped {
+			clipped = "*"
+		}
+		rows = append(rows, fmt.Sprintf("%s%s %s %s-%s %-3s-%-3s %2.0f° %-3s %s",
+			cursor, clipped,
+			pass.Start.UTC().Format("01-02"),
+			pass.Start.UTC().Format("15:04:05"),
+			pass.End.UTC().Format("15:04:05"),
+			orbit.CompassPoint(pass.StartAzimuthDeg),
+			orbit.CompassPoint(pass.EndAzimuthDeg),
 			pass.MaxElevationDeg,
-			pass.MaxTime.Format(time.RFC3339), clipped,
+			orbit.CompassPoint(pass.MaxAzimuthDeg),
+			pass.MaxTime.UTC().Format("15:04:05"),
 		))
 	}
+	track, err := orbit.PassTrack(m.currentSat, input.observer, m.passResult.passes[selected], 60)
+	if err != nil {
+		b.WriteString(strings.Join(rows, "\n"))
+		return b.String()
+	}
+	const rowWidth, gap = 52, 2
+	// Fit the plot beside the rows when it fits; otherwise it follows them, and
+	// the page scrolls.
+	radius := minInt(7, maxInt(4, (m.height-13)/2))
+	beside := minInt(radius, (m.width-rowWidth-gap-1)/4)
+	if beside >= 4 {
+		radius = beside
+	}
+	sky := append([]string{"Sky: o start @ top x end"}, strings.Split(renderSkyView(track, radius), "\n")...)
+	if beside >= 4 {
+		for i := 0; i < maxInt(len(rows), len(sky)); i++ {
+			row, plot := "", ""
+			if i < len(rows) {
+				row = rows[i]
+			}
+			if i < len(sky) {
+				plot = sky[i]
+			}
+			b.WriteString(strings.TrimRight(fmt.Sprintf("%-*s%*s%s", rowWidth, row, gap, "", plot), " "))
+			b.WriteString("\n")
+		}
+		return b.String()
+	}
+	b.WriteString(strings.Join(rows, "\n"))
+	b.WriteString("\n\n" + strings.Join(sky, "\n") + "\n")
 	return b.String()
 }
 

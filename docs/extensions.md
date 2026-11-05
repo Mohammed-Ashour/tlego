@@ -6,7 +6,7 @@ Start with `tlego plugin init summary` for Go or `tlego plugin init summary --la
 
 ## Machine output
 
-`predict`, `report` and `passes` accept `--format json --schema-version 1.0`. Each successful invocation writes one complete JSON document to stdout. Failure leaves stdout empty, writes a JSON error to stderr, and exits nonzero. Human diagnostics and logs also use stderr. Help remains readable text.
+`predict`, `report`, `passes` and `tonight` accept `--format json --schema-version 1.0`. Each successful invocation writes one complete JSON document to stdout. Failure leaves stdout empty, writes a JSON error to stderr, and exits nonzero. Human diagnostics and logs also use stderr. Help remains readable text.
 
 ```bash
 tlego predict --file examples/tui-demo/iss.tle \
@@ -29,7 +29,8 @@ Use a catalog ID instead of `--file` for live retrieval. `--file -` reads a sing
 - Geographic positions use degrees, longitude in `[-180, 180)`, altitude in km and vector speed in km/s. Cartesian calculations use TEME. Orbit classes and apogee/perigee values in reports are estimates. [Orbit estimate criteria and checks](orbit-estimates.md) define GEO, GSO, LEO, MEO, HEO and Other; consumers should accept unfamiliar class strings.
 - Provenance identifies source, input format, element epoch, retrieval time and cache status. File/stdin input has a null retrieval time and no cache. Cache paths are not exported. TUI records with unavailable retrieval metadata use `unknown` explicitly.
 - Pass records separate the requested window from estimated rise/set times. A clipped boundary has a null rise/set and a clipping flag. Empty passes are a successful result with `passes: []`.
-- Passes use the geometric zero-degree horizon. Times and maxima are sampled estimates with the declared step, not optical visibility predictions. Planning is limited to 30 days, at least one-second steps and 250,000 samples.
+- Passes use the geometric zero-degree horizon. They are found at the declared step, then times and maxima are refined to one second, so a pass shorter than the step can be missed. Azimuths are true-north degrees. These are not optical visibility predictions. Planning is limited to 30 days, at least one-second steps and 250,000 samples.
+- `tonight` records list the visible part of each pass in the next dark window. Dark-window fields are null when the Sun stays above the limit for 24 hours. [Visibility estimates](visibility.md) define the criteria.
 - Error records contain `kind: "error"`, `schema_version`, and an error code and message. `command_failed` covers CLI failures; `request_failed` covers HTTP failures. Both are failures, never empty successful results.
 
 The TUI retains its original unversioned `json` report format and adds `json-v1` to the format cycle. HTTP retains `/api/location` and adds `/api/v1/position?norad_id=25544&time=2026-10-24T05:01:11Z`. The versioned endpoint uses the same position record as the CLI. The experimental web UI still uses the legacy route.

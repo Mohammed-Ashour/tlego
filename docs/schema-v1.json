@@ -69,6 +69,28 @@
       ]
     },
     {
+      "allOf": [
+        {
+          "$ref": "#/$defs/success"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "tonight"
+            },
+            "data": {
+              "$ref": "#/$defs/tonight"
+            }
+          },
+          "required": [
+            "kind",
+            "data"
+          ]
+        }
+      ]
+    },
+    {
       "$ref": "#/$defs/error"
     }
   ],
@@ -83,7 +105,8 @@
           "enum": [
             "position",
             "report",
-            "passes"
+            "passes",
+            "tonight"
           ]
         },
         "data": {},
@@ -382,6 +405,21 @@
               },
               "end_clipped": {
                 "type": "boolean"
+              },
+              "start_azimuth_deg": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 360
+              },
+              "maximum_azimuth_deg": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 360
+              },
+              "end_azimuth_deg": {
+                "type": "number",
+                "minimum": 0,
+                "exclusiveMaximum": 360
               }
             },
             "required": [
@@ -436,6 +474,140 @@
         "schema_version",
         "kind",
         "error"
+      ]
+    },
+    "look_point": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "Z$"
+        },
+        "azimuth_deg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "elevation_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 90
+        }
+      },
+      "required": [
+        "at",
+        "azimuth_deg",
+        "elevation_deg"
+      ]
+    },
+    "tonight": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "catalog_id": {
+          "type": "string",
+          "pattern": "^0*[1-9][0-9]*$"
+        },
+        "observer": {
+          "type": "object",
+          "properties": {
+            "latitude_deg": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "longitude_deg": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "altitude_km": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "latitude_deg",
+            "longitude_deg",
+            "altitude_km"
+          ]
+        },
+        "dark_start": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dark_end": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "Z$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "dark_end_clipped": {
+          "type": "boolean"
+        },
+        "minimum_elevation_deg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 90
+        },
+        "maximum_sun_elevation_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 0
+        },
+        "passes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": {
+                "$ref": "#/$defs/look_point"
+              },
+              "peak": {
+                "$ref": "#/$defs/look_point"
+              },
+              "end": {
+                "$ref": "#/$defs/look_point"
+              },
+              "ends_in_shadow": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "start",
+              "peak",
+              "end",
+              "ends_in_shadow"
+            ]
+          }
+        }
+      },
+      "required": [
+        "name",
+        "catalog_id",
+        "observer",
+        "dark_start",
+        "dark_end",
+        "dark_end_clipped",
+        "minimum_elevation_deg",
+        "maximum_sun_elevation_deg",
+        "passes"
       ]
     }
   }

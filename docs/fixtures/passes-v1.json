@@ -14,64 +14,82 @@
     "sample_step_seconds": 60,
     "passes": [
       {
-        "start": "2026-10-24T05:20:11Z",
-        "end": "2026-10-24T05:31:11Z",
-        "rise_at": "2026-10-24T05:20:11Z",
-        "set_at": "2026-10-24T05:31:11Z",
-        "maximum_at": "2026-10-24T05:25:11Z",
-        "maximum_elevation_deg": 65.43937440642742,
+        "start": "2026-10-24T05:19:16Z",
+        "end": "2026-10-24T05:30:17Z",
+        "rise_at": "2026-10-24T05:19:16Z",
+        "set_at": "2026-10-24T05:30:17Z",
+        "maximum_at": "2026-10-24T05:24:46Z",
+        "maximum_elevation_deg": 85.44868359382812,
         "start_clipped": false,
-        "end_clipped": false
+        "end_clipped": false,
+        "start_azimuth_deg": 271.5486194109011,
+        "maximum_azimuth_deg": 7.167756473403074,
+        "end_azimuth_deg": 92.18637196587844
       },
       {
-        "start": "2026-10-24T06:56:11Z",
-        "end": "2026-10-24T07:07:11Z",
-        "rise_at": "2026-10-24T06:56:11Z",
-        "set_at": "2026-10-24T07:07:11Z",
-        "maximum_at": "2026-10-24T07:01:11Z",
-        "maximum_elevation_deg": 47.75996130300659,
+        "start": "2026-10-24T06:56:04Z",
+        "end": "2026-10-24T07:06:58Z",
+        "rise_at": "2026-10-24T06:56:04Z",
+        "set_at": "2026-10-24T07:06:58Z",
+        "maximum_at": "2026-10-24T07:01:31Z",
+        "maximum_elevation_deg": 52.56351525999047,
         "start_clipped": false,
-        "end_clipped": false
+        "end_clipped": false,
+        "start_azimuth_deg": 283.2621827614728,
+        "maximum_azimuth_deg": 201.89984189766847,
+        "end_azimuth_deg": 119.95680994006779
       },
       {
-        "start": "2026-10-24T08:33:11Z",
-        "end": "2026-10-24T08:43:11Z",
-        "rise_at": "2026-10-24T08:33:11Z",
-        "set_at": "2026-10-24T08:43:11Z",
-        "maximum_at": "2026-10-24T08:38:11Z",
-        "maximum_elevation_deg": 13.735833707618355,
+        "start": "2026-10-24T08:33:03Z",
+        "end": "2026-10-24T08:42:32Z",
+        "rise_at": "2026-10-24T08:33:03Z",
+        "set_at": "2026-10-24T08:42:32Z",
+        "maximum_at": "2026-10-24T08:37:47Z",
+        "maximum_elevation_deg": 14.745571827771416,
         "start_clipped": false,
-        "end_clipped": false
+        "end_clipped": false,
+        "start_azimuth_deg": 280.0530776797208,
+        "maximum_azimuth_deg": 220.23785444790065,
+        "end_azimuth_deg": 159.914396053985
       },
       {
-        "start": "2026-10-25T01:20:11Z",
-        "end": "2026-10-25T01:29:11Z",
-        "rise_at": "2026-10-25T01:20:11Z",
-        "set_at": "2026-10-25T01:29:11Z",
-        "maximum_at": "2026-10-25T01:24:11Z",
-        "maximum_elevation_deg": 12.55813252669169,
+        "start": "2026-10-25T01:19:43Z",
+        "end": "2026-10-25T01:28:57Z",
+        "rise_at": "2026-10-25T01:19:43Z",
+        "set_at": "2026-10-25T01:28:57Z",
+        "maximum_at": "2026-10-25T01:24:18Z",
+        "maximum_elevation_deg": 13.285810014672554,
         "start_clipped": false,
-        "end_clipped": false
+        "end_clipped": false,
+        "start_azimuth_deg": 196.69618077334977,
+        "maximum_azimuth_deg": 138.7422823387389,
+        "end_azimuth_deg": 80.69493175628224
       },
       {
-        "start": "2026-10-25T02:56:11Z",
-        "end": "2026-10-25T03:06:11Z",
-        "rise_at": "2026-10-25T02:56:11Z",
-        "set_at": "2026-10-25T03:06:11Z",
-        "maximum_at": "2026-10-25T03:00:11Z",
-        "maximum_elevation_deg": 44.14933064803699,
+        "start": "2026-10-25T02:55:08Z",
+        "end": "2026-10-25T03:05:58Z",
+        "rise_at": "2026-10-25T02:55:08Z",
+        "set_at": "2026-10-25T03:05:58Z",
+        "maximum_at": "2026-10-25T03:00:31Z",
+        "maximum_elevation_deg": 48.861640171101875,
         "start_clipped": false,
-        "end_clipped": false
+        "end_clipped": false,
+        "start_azimuth_deg": 237.81229606233808,
+        "maximum_azimuth_deg": 157.58799108366088,
+        "end_azimuth_deg": 76.46562969295417
       },
       {
-        "start": "2026-10-25T04:32:11Z",
-        "end": "2026-10-25T04:43:11Z",
-        "rise_at": "2026-10-25T04:32:11Z",
-        "set_at": "2026-10-25T04:43:11Z",
-        "maximum_at": "2026-10-25T04:37:11Z",
-        "maximum_elevation_deg": 85.10791416087642,
+        "start": "2026-10-25T04:31:46Z",
+        "end": "2026-10-25T04:42:47Z",
+        "rise_at": "2026-10-25T04:31:46Z",
+        "set_at": "2026-10-25T04:42:47Z",
+        "maximum_at": "2026-10-25T04:37:16Z",
+        "maximum_elevation_deg": 86.10155489492911,
         "start_clipped": false,
-        "end_clipped": false
+        "end_clipped": false,
+        "start_azimuth_deg": 266.43441566131537,
+        "maximum_azimuth_deg": 1.054277592179801,
+        "end_azimuth_deg": 87.2913739241855
       }
     ]
   },
@@ -85,7 +103,7 @@
   "warnings": [
     {
       "code": "sampled_passes",
-      "message": "Pass events are sampled estimates; optical visibility is not calculated."
+      "message": "Pass events are estimates, and a pass shorter than the sampling step can be missed. Use tlego tonight for naked-eye visibility."
     }
   ]
 }

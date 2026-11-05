@@ -82,11 +82,37 @@ func FromTLE(t tle.TLE) (Record, error) {
 			return Record{}, err
 		}
 	}
+	// The legacy parser misplaces the implied decimal point in unsigned values of
+	// these two fields, making them ten times too large. Prefer the original line.
+	if line := t.Line1.LineString; len(line) >= 61 {
+		for _, f := range []struct {
+			name   string
+			value  string
+			target *float64
+		}{{"second mean motion derivative", line[44:52], &vals[8]}, {"BStar", line[53:61], &vals[6]}} {
+			if *f.target, err = parseImpliedDecimal(f.name, f.value); err != nil {
+				return Record{}, err
+			}
+		}
+	}
 	r := Record{Name: t.Name, CatalogID: id, Epoch: epoch, MeanMotionRevDay: vals[0], Eccentricity: vals[1], InclinationDeg: vals[2], RAANDeg: vals[3], ArgumentOfPerigeeDeg: vals[4], MeanAnomalyDeg: vals[5], BStar: vals[6], MeanMotionDot: vals[7], MeanMotionDDot: vals[8], SourceFormat: "tle", LegacyTLE: &t}
 	if err := r.Validate(); err != nil {
 		return Record{}, err
 	}
 	return r, nil
+}
+
+// parseImpliedDecimal reads the TLE form " 14938-3", which means 0.14938e-3.
+func parseImpliedDecimal(name, field string) (float64, error) {
+	sign, digits, exponent := field[:1], field[1:6], field[6:8]
+	if sign == " " {
+		sign = ""
+	}
+	v, err := strconv.ParseFloat(strings.ReplaceAll(sign+"."+digits+"e"+strings.TrimSpace(exponent), " ", "0"), 64)
+	if err != nil || math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0, fmt.Errorf("invalid TLE %s %q", name, field)
+	}
+	return v, nil
 }
 
 func (r Record) Validate() error {

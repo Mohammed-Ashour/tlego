@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -47,5 +49,31 @@ func TestComputePassesReturnsUTCClippedPassEstimate(t *testing.T) {
 func TestComputePassesRejectsNonPositiveDuration(t *testing.T) {
 	if passes := ComputePasses(testSatellite(t), Observer{}, time.Now(), 0, time.Minute); len(passes) != 0 {
 		t.Fatalf("ComputePasses() = %v, want no passes", passes)
+	}
+}
+
+func TestRenderSkyViewPlacesCompassAndTrack(t *testing.T) {
+	track := []orbit.LookPoint{{AzimuthDeg: 270, ElevationDeg: 0}, {AzimuthDeg: 0, ElevationDeg: 90}, {AzimuthDeg: 90, ElevationDeg: 0}}
+	rows := strings.Split(renderSkyView(track, 4), "\n")
+	if len(rows) != 9 {
+		t.Fatalf("got %d rows", len(rows))
+	}
+	if !strings.Contains(rows[0], "N") || !strings.Contains(rows[8], "S") {
+		t.Fatalf("north and south misplaced:\n%s", strings.Join(rows, "\n"))
+	}
+	centre := rows[4]
+	if centre[8] != '@' || !strings.HasPrefix(centre, "o") || !strings.HasSuffix(centre, "x") {
+		t.Fatalf("centre row = %q", centre)
+	}
+}
+
+func TestRenderWorldMapShadedMarksNightOnly(t *testing.T) {
+	west := func(_, lon float64) bool { return lon < 0 }
+	rows := strings.Split(renderWorldMapShaded(nil, 21, 9, west), "\n")
+	if rows[1][2] != '.' || rows[1][18] != ' ' {
+		t.Fatalf("shading wrong: %q", rows[1])
+	}
+	if strings.Contains(renderWorldMap(nil, 21, 9), ".") {
+		t.Fatal("unshaded map contains night marks")
 	}
 }

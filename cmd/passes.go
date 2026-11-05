@@ -42,14 +42,14 @@ func planPasses(ctx context.Context, c *cli.Command) error {
 		return commandError(c, err)
 	}
 	result := output.PassPlanV1(record.CatalogID, obs, instant, duration, step, passes)
-	warnings = append(warnings, output.Warning{Code: "sampled_passes", Message: "Pass events are sampled estimates; optical visibility is not calculated."})
+	warnings = append(warnings, output.Warning{Code: "sampled_passes", Message: "Pass events are estimates, and a pass shorter than the sampling step can be missed. Use tlego tonight for naked-eye visibility."})
 	if c.String("format") == "json" {
 		return emitResult(c, "passes", result, p, warnings)
 	}
 	printWarnings(c, warnings)
 	fmt.Fprintf(c.Writer, "Pass estimates for %s (%s), %s through %s\n", record.Name, record.CatalogID, result.WindowStart.Format(time.RFC3339), result.WindowEnd.Format(time.RFC3339))
 	for _, pass := range result.Passes {
-		fmt.Fprintf(c.Writer, "%s to %s | max %.2f° at %s | clipped start=%t end=%t\n", pass.Start.Format(time.RFC3339), pass.End.Format(time.RFC3339), pass.MaximumElevationDeg, pass.MaximumAt.Format(time.RFC3339), pass.StartClipped, pass.EndClipped)
+		fmt.Fprintf(c.Writer, "%s to %s | %s to %s | max %.2f° %s at %s | clipped start=%t end=%t\n", pass.Start.Format(time.RFC3339), pass.End.Format(time.RFC3339), orbit.CompassPoint(pass.StartAzimuthDeg), orbit.CompassPoint(pass.EndAzimuthDeg), pass.MaximumElevationDeg, orbit.CompassPoint(pass.MaximumAzimuthDeg), pass.MaximumAt.Format(time.RFC3339), pass.StartClipped, pass.EndClipped)
 	}
 	if len(passes) == 0 {
 		fmt.Fprintln(c.Writer, "No passes above the horizon in this window.")

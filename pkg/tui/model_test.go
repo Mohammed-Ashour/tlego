@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Mohammed-Ashour/tlego/internal/catalog"
 	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
@@ -309,5 +310,43 @@ func TestFailedElementLoadClearsPreviousSatelliteState(t *testing.T) {
 				t.Fatalf("misleading detail view: %s", m.detailView())
 			}
 		})
+	}
+}
+
+func TestDetailPassesViewShowsSkyViewAndCyclesSelection(t *testing.T) {
+	records, err := catalog.ReadElements("../../examples/tui-demo/iss.tle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sat, err := orbit.New(records[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	observer := Observer{Lat: 51.48}
+	start := time.Date(2026, 10, 24, 5, 1, 11, 0, time.UTC)
+	passes, err := orbit.PlanPassesElements(sat, observer, start, 24*time.Hour, time.Minute)
+	if err != nil || len(passes) < 2 {
+		t.Fatalf("passes=%d err=%v", len(passes), err)
+	}
+	m := Model{currentSat: sat, detailTab: 4, width: 80, height: 24}
+	m.passResult = passResult{input: passInput{observer: observer, start: start, duration: 24 * time.Hour, step: time.Minute}, passes: passes}
+	first := m.detailPassesView()
+	selection := func(i int) string { return ">  10-" + passes[i].Start.Format("02 15:04:05") }
+	if !strings.Contains(first, selection(0)) || !strings.Contains(first, "Sky:") {
+		t.Fatalf("view:\n%s", first)
+	}
+	lines := strings.Split(strings.TrimRight(first, "\n"), "\n")
+	if len(lines) > 14 {
+		t.Fatalf("view has %d lines, which does not fit 80x24:\n%s", len(lines), first)
+	}
+	for _, line := range lines {
+		if width := len([]rune(line)); width > 80 {
+			t.Fatalf("line is %d columns wide: %q", width, line)
+		}
+	}
+	updated, _ := m.updateDetail(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
+	second := updated.detailPassesView()
+	if !strings.Contains(second, selection(1)) {
+		t.Fatalf("selection did not move:\n%s", second)
 	}
 }
