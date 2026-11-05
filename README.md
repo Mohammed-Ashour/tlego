@@ -6,7 +6,7 @@ Browse satellites, inspect their orbits, and track their positions from your ter
 
 *An offline ISS walkthrough using a saved 2026-10-24 element set.* [Download the MP4](https://github.com/Mohammed-Ashour/tlego/raw/refs/heads/main/assets/tui-demo.mp4) · [Run or record the demo](docs/demos/README.md)
 
-[Get started](#get-started) · [Try it offline](#try-it-offline) · [Use the TUI](#use-the-tui) · [CLI commands](#cli-commands) · [Development](#development)
+[Get started](#get-started) · [See the ISS tonight](#see-the-iss-tonight) · [Try it offline](#try-it-offline) · [Use the TUI](#use-the-tui) · [CLI commands](#cli-commands) · [Development](#development)
 
 ## Get started
 
@@ -27,6 +27,24 @@ tlego tui --group "Space Stations"
 ```
 
 These commands fetch live data when a usable cache is unavailable. To see the interface without provider access, use the offline example below.
+
+## See the ISS tonight
+
+```bash
+tlego tonight --lat 51.48 --lon 0
+```
+
+```text
+ISS (ZARYA) (25544) from 51.4800°, 0.0000°
+Dark sky: Sat 24 Oct 17:23 UTC to Sun 25 Oct 06:07 UTC
+
+Sun 25 Oct  visible for 3m 25s
+  appears  04:37:11  84° above NW
+  highest  04:37:16  86° above N
+  ends     04:40:36  11° above E
+```
+
+This example uses the saved ISS snapshot. Pass another catalog ID to check a different satellite. If you have saved an observer in the TUI's Settings, you can leave out `--lat` and `--lon`. [Visibility estimates](docs/visibility.md) explain the criteria and limits.
 
 ## Try it offline
 
@@ -61,7 +79,7 @@ flowchart TD
 | Follow its position | Track, then Space to start or stop updates |
 | Look ahead | Predict, then enter `+2h`, `+0.5d` or an RFC3339 timestamp |
 | Save a report | Reports, choose a format, generate, then save |
-| Estimate local passes | Settings to set your observer, then Detail → Passes and p |
+| Estimate local passes | Settings to set your observer, then Detail → Passes and p; n picks a pass for the sky view |
 
 ### Keyboard essentials
 
@@ -98,7 +116,7 @@ Existing TLE files and caches still work. `tlego tle` exports original legacy TL
 
 ## CLI commands
 
-CLI, TUI, HTTP and orbit exports use the same orbital core, with UTC calculations and degree-valued geographic coordinates. Use `--format json` with predict, report or passes for versioned machine output.
+CLI, TUI, HTTP and orbit exports use the same orbital core, with UTC calculations and degree-valued geographic coordinates. Use `--format json` with predict, report, passes or tonight for versioned machine output.
 
 | Command | What it does |
 |---|---|
@@ -107,6 +125,7 @@ CLI, TUI, HTTP and orbit exports use the same orbital core, with UTC calculation
 | `tlego search starlink` | Search names and IDs with partial-coverage warnings |
 | `tlego predict --time 2026-10-24T05:01:11Z 25544` | Predict a position |
 | `tlego report 25544 --format json` | Generate a versioned JSON report |
+| `tlego tonight --lat 51.48 --lon 0` | List naked-eye ISS passes in the next dark period |
 | `tlego passes --lat 51.48 --lon 0 25544 --format json` | Estimate passes for an observer |
 | `tlego plugin list` | Inspect executable extensions on PATH |
 | `tlego viz 25544` | Write a self-contained orbit viewer to `25544.html` |
@@ -142,7 +161,7 @@ The globe and trajectories use the same physical scale. Lighting is illustrative
 ## Current limits and next steps
 
 - Retrieval uses TLE data. Full coverage of newer catalog objects needs [GP/OMM support](https://github.com/Mohammed-Ashour/tlego/issues/18).
-- Pass events and maxima are sampled at one-minute steps. Clipped forecast boundaries are marked. Optical visibility and precision antenna control are not calculated.
+- Passes are found at one-minute steps and refined to one second, so a shorter pass can be missed. Clipped forecast boundaries are marked. `tlego tonight` estimates naked-eye visibility without brightness or weather. Precision antenna control is not calculated.
 - Orbit classes use declared period, shape and altitude criteria; apogee and perigee are two-body estimates. [Criteria, reference checks and limits](docs/orbit-estimates.md) explain their meaning.
 - TUI `json` reports retain their legacy format. Select `json-v1` for the versioned report contract. [Core and extension documentation](docs/extensions.md) describes the JSON schema, compatibility and executable extensions.
 

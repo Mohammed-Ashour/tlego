@@ -20,7 +20,7 @@ tlego tui --screen Settings
 |---|---|
 | Home | Quick actions and five recent catalog IDs |
 | Explore | Group browsing, selected-group filtering, all-group searches, result selection |
-| Detail | Summary, original TLE, estimated orbital parameters, ASCII ground track, sampled passes |
+| Detail | Summary, original TLE, estimated orbital parameters, ASCII ground track with day and night, passes with a sky view |
 | Track | Start/stop position updates, bounded trail and textual snapshot |
 | Predict | Point-in-time coordinates from RFC3339, now or signed duration/day offsets |
 | Reports | Text, JSON and CSV exports with editable local save path |
@@ -33,7 +33,7 @@ tlego tui --screen Settings
 - `/` on Explore enters search. Enter filters the selected group or searches all groups when no group is selected. Escape then a searches all groups. Tab cycles search/groups/results. Enter selects the focused item.
 - `:` starts a command: norad, group, track, search, screen, help, quit or exit.
 - Space toggles Track updates. Leaving Track stops its updates.
-- Detail uses 1-5 or brackets for tabs. p on Passes calculates the next 24 hours for the configured observer.
+- Detail uses 1-5 or brackets for tabs. p on Passes calculates the next 24 hours for the configured observer, and n selects a pass for the sky view.
 - Reports uses f to cycle formats, r to generate, Tab to edit a path, Enter or Escape to finish editing, then s to save.
 - Settings uses Tab/Shift+Tab or Up/Down to choose fields and Ctrl+S to save. Printable shortcut characters remain normal text while editing.
 - Page Up/Page Down scroll long content. `?` shows help when outside an input.
@@ -58,7 +58,7 @@ Errors, failed-group search coverage and stale-cache warnings remain visible in 
 
 Positions are computed using UTC, displayed in degrees and km, and use the propagated velocity vector for km/s speed. Longitude is normalized to [-180,180). This corrects the TUI path only; older CLI calculations have separate tracked issues.
 
-Pass times and maxima are sampled at one-minute steps, not refined event roots. Start/end-clipped passes are marked. Configure your observer first; the default is 0 latitude, 0 longitude and 0 km altitude. These results do not establish optical visibility, precision antenna control or collision risk.
+Passes are found at one-minute steps, and their times and maxima are then refined to one second. A pass shorter than a minute can be missed. Start/end-clipped passes are marked. Configure your observer first; the default is 0 latitude, 0 longitude and 0 km altitude. These results do not establish optical visibility, precision antenna control or collision risk. Use `tlego tonight` for a naked-eye estimate.
 
 Orbit classes use the shared [period, shape and altitude criteria](orbit-estimates.md), and apogee/perigee are two-body estimates. Element freshness and scientific calibration remain separate concerns. Live retrieval uses GP JSON and retains catalog IDs up to nine digits. Legacy TLE caches remain usable. The element tab labels GP JSON and shows its original fields.
 

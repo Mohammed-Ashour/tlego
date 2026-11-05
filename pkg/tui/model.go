@@ -105,6 +105,7 @@ type Model struct {
 	reportSaved  string
 
 	passResult    passResult
+	passIndex     int
 	passesLoading bool
 	passesErr     error
 
@@ -326,6 +327,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		m.passResult = passResult{input: msg.input, passes: msg.passes}
+		m.passIndex = 0
 	case reportBuiltMsg:
 		m.loading = false
 		if msg.err != nil {
@@ -855,6 +857,10 @@ func (m Model) updateDetail(msg tea.Msg) (Model, tea.Cmd) {
 				m.status = "Calculating passes"
 				input := passInput{element: m.currentEntry.Record.CatalogID, version: m.elementVersion, observer: m.settings.Observer, start: time.Now().UTC(), duration: 24 * time.Hour, step: time.Minute}
 				return m.startContextRequest(func(ctx context.Context) tea.Cmd { return passesCmd(ctx, m.currentSat, input) })
+			}
+		case "n":
+			if shown := minInt(len(m.passResult.passes), 6); m.detailTab == 4 && shown > 0 {
+				m.passIndex = (m.passIndex%shown + 1) % shown
 			}
 		case "t":
 			if m.currentEntry != nil {

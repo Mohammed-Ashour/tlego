@@ -62,6 +62,11 @@ func evaluationTime(c *cli.Command, required bool) (time.Time, error) {
 }
 
 func loadElement(ctx context.Context, c *cli.Command) (elements.Record, output.Provenance, []output.Warning, error) {
+	return loadElementDefault(ctx, c, "")
+}
+
+// loadElementDefault uses defaultID when neither an argument nor --file is given.
+func loadElementDefault(ctx context.Context, c *cli.Command, defaultID string) (elements.Record, output.Provenance, []output.Warning, error) {
 	var record elements.Record
 	var provenance output.Provenance
 	var warnings []output.Warning
@@ -97,12 +102,15 @@ func loadElement(ctx context.Context, c *cli.Command) (elements.Record, output.P
 			provenance.Source = "stdin"
 		}
 	} else {
-		if c.Args().Len() != 1 {
+		id := c.Args().First()
+		if c.Args().Len() == 0 && defaultID != "" {
+			id = defaultID
+		} else if c.Args().Len() != 1 {
 			return record, provenance, warnings, fmt.Errorf("provide one NORAD ID or --file <element-file>")
 		}
 		var meta catalog.FetchMeta
 		var err error
-		record, meta, err = commandStore(c).FetchElementByNorad(ctx, c.Args().First())
+		record, meta, err = commandStore(c).FetchElementByNorad(ctx, id)
 		if err != nil {
 			return record, provenance, warnings, err
 		}

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"github.com/Mohammed-Ashour/tlego/internal/orbit"
 	"strings"
 	"time"
 
@@ -216,7 +217,8 @@ func (m Model) detailGroundTrackView() string {
 	if len(points) == 0 {
 		points = buildTrail(m.currentSat, time.Now(), 90*time.Minute, 5*time.Minute)
 	}
-	return renderWorldMap(points, width, height)
+	now := time.Now()
+	return renderWorldMapShaded(points, width, height, orbit.NightMask(now)) + "\nDots mark night at " + now.UTC().Format("15:04 UTC") + ". @ is the satellite, * its recent track."
 }
 
 func (m Model) detailPassesView() string {
@@ -238,7 +240,8 @@ func (m Model) detailPassesView() string {
 		b.WriteString("No passes found in this window.")
 		return b.String()
 	}
-	b.WriteString("Sampled passes (* means clipped window):\n")
+	selected := m.passIndex % len(m.passResult.passes)
+	b.WriteString("Passes (* means clipped window, n selects the next one):\n")
 	for i, pass := range m.passResult.passes {
 		if i >= 6 {
 			break
@@ -247,13 +250,26 @@ func (m Model) detailPassesView() string {
 		if pass.StartClipped || pass.EndClipped {
 			clipped = " *"
 		}
+		cursor := "  "
+		if i == selected {
+			cursor = "> "
+		}
 		b.WriteString(fmt.Sprintf(
-			"- %s to %s | max %.1f° at %s%s\n",
+			"%s%s to %s | %s to %s | max %.1f° %s at %s%s\n",
+			cursor,
 			pass.Start.Format(time.RFC3339),
 			pass.End.Format(time.RFC3339),
+			orbit.CompassPoint(pass.StartAzimuthDeg),
+			orbit.CompassPoint(pass.EndAzimuthDeg),
 			pass.MaxElevationDeg,
+			orbit.CompassPoint(pass.MaxAzimuthDeg),
 			pass.MaxTime.Format(time.RFC3339), clipped,
 		))
+	}
+	if track, err := orbit.PassTrack(m.currentSat, m.passResult.input.observer, m.passResult.passes[selected], 60); err == nil {
+		b.WriteString("\nSky view of the selected pass: o rises, @ highest, x sets\n")
+		b.WriteString(renderSkyView(track, 7))
+		b.WriteString("\n")
 	}
 	return b.String()
 }
