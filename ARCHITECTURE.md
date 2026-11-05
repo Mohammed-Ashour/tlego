@@ -24,6 +24,7 @@ flowchart TD
     Extensions --> External[tlego-command executable]
     CLI --> TUI[pkg/tui]
     CLI --> HTTP[pkg/server]
+    HTTP --> WebUI[internal/webui]
     CLI --> Visual[pkg/visual]
     CLI --> Catalog[internal/catalog]
     TUI --> Catalog
@@ -50,6 +51,7 @@ flowchart TD
 - cmd/plugin.go exposes plugin list and plugin init. Initialization writes a new standalone Go or Python project from embedded templates without invoking external tools or overwriting existing directories.
 - cmd/tui.go calls pkg/tui.RunContext.
 - cmd/server.go calls pkg/server.Serve with context cancellation. The CLI defaults to 127.0.0.1:8080; --addr and --static-dir configure serving.
+- cmd/web.go calls pkg/server.ServeApp with the embedded internal/webui files, or with a local element file instead of the live catalog. It binds first, prints the URL, then opens a browser.
 - pkg/server.NewHandler exposes the legacy API plus the versioned position endpoint without registering on the global mux.
 - examples/ contains standalone Go examples and the independently packaged Python calendar extension.
 
@@ -65,7 +67,8 @@ flowchart TD
 | internal/output | Legacy report encoding and explicit JSON v1 transport records | Orbit types and element records; no fetching or process execution |
 | internal/extensions | PATH discovery, direct executable launch, streams, status, cancellation and embedded starter generation | Standard process/filesystem APIs; Windows cleanup uses the existing x/sys dependency |
 | pkg/tui | Screen/input state, settings, selected records with provenance, cancellable requests, tracking sessions and pass results | Core packages; old exported domain/report helpers remain wrappers |
-| pkg/server | HTTP request validation, response adapters and static serving | Shared catalog, orbit and output packages |
+| pkg/server | HTTP request validation, response adapters and static serving | Shared catalog, orbit and output packages; depends on an element source interface, not a concrete store |
+| internal/webui | Compiled browser app and its source | No Go logic beyond embedding; all orbital results come from the API, and the committed bundle is checked in CI |
 | pkg/visual, pkg/templates | Orbit sampling and embedded offline HTML export | Core orbital states, export validation and the pinned compiled viewer |
 | pkg/celestrak, pkg/tui/data | Historical public catalog APIs | Thin adapters to internal/catalog; mutable legacy URL/download configuration remains supported |
 | pkg/tle, pkg/utils | Historical parser/conversion APIs | Public TLE parsing adapts internal/elements with unchanged exported types; legacy conversion helpers remain |
@@ -90,6 +93,8 @@ internal/elements owns TLE line and payload validation before the retained upstr
 internal/orbit.Propagator.At converts evaluation time to whole-second UTC, retains the full element epoch, propagates TEME position and velocity in km and km/s, converts latitude/longitude to degrees with longitude in [-180, 180), and derives altitude and vector speed. PlanPasses validates the observer and sample budget, samples the zero-degree horizon with clipped-window flags, then refines each event and maximum to one second. Look angles place the observer on the WGS-84 ellipsoid. PlanVisiblePasses applies the criteria in docs/visibility.md to each pass. Context-aware pass APIs stop sampling on cancellation; the original APIs remain wrappers. PositionFromSatellite, OrbitInfoFromTLE and TUI ComputePasses retain their original public signatures through adapters.
 
 internal/output builds legacy reports with explicit generation time and encodes legacy text, JSON and CSV. Versioned JSON uses separate position/report/pass records and provenance. CLI predict/report/passes/tonight support --format json and --schema-version 1.0; stdout receives one complete successful document, while failures use JSON stderr and a nonzero status. The TUI retains legacy json and adds json-v1. Selected records carry their retrieval metadata through group and search caches. Requests inherit the program context and cancel on replacement, navigation or exit. Tracking ticks identify their session. A successful reload of the same tracked satellite resumes with one new-session tick. Pass results retain their element version, observer, window and step; observer or element changes invalidate them. Report replacement uses a checked temporary file and preserves existing permission bits. New reports keep private temporary-file permissions. Existing destination symlinks resolve to their targets before atomic replacement; unresolved links return an error. HTTP retains /api/location and adds /api/v1/position. GP reports preserve the original object in element_data and leave the legacy tle string empty. source_format identifies gp-json; no synthetic TLE is created. Field names and units are documented in docs/schema-v1.json and docs/extensions.md.
+
+The web app requests a 25-hour sampled track for each satellite and interpolates markers between samples. It does not propagate in the browser. Its Sun direction comes from the track response, and Earth rotation from the same UTC-derived GMST as the orbit viewer. Passes, visibility and sky paths come from the same planners as the CLI.
 
 The viz command accepts a live catalog ID or a validated local TLE or GP JSON file. pkg/visual samples core states from one UTC start and atomically writes embedded data, renderer and CSS. Points are physical TEME kilometres with UTC times and metadata. The frontend maps axes into Three.js, rotates the globe using UTC-derived GMST, and interpolates only within the common sample interval. The viewer bundle has a separate Node build/check job; Go consumers do not need Node.
 

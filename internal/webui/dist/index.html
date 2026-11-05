@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>TLEGO</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <span class="brand"><span class="brand-mark" aria-hidden="true"><i></i></span>TLEGO</span>
+      <p id="data-status" class="data-status" role="status"></p>
+      <div class="topbar-actions">
+        <button id="zone-toggle" class="text-button" type="button" aria-pressed="false" title="Switch between local time and UTC">Local time</button>
+        <button id="observer-open" class="text-button observer-button" type="button"><span class="observer-dot" aria-hidden="true"></span><span id="observer-label">Set location</span></button>
+      </div>
+    </header>
+
+    <aside class="catalog panel" aria-label="Satellite catalog">
+      <h2 class="eyebrow">Tracking</h2>
+      <ul id="tracked-list" class="tracked-list"></ul>
+      <h2 class="eyebrow catalog-heading">Add satellites</h2>
+      <label class="field"><span>Group</span><select id="group-select"></select></label>
+      <label class="field"><span>Filter or NORAD ID</span><input id="filter-input" type="search" placeholder="ISS, 25544" autocomplete="off" spellcheck="false"></label>
+      <div id="catalog-actions" class="catalog-actions"></div>
+      <p id="catalog-status" class="note" role="status"></p>
+      <ul id="catalog-list" class="catalog-list"></ul>
+    </aside>
+
+    <main class="viewport">
+      <div id="scene" class="scene"></div>
+      <div id="sat-label" class="sat-label" hidden></div>
+      <section id="headline" class="headline" aria-live="polite"></section>
+      <p id="pick-hint" class="pick-hint" hidden>Click your location on the globe, or press Escape to cancel.</p>
+      <div id="scene-error" class="scene-error" role="alert" hidden></div>
+      <div class="camera-tools" aria-label="Camera controls">
+        <button id="camera-follow" class="icon-button" type="button" aria-pressed="false" aria-label="Follow the selected satellite" title="Follow the selected satellite">◎</button>
+        <button id="camera-home" class="icon-button" type="button" aria-label="Frame the selected satellite" title="Frame the selected satellite">⌂</button>
+        <button id="zoom-in" class="icon-button" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+        <button id="zoom-out" class="icon-button" type="button" aria-label="Zoom out" title="Zoom out">−</button>
+      </div>
+    </main>
+
+    <aside class="inspector panel" aria-label="Selected satellite">
+      <div class="inspector-title">
+        <span id="selected-swatch" class="swatch" aria-hidden="true"></span>
+        <div><h1 id="selected-name">No satellite</h1><p id="selected-id" class="note"></p></div>
+      </div>
+      <div class="tabs" role="tablist" aria-label="Satellite details">
+        <button id="tab-now" class="tab" role="tab" type="button" aria-selected="true" aria-controls="panel-now">Now</button>
+        <button id="tab-passes" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-passes" tabindex="-1">Passes</button>
+        <button id="tab-orbit" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-orbit" tabindex="-1">Orbit</button>
+      </div>
+      <section id="panel-now" class="tab-panel" role="tabpanel" aria-labelledby="tab-now">
+        <dl id="now-readouts" class="readouts"></dl>
+        <p id="now-note" class="note"></p>
+      </section>
+      <section id="panel-passes" class="tab-panel" role="tabpanel" aria-labelledby="tab-passes" hidden>
+        <div id="passes-content"></div>
+      </section>
+      <section id="panel-orbit" class="tab-panel" role="tabpanel" aria-labelledby="tab-orbit" hidden>
+        <dl id="orbit-readouts" class="readouts"></dl>
+        <p id="orbit-note" class="note"></p>
+        <div id="orbit-links" class="link-row"></div>
+      </section>
+    </aside>
+
+    <footer class="timeline" aria-label="Timeline">
+      <button id="live-button" class="live-button is-live" type="button" aria-pressed="true"><span class="live-dot" aria-hidden="true"></span>Live</button>
+      <button id="play-button" class="icon-button" type="button" aria-label="Play timeline" title="Play timeline">▶</button>
+      <label class="speed"><span class="sr-only">Playback speed</span>
+        <select id="speed-select"><option value="1">1×</option><option value="10">10×</option><option value="60" selected>60×</option><option value="600">600×</option></select>
+      </label>
+      <div class="scrubber">
+        <input id="time-slider" type="range" min="0" max="90000" step="1" value="3600" aria-label="Timeline position">
+        <div class="scrubber-labels"><span id="time-start"></span><span id="time-end"></span></div>
+      </div>
+      <output id="time-current" class="time-current" for="time-slider"></output>
+    </footer>
+  </div>
+
+  <dialog id="observer-dialog" class="dialog" aria-labelledby="observer-title">
+    <form id="observer-form" method="dialog" novalidate>
+      <h2 id="observer-title">Your location</h2>
+      <p class="note">Used to predict passes. It stays in this browser and is sent only to this TLEGO server, never in shared links.</p>
+      <div class="dialog-grid">
+        <label class="field"><span>Latitude °</span><input id="observer-lat" inputmode="decimal" autocomplete="off" required></label>
+        <label class="field"><span>Longitude °</span><input id="observer-lon" inputmode="decimal" autocomplete="off" required></label>
+        <label class="field"><span>Altitude km</span><input id="observer-alt" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+      </div>
+      <div class="dialog-actions-left">
+        <button id="observer-locate" class="text-button" type="button">Use my location</button>
+        <button id="observer-pick" class="text-button" type="button">Pick on globe</button>
+      </div>
+      <p id="observer-error" class="form-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button id="observer-clear" class="text-button" type="button">Clear</button>
+        <button id="observer-cancel" class="text-button" type="button">Cancel</button>
+        <button class="primary-button" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="app.js"></script>
+</body>
+</html>

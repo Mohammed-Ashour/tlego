@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
@@ -23,17 +25,27 @@ type Satellite struct {
 	NORADID string `json:"norad_id"`
 }
 
-type api struct{ store *catalog.Store }
+// elementSource is the catalog behaviour the API needs. *catalog.Store provides it
+// for live data, and fileSource for local element files.
+type elementSource interface {
+	FetchGroups() ([]catalog.Group, error)
+	FetchGroupElements(ctx context.Context, name string) ([]elements.Record, catalog.FetchMeta, error)
+	FetchElementByNorad(ctx context.Context, id string) (elements.Record, catalog.FetchMeta, error)
+	SearchElements(ctx context.Context, query string) (catalog.ElementSearchResult, error)
+}
+
+type api struct{ store elementSource }
 
 // NewHandler uses the shared catalog/cache and retains the legacy API routes.
 func NewHandler() http.Handler { return newHandler(catalog.NewStore("", 12*time.Hour)) }
-func newHandler(store *catalog.Store) http.Handler {
+func newHandler(store elementSource) http.Handler {
 	a := api{store}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/satellite-groups", a.listGroups)
 	mux.HandleFunc("/api/satellites", a.listSatellites)
 	mux.HandleFunc("/api/location", a.location)
 	mux.HandleFunc("/api/v1/position", a.positionV1)
+	a.registerAppRoutes(mux)
 	return mux
 }
 func (a api) listGroups(w http.ResponseWriter, r *http.Request) {
@@ -164,14 +176,7 @@ func (a api) positionV1(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusUnprocessableEntity, err)
 		return
 	}
-	fetched := meta.FetchedAt.UTC()
-	p := output.Provenance{Source: "celestrak", SourceFormat: record.SourceFormat, ElementEpoch: epoch.UTC(), FetchedAt: &fetched, CacheStatus: "fetched"}
-	if meta.FromCache {
-		p.CacheStatus = "fresh"
-	}
-	if meta.Stale {
-		p.CacheStatus = "stale"
-	}
+	p := provenanceFor(record, meta, epoch)
 	var warnings []output.Warning
 	if meta.Warning != "" {
 		warnings = append(warnings, output.Warning{Code: "stale_elements", Message: meta.Warning})
@@ -184,6 +189,10 @@ func (a api) positionV1(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintln(w, string(body))
 }
+func containsFold(value, query string) bool {
+	return strings.Contains(strings.ToLower(value), strings.ToLower(query))
+}
+
 func writeJSON(w http.ResponseWriter, value any) {
 	bytes, err := json.Marshal(value)
 	if err != nil {
@@ -202,7 +211,15 @@ func Serve(ctx context.Context, addr, staticDir string) error {
 	if staticDir != "" {
 		mux.Handle("/", http.FileServer(http.Dir(staticDir)))
 	}
-	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	return serveListener(ctx, listener, mux)
+}
+
+func serveListener(ctx context.Context, listener net.Listener, handler http.Handler) error {
+	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -214,7 +231,7 @@ func Serve(ctx context.Context, addr, staticDir string) error {
 		case <-done:
 		}
 	}()
-	err := srv.ListenAndServe()
+	err := srv.Serve(listener)
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}

@@ -73,6 +73,24 @@ jobs:
       - name: Verify committed viewer bundle
         run: git diff --exit-code -- viewer.bundle.js
 
+  webui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: internal/webui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: internal/webui/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - name: Verify committed web app bundle
+        run: git diff --exit-code -- dist
+
   extensions:
     runs-on: ubuntu-latest
     steps:

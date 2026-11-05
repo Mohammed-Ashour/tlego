@@ -264,3 +264,35 @@ func TestNextDarkWindowIgnoresZeroLengthWindow(t *testing.T) {
 		t.Fatalf("window=%+v ok=%t err=%v", window, ok, err)
 	}
 }
+
+func TestPlanTonightSkipsEndingDarkPeriodWithNoPasses(t *testing.T) {
+	prop := issPropagator(t)
+	plan, err := PlanTonight(context.Background(), prop, greenwich, parseUTC(t, "2026-10-24T06:04:30Z"), DefaultVisibility())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Window == nil || plan.Window.Start.Before(parseUTC(t, "2026-10-24T17:00:00Z")) {
+		t.Fatalf("window = %+v", plan.Window)
+	}
+	if _, err := PlanTonight(context.Background(), prop, greenwich, time.Time{}, Visibility{MinElevationDeg: -1}); err == nil {
+		t.Fatal("accepted invalid criteria")
+	}
+}
+
+func TestTrackStopsAtBudgetAndCoversWindow(t *testing.T) {
+	prop := issPropagator(t)
+	start := parseUTC(t, "2026-10-24T05:00:00Z")
+	samples, err := Track(context.Background(), prop, start, time.Hour, time.Minute, 100, &greenwich)
+	if err != nil || len(samples) != 61 || samples[0].Look == nil {
+		t.Fatalf("samples=%d err=%v", len(samples), err)
+	}
+	if !samples[60].State.Time.Equal(start.Add(time.Hour)) {
+		t.Fatalf("last sample at %s", samples[60].State.Time)
+	}
+	if _, err := Track(context.Background(), prop, start, time.Hour, time.Second, 100, nil); err == nil {
+		t.Fatal("exceeded the sample budget")
+	}
+	if samples, err := Track(context.Background(), prop, start, time.Minute, time.Minute, 100, nil); err != nil || samples[0].Look != nil {
+		t.Fatalf("look without observer: %v %v", samples, err)
+	}
+}

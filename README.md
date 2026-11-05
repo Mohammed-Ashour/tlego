@@ -1,12 +1,12 @@
 # TLEGO
 
-Browse satellites, inspect their orbits, and track their positions from your terminal. TLEGO is a Go CLI with a keyboard-driven terminal UI, CelesTrak data access, and HTML orbit exports.
+Browse satellites, track them on a live 3D globe, and find out when you can see them. TLEGO is a single Go binary with a web app, a keyboard-driven terminal UI, a scriptable CLI and HTML orbit exports, using CelesTrak data.
 
 [![A 30-second ISS walkthrough: browse, track, predict and export a report](assets/tui-demo.gif)](assets/tui-demo.mp4)
 
 *An offline ISS walkthrough using a saved 2026-10-24 element set.* [Download the MP4](https://github.com/Mohammed-Ashour/tlego/raw/refs/heads/main/assets/tui-demo.mp4) · [Run or record the demo](docs/demos/README.md)
 
-[Get started](#get-started) · [See the ISS tonight](#see-the-iss-tonight) · [Try it offline](#try-it-offline) · [Use the TUI](#use-the-tui) · [CLI commands](#cli-commands) · [Development](#development)
+[Get started](#get-started) · [Web app](#web-app) · [See the ISS tonight](#see-the-iss-tonight) · [Try it offline](#try-it-offline) · [Use the TUI](#use-the-tui) · [CLI commands](#cli-commands) · [Development](#development)
 
 ## Get started
 
@@ -40,6 +40,18 @@ tlego tui --group "Space Stations"
 ```
 
 These commands fetch live data when a usable cache is unavailable. To see the interface without provider access, use the offline example below.
+
+## Web app
+
+```bash
+tlego web
+```
+
+![The web app showing the ISS and Tiangong on a sunlit globe, with a pass on a sky plot](assets/web-app.png)
+
+This starts a local server and opens your browser. Track up to eight satellites on a globe with real day and night, set your location to see where to look, and scrub through the next day. Passes show a sky plot and mark the ones you can see. Everything is in the binary, so it needs no Node and loads nothing from other sites. To try it without provider access, run `go run . web --file examples/tui-demo/iss.tle` from a checkout.
+
+The [web app guide](docs/web-app.md) covers the options, privacy and the API.
 
 ## See the ISS tonight
 
@@ -144,7 +156,8 @@ CLI, TUI, HTTP and orbit exports use the same orbital core, with UTC calculation
 | `tlego passes --lat 51.48 --lon 0 25544 --format json` | Estimate passes for an observer |
 | `tlego plugin list` | Inspect executable extensions on PATH |
 | `tlego viz 25544` | Write a self-contained orbit viewer to `25544.html` |
-| `tlego server` | Start the experimental web UI/API on localhost:8080 |
+| `tlego web` | Open the web app in your browser |
+| `tlego server` | Start the JSON API and the older experimental UI from a checkout |
 | `tlego --help` | List all commands; add `--help` to a command for its options |
 
 All frontends use the shared catalog and cache, with validated atomic replacement and stale fallback. CLI retrieval supports `--cache-dir` and `--cache-ttl`. Position, report and pass commands accept `--file path.tle` or `--file -` for offline input. The experimental server binds `127.0.0.1:8080` by default; `--addr` changes the address, and `--static-dir` selects the checkout UI directory.
