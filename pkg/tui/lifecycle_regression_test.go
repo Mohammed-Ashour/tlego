@@ -300,3 +300,66 @@ func TestReportRenameFailureCleansTemporaryFile(t *testing.T) {
 		t.Fatalf("directory contents %v: %v", entries, err)
 	}
 }
+
+func reviewRecord(t *testing.T) elements.Record {
+	t.Helper()
+	records, err := elements.ParseGPJSON([]byte(`{"OBJECT_NAME":"TEST","NORAD_CAT_ID":25544,"EPOCH":"2024-01-02T03:04:05","MEAN_MOTION":15.5,"ECCENTRICITY":0.001,"INCLINATION":51.6,"RA_OF_ASC_NODE":20,"ARG_OF_PERICENTER":30,"MEAN_ANOMALY":40,"BSTAR":0.0001,"MEAN_MOTION_DOT":0.00001,"MEAN_MOTION_DDOT":0}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return records[0]
+}
+
+func TestFailedRefreshClearsPassCalculation(t *testing.T) {
+	m := testModel(t)
+	m.setCurrentElement(reviewRecord(t))
+	m.setScreen(screenDetail)
+	m.detailTab = 4
+	m = keyModel(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	if !m.passesLoading {
+		t.Fatal("p did not start a pass calculation")
+	}
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	m = next.(Model)
+	next, _ = m.Update(requestResultMsg{id: m.requestID, msg: noradLoadedMsg{noradID: "25544", err: errors.New("network down")}})
+	m = next.(Model)
+	if m.passesLoading || strings.Contains(m.detailPassesView(), "Calculating") {
+		t.Fatalf("passesLoading = %t, view = %q", m.passesLoading, m.detailPassesView())
+	}
+}
+
+func TestTrackCommandKeepsActiveTrackingOfSameSatellite(t *testing.T) {
+	m := testModel(t)
+	m.setCurrentElement(reviewRecord(t))
+	m.setScreen(screenTrack)
+	m = keyModel(m, tea.KeyMsg{Type: tea.KeySpace})
+	next, _ := m.handleCommand("track 25544")
+	m = next.(Model)
+	next, cmd := m.Update(requestResultMsg{id: m.requestID, msg: noradLoadedMsg{noradID: "25544", record: reviewRecord(t)}})
+	m = next.(Model)
+	if !m.trackRunning || cmd == nil {
+		t.Fatalf("running = %t, tick scheduled = %t", m.trackRunning, cmd != nil)
+	}
+	next, _ = m.handleCommand("track 25544")
+	m = next.(Model)
+	next, cmd = m.Update(requestResultMsg{id: m.requestID, msg: noradLoadedMsg{noradID: "25544", err: errors.New("down")}})
+	m = next.(Model)
+	if m.trackRunning || cmd != nil {
+		t.Fatalf("failed load: running = %t, tick scheduled = %t", m.trackRunning, cmd != nil)
+	}
+}
+
+func TestLocalFilterKeepsRefreshedElements(t *testing.T) {
+	old := reviewRecord(t)
+	newer := reviewRecord(t)
+	newer.MeanMotionRevDay = 14
+	m := testModel(t)
+	next, _ := m.Update(groupTLEsLoadedMsg{group: "first", records: []elements.Record{old}})
+	m = next.(Model)
+	next, _ = m.Update(requestResultMsg{id: m.requestID, msg: noradLoadedMsg{noradID: "25544", record: newer}})
+	m = next.(Model)
+	m.applySearch("first", "TEST")
+	if got := m.tleCache["25544"].Record.MeanMotionRevDay; got != 14 {
+		t.Fatalf("mean motion = %v, want the refreshed 14", got)
+	}
+}

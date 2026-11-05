@@ -65,6 +65,8 @@ func fetchCached[T any](ctx context.Context, s *Store, source, path, expectedID,
 	if err != nil {
 		return nil, meta, err
 	}
+	// Refreshes of one cache path run one at a time, even for different clients, so
+	// a caller may wait for an unrelated refresh. Its own context still applies.
 	signature := cacheRequest{source: source, expectedID: expectedID, format: format, ttl: s.cacheTTL, client: s.client}
 	for {
 		cacheRefreshes.Lock()
@@ -94,14 +96,18 @@ func fetchCached[T any](ctx context.Context, s *Store, source, path, expectedID,
 		flight := &cacheFlight{done: make(chan struct{}), signature: signature}
 		cacheRefreshes.active[key] = flight
 		cacheRefreshes.Unlock()
+		// Waiters retry unless the leader records a result, so a panicking
+		// transport or parser cannot leave this path blocked forever.
+		flight.canceled = true
+		defer func() {
+			cacheRefreshes.Lock()
+			delete(cacheRefreshes.active, key)
+			close(flight.done)
+			cacheRefreshes.Unlock()
+		}()
 		records, resultMeta, fetchErr := fetchCachedOnce(ctx, s, source, path, meta, parse, legacy)
-		snapshot := clone(records)
-		cacheRefreshes.Lock()
-		flight.value, flight.meta, flight.err = snapshot, resultMeta, fetchErr
+		flight.value, flight.meta, flight.err = clone(records), resultMeta, fetchErr
 		flight.canceled = fetchErr != nil && ctx.Err() != nil
-		delete(cacheRefreshes.active, key)
-		close(flight.done)
-		cacheRefreshes.Unlock()
 		return records, resultMeta, fetchErr
 	}
 }

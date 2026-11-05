@@ -2,12 +2,9 @@ package tle
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"time"
 
 	upstream "github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	utils "github.com/Mohammed-Ashour/tlego/pkg/utils"
 )
 
@@ -57,19 +54,26 @@ type TLE struct {
 func (t TLE) String() string {
 	return fmt.Sprintf("%s\n%s\n%s", t.Name, t.Line1.LineString, t.Line2.LineString)
 }
+
+// guardParser turns a panic in the legacy parser into an error. These public
+// functions keep their legacy acceptance; strict validation lives in internal/elements.
+func guardParser[T any](parse func() (T, error)) (result T, err error) {
+	defer func() {
+		if recover() != nil {
+			var zero T
+			result, err = zero, fmt.Errorf("invalid TLE data: parser rejected malformed input")
+		}
+	}()
+	return parse()
+}
+
 func ReadTLELine1(line string) (TLELine1, error) {
-	if err := elements.ValidateTLELine1(line); err != nil {
-		return TLELine1{}, err
-	}
-	parsed, err := upstream.ReadTLELine1(line)
+	parsed, err := guardParser(func() (upstream.TLELine1, error) { return upstream.ReadTLELine1(line) })
 	return TLELine1(parsed), err
 }
 
 func ReadTLELine2(line string) (TLELine2, error) {
-	if err := elements.ValidateTLELine2(line); err != nil {
-		return TLELine2{}, err
-	}
-	parsed, err := upstream.ReadTLELine2(line)
+	parsed, err := guardParser(func() (upstream.TLELine2, error) { return upstream.ReadTLELine2(line) })
 	return TLELine2(parsed), err
 }
 
@@ -78,30 +82,15 @@ func adapt(parsed upstream.TLE) TLE {
 }
 
 func ParseTLE(line1, line2, name string) (TLE, error) {
-	parsed, err := elements.ParseTLE([]byte(line1+"\n"+line2), "")
+	parsed, err := guardParser(func() (upstream.TLE, error) { return upstream.ParseTLE(line1, line2, name) })
 	if err != nil {
 		return TLE{}, err
 	}
-	if len(parsed) != 1 || parsed[0].Line1.LineString != line1 || parsed[0].Line2.LineString != line2 {
-		return TLE{}, fmt.Errorf("expected one TLE pair")
-	}
-	result := adapt(parsed[0])
-	result.Name = name
-	result.NoradID = "" // Preserve the standalone ParseTLE contract.
-	return result, nil
+	return adapt(parsed), nil
 }
 
 func ReadTLEFile(filePath string) ([]TLE, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	contents, err := io.ReadAll(io.LimitReader(file, (32<<20)+1))
-	if err != nil {
-		return nil, err
-	}
-	parsed, err := elements.ParseTLE(contents, "")
+	parsed, err := guardParser(func() ([]upstream.TLE, error) { return upstream.ReadTLEFile(filePath) })
 	if err != nil {
 		return nil, err
 	}

@@ -260,3 +260,27 @@ func TestUnavailableDefaultCacheFailsWithoutRelativeFallback(t *testing.T) {
 		t.Fatalf("missing default cache did not fail explicitly: %v", err)
 	}
 }
+
+type panicTransport struct{}
+
+func (panicTransport) RoundTrip(*http.Request) (*http.Response, error) { panic("boom") }
+
+func TestPanickingRefreshDoesNotBlockLaterCallers(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "panic.tle")
+	func() {
+		defer func() { _ = recover() }()
+		store := NewStoreWithClient(dir, -time.Nanosecond, &http.Client{Transport: panicTransport{}})
+		_, _, _ = store.DownloadToPath(context.Background(), "http://example.test/x", path, "")
+	}()
+	key, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cacheRefreshes.Lock()
+	flight := cacheRefreshes.active[key]
+	cacheRefreshes.Unlock()
+	if flight != nil {
+		t.Fatal("panicking refresh left its flight registered")
+	}
+}
