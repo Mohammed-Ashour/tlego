@@ -10,17 +10,9 @@ Browse satellites, track them on a live 3D globe, and find out when you can see 
 
 ## Get started
 
-Install with Homebrew or Scoop, or download a binary from [GitHub Releases](https://github.com/Mohammed-Ashour/tlego/releases/latest):
+Download a binary from [GitHub Releases](https://github.com/Mohammed-Ashour/tlego/releases/latest), or install with Go 1.23.1 or newer:
 
 ```bash
-# macOS and Linux
-brew install Mohammed-Ashour/tap/tlego
-
-# Windows
-scoop bucket add tlego https://github.com/Mohammed-Ashour/scoop-bucket
-scoop install tlego
-
-# Any platform with Go 1.23.1 or newer
 go install github.com/Mohammed-Ashour/tlego@latest
 ```
 
