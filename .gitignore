@@ -14,3 +14,4 @@
 /examples/calendar/build/
 /examples/calendar/*.egg-info/
 /examples/calendar/__pycache__/
+/dist/

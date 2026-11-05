@@ -10,14 +10,27 @@ Browse satellites, inspect their orbits, and track their positions from your ter
 
 ## Get started
 
-Install [Go](https://go.dev/doc/install) 1.23.1 or newer, then install the current main branch:
+Install with Homebrew or Scoop, or download a binary from [GitHub Releases](https://github.com/Mohammed-Ashour/tlego/releases/latest):
 
 ```bash
-go install github.com/Mohammed-Ashour/tlego@main
+# macOS and Linux
+brew install Mohammed-Ashour/tap/tlego
+
+# Windows
+scoop bucket add tlego https://github.com/Mohammed-Ashour/scoop-bucket
+scoop install tlego
+
+# Any platform with Go 1.23.1 or newer
+go install github.com/Mohammed-Ashour/tlego@latest
+```
+
+Then start the terminal UI:
+
+```bash
 tlego tui
 ```
 
-The TUI is on `main`. Older tagged releases selected by `@latest` do not include it yet. If your shell cannot find `tlego`, add Go's binary installation directory to `PATH`. By default, this is the `bin` directory under `go env GOPATH`, unless you set `GOBIN`.
+If your shell cannot find a `go install` binary, add Go's binary installation directory to `PATH`. By default, this is the `bin` directory under `go env GOPATH`, unless you set `GOBIN`.
 
 Open the ISS directly or choose a satellite group:
 
@@ -141,7 +154,7 @@ The globe and trajectories use the same physical scale. Lighting is illustrative
 
 ## Current limits and next steps
 
-- Retrieval uses TLE data. Full coverage of newer catalog objects needs [GP/OMM support](https://github.com/Mohammed-Ashour/tlego/issues/18).
+- CelesTrak stopped issuing 5-digit catalog numbers in July 2026, and newer objects have no TLE data. Live commands already use GP JSON and work with these IDs; only `tlego tle` is limited to legacy TLE text.
 - Pass events and maxima are sampled at one-minute steps. Clipped forecast boundaries are marked. Optical visibility and precision antenna control are not calculated.
 - Orbit classes use declared period, shape and altitude criteria; apogee and perigee are two-body estimates. [Criteria, reference checks and limits](docs/orbit-estimates.md) explain their meaning.
 - TUI `json` reports retain their legacy format. Select `json-v1` for the versioned report contract. [Core and extension documentation](docs/extensions.md) describes the JSON schema, compatibility and executable extensions.
@@ -175,7 +188,7 @@ go vet ./...
 
 CI builds and tests on Linux, macOS and Windows. Use `go test -race ./...` when changing concurrent behavior on a supported platform.
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md) for the current package boundaries, [the TUI notes](docs/tui-spec.md) for interaction behavior, and [the recording guide](docs/demos/README.md) to update the walkthrough. Keep pull requests focused and include the relevant checks. For new behavior, start from a tracked issue or describe the proposed change in the PR.
+Read [ARCHITECTURE.md](ARCHITECTURE.md) for the current package boundaries, [the TUI notes](docs/tui-spec.md) for interaction behavior, and [the recording guide](docs/demos/README.md) to update the walkthrough. [Publishing a release](docs/releasing.md) covers tagging and package managers. Keep pull requests focused and include the relevant checks. For new behavior, start from a tracked issue or describe the proposed change in the PR.
 
 ## Data, dependencies and license
 

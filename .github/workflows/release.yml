@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test
+        run: go test ./...
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+      - name: Keep package manager manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-manifests
+          path: |
+            dist/homebrew/**
+            dist/scoop/**
+          if-no-files-found: warn
+      - name: Smoke test the published Linux binary
+        run: |
+          dist/tlego_linux_amd64_v1/tlego --version | grep -F "${GITHUB_REF_NAME}"
+          dist/tlego_linux_amd64_v1/tlego predict --file examples/tui-demo/iss.tle --time 2026-10-24T05:01:11Z --format json > /dev/null
