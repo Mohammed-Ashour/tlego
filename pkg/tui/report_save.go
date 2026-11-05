@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -32,8 +35,26 @@ func writeReportWith(path string, data []byte, create func(string, string) (repo
 			return err
 		}
 	}
+	if info != nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("report target %s is not a regular file", path)
+		}
+		// Rename needs only directory permission, so check the file's own.
+		probe, err := os.OpenFile(path, os.O_WRONLY, 0)
+		if err != nil {
+			return err
+		}
+		if err := probe.Close(); err != nil {
+			return err
+		}
+	}
 	f, err := create(filepath.Dir(path), ".tlego-report-*")
 	if err != nil {
+		// A writable file in a read-only directory can only be written in place,
+		// which is not atomic.
+		if info != nil && errors.Is(err, fs.ErrPermission) {
+			return os.WriteFile(path, data, info.Mode().Perm())
+		}
 		return err
 	}
 	defer os.Remove(f.Name())

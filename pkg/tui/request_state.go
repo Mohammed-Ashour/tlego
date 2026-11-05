@@ -57,6 +57,8 @@ func (m *Model) beginRequest() {
 	m.err = nil
 	m.warning = ""
 	m.loading = true
+	// cancelRequest stopped any pass calculation.
+	m.passesLoading = false
 }
 func (m Model) wrapRequest(cmd tea.Cmd) tea.Cmd {
 	id := m.requestID
@@ -74,6 +76,7 @@ func (m *Model) setScreen(next screen) {
 	m.loading = false
 	m.passesLoading = false
 	m.trackRunning = false
+	m.trackResume = false
 	m.blurInputs()
 	m.active = next
 	m.scrollOffset = 0

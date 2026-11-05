@@ -62,3 +62,29 @@ func TestSearchDeadlineShowsPartialResultsAndCancellationRemainsError(t *testing
 		})
 	}
 }
+
+func TestPartialSearchWithoutMatchIsAnError(t *testing.T) {
+	payload, err := os.ReadFile("../internal/elements/testdata/25544.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = originalTransport })
+	calls := 0
+	http.DefaultTransport = fixtureTransport(func(r *http.Request) (*http.Response, error) {
+		calls++
+		if calls == 1 {
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewReader(payload)), Header: make(http.Header)}, nil
+		}
+		return nil, errors.New("provider unavailable")
+	})
+	var stdout, stderr bytes.Buffer
+	command := &cli.Command{Name: "search", Flags: cacheFlags(), Action: searchSatellites, Writer: &stdout, ErrWriter: &stderr}
+	err = command.Run(context.Background(), []string{"search", "--cache-dir", t.TempDir(), "NOPE"})
+	if err == nil || !strings.Contains(err.Error(), "incomplete") {
+		t.Fatalf("error = %v, stdout = %q", err, stdout.String())
+	}
+	if strings.Contains(stdout.String(), "No satellites found") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}

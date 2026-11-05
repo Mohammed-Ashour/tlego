@@ -95,6 +95,7 @@ type Model struct {
 	detailTab int
 
 	trackRunning bool
+	trackResume  bool
 	trackTrail   []Position
 
 	predictResult *PredictResult
@@ -274,13 +275,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case noradLoadedMsg:
 		m.loading = false
+		wasTracking := m.trackRunning || m.trackResume
+		m.trackResume = false
 		if msg.err != nil {
 			m.status = fmt.Sprintf("Failed to load NORAD %s", msg.noradID)
 			m.err = msg.err
 			break
 		}
 		m.warning = msg.meta.Warning
-		resumeTracking := m.active == screenTrack && m.trackRunning && m.currentEntry != nil && m.currentEntry.Record.CatalogID == msg.record.CatalogID
+		resumeTracking := m.active == screenTrack && wasTracking && m.currentEntry != nil && m.currentEntry.Record.CatalogID == msg.record.CatalogID
 		m.setCurrentEntry(catalog.ElementEntry{Record: msg.record, Meta: msg.meta})
 		if resumeTracking && m.currentSat != nil {
 			m.trackRunning = true
@@ -700,7 +703,9 @@ func (m Model) handleCommand(command string) (tea.Model, tea.Cmd) {
 			m.status = "usage: :track <id>"
 			return m, nil
 		}
+		running := m.active == screenTrack && m.trackRunning
 		m.setScreen(screenTrack)
+		m.trackResume = running
 		m.loading = true
 		return m.startContextRequest(func(ctx context.Context) tea.Cmd { return fetchNoradCmd(ctx, m.store, parts[1]) })
 	case "group":
@@ -852,11 +857,12 @@ func (m Model) updateDetail(msg tea.Msg) (Model, tea.Cmd) {
 			}
 		case "p":
 			if m.detailTab == 4 && m.currentSat != nil {
-				m.passesLoading = true
 				m.passesErr = nil
 				m.status = "Calculating passes"
 				input := passInput{element: m.currentEntry.Record.CatalogID, version: m.elementVersion, observer: m.settings.Observer, start: time.Now().UTC(), duration: 24 * time.Hour, step: time.Minute}
-				return m.startContextRequest(func(ctx context.Context) tea.Cmd { return passesCmd(ctx, m.currentSat, input) })
+				next, cmd := m.startContextRequest(func(ctx context.Context) tea.Cmd { return passesCmd(ctx, m.currentSat, input) })
+				next.passesLoading = true
+				return next, cmd
 			}
 		case "n":
 			if shown := minInt(len(m.passResult.passes), 6); m.detailTab == 4 && shown > 0 {
@@ -1035,7 +1041,10 @@ func (m *Model) applySearch(group, query string) {
 	var summaries []TLESummary
 	for _, item := range source {
 		if strings.Contains(strings.ToLower(item.Record.Name), query) || strings.Contains(item.Record.CatalogID, query) {
-			m.tleCache[item.Record.CatalogID] = item
+			// A local filter must not replace elements refreshed after the group loaded.
+			if _, known := m.tleCache[item.Record.CatalogID]; !known {
+				m.tleCache[item.Record.CatalogID] = item
+			}
 			summaries = append(summaries, summaryFromElement(item.Record))
 		}
 	}
