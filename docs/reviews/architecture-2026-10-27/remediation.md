@@ -31,8 +31,6 @@ The numerical engine and transport schemas remain unchanged. Public legacy parse
 
 The new context-aware pass APIs also serve the CLI. The experimental browser uses a small local request module with no new dependency.
 
-The [decision record](../../agdr/AgDR-0001-review-remediation.md) contains the selected approach and its tradeoffs.
-
 ## Verification
 
 The following checks passed:
@@ -72,7 +70,6 @@ Windows runtime tests remain the responsibility of the existing Windows CI job. 
 
 The baseline measurements and defect probes describe the review commit. The new regression tests verify the corrected behavior.
 
-
 ## Terra review corrections, 2026-10-28
 
 The follow-up review used commit `6b6797e4d73a06d39d9300d734055ca8ffc81617`. All four confirmed findings have focused corrections.
@@ -89,5 +86,3 @@ The browser review also identified an existing group-state gap. A group change n
 The JavaScript suite now has 12 tests, including the failed-group transition.
 
 Existing valid report symlinks remain supported. Dangling or unresolved links return an error before writing. New Unix reports use mode 0600 or stricter; they no longer default to 0644.
-
-The approach is recorded in [AgDR-0002](../../agdr/AgDR-0002-review-regressions.md).
