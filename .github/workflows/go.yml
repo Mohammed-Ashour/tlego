@@ -31,6 +31,30 @@ jobs:
     - name: Test
       run: go test -v ./...
 
+  release-config:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - name: Test with the release Go version
+        run: go test ./...
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: v2.20.0
+          args: release --snapshot --clean --skip=publish
+      - name: Load the generated Homebrew cask
+        run: |
+          brew tap-new --no-git local/check
+          mkdir -p "$(brew --repository)/Library/Taps/local/homebrew-check/Casks"
+          cp dist/homebrew/Casks/tlego.rb "$(brew --repository)/Library/Taps/local/homebrew-check/Casks/tlego.rb"
+          brew trust local/check || true
+          brew info --cask local/check/tlego
+
   viewer:
     runs-on: ubuntu-latest
     defaults:

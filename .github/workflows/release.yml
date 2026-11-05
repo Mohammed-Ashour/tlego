@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          # Binaries ship with this Go, so keep it on a supported release.
+          go-version: "1.26"
+          cache: true
+      - name: Test
+        run: go test ./...
+      - name: Smoke test before publishing
+        run: |
+          go build -o /tmp/tlego -ldflags "-X github.com/Mohammed-Ashour/tlego/cmd.Version=${GITHUB_REF_NAME}" .
+          /tmp/tlego --version | grep -F "${GITHUB_REF_NAME}"
+          /tmp/tlego predict --file examples/tui-demo/iss.tle --time 2026-10-24T05:01:11Z --format json > /dev/null
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: v2.20.0
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+      - name: Keep package manager manifests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-manifests
+          path: |
+            dist/homebrew/**
+            dist/scoop/**
+          if-no-files-found: warn

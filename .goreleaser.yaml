@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: tlego
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: tlego
+    main: .
+    binary: tlego
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/Mohammed-Ashour/tlego/cmd.Version=v{{ .Version }}
+
+archives:
+  - id: tlego
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE.md
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native
+
+release:
+  prerelease: auto
+  # Lets a failed release job be re-run for the same tag.
+  replace_existing_artifacts: true
+  footer: |
+    Satellite elements come from [CelesTrak](https://celestrak.org/). Pass and visibility results are estimates.
+
+# Without TAP_GITHUB_TOKEN the manifests are only generated in dist/ and kept as
+# a workflow artifact. With it, stable releases update the tap and bucket, and
+# prereleases are skipped ("auto"). A failed update fails the job after the
+# release is public; docs/releasing.md covers recovery.
+homebrew_casks:
+  - name: tlego
+    binaries: [tlego]
+    repository:
+      owner: Mohammed-Ashour
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
+    homepage: https://github.com/Mohammed-Ashour/tlego
+    description: Track satellites and predict passes from your terminal
+    license: MIT
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/tlego"]
+          end
+
+scoops:
+  - name: tlego
+    repository:
+      owner: Mohammed-Ashour
+      name: scoop-bucket
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
+    homepage: https://github.com/Mohammed-Ashour/tlego
+    description: Track satellites and predict passes from your terminal
+    license: MIT
