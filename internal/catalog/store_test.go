@@ -284,3 +284,48 @@ func TestPanickingRefreshDoesNotBlockLaterCallers(t *testing.T) {
 		t.Fatal("panicking refresh left its flight registered")
 	}
 }
+
+func TestCachedReadsNeverContactTheProvider(t *testing.T) {
+	dir := t.TempDir()
+	store := NewStoreWithClient(dir, time.Nanosecond, &http.Client{Transport: panicTransport{}})
+	if _, _, ok := store.CachedElementByNorad("25544"); ok {
+		t.Fatal("found an element in an empty cache")
+	}
+	if _, _, ok := store.CachedGroupElements("Space Stations"); ok {
+		t.Fatal("found a group in an empty cache")
+	}
+	if _, _, ok := store.CachedGroupElements("No Such Group"); ok {
+		t.Fatal("found an unknown group")
+	}
+	payload, err := os.ReadFile("../elements/testdata/25544.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{filepath.Join(dir, "elements", "norad", "25544.json"), filepath.Join(dir, "elements", "groups", "space_stations.json")} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, payload, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	record, meta, ok := store.CachedElementByNorad("25544")
+	if !ok || record.CatalogID != "25544" || !meta.FromCache || meta.FetchedAt.IsZero() {
+		t.Fatalf("record=%+v meta=%+v ok=%t", record, meta, ok)
+	}
+	if records, _, ok := store.CachedGroupElements("space stations"); !ok || len(records) != 1 {
+		t.Fatalf("records=%d ok=%t", len(records), ok)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "elements", "norad", "99.json"), payload, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := store.CachedElementByNorad("99"); ok {
+		t.Fatal("accepted a saved file holding another satellite")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "elements", "norad", "25544.json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, ok := store.CachedElementByNorad("25544"); ok {
+		t.Fatal("accepted a corrupt saved file")
+	}
+}

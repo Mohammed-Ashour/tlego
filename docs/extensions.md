@@ -22,7 +22,7 @@ tlego passes --file examples/tui-demo/iss.tle \
 
 Use a catalog ID instead of `--file` for live retrieval. `--file -` reads a single satellite from stdin. Local inputs make no provider request. `viz --file` also supports multiple records. `--cache-dir` and `--cache-ttl` configure CLI retrieval; the default is the platform user cache with a 12-hour TTL. Retrieval time measures cache freshness, while the separate element epoch measures the age of the underlying orbital elements.
 
-[JSON Schema](schema-v1.json) defines the transport records. [Fixtures](fixtures/) include position, report, pass and error documents plus an intentionally invalid position. The schema permits unknown fields for compatible additions. Consumers must ignore unknown fields and warning codes. Breaking changes require a different major version and explicit selection. This host currently accepts exactly `1.0`.
+[JSON Schema](schema-v1.json) defines the transport records. [Fixtures](fixtures/) include position, report, pass, tonight, track, look and error documents plus an intentionally invalid position. The schema permits unknown fields for compatible additions. Consumers must ignore unknown fields and warning codes. Breaking changes require a different major version and explicit selection. This host currently accepts exactly `1.0`.
 
 - Catalog IDs are decimal strings with one to nine digits. The element reader accepts legacy TLE and GP JSON. GP reports preserve the original object in `element_data`, leave `tle` empty and identify `source_format: "gp-json"`. See [GP JSON support](gp-elements.md).
 - Timestamps are RFC3339 UTC with `Z`. Propagation uses whole seconds; `evaluated_at` identifies the instant actually calculated.
@@ -31,9 +31,10 @@ Use a catalog ID instead of `--file` for live retrieval. `--file -` reads a sing
 - Pass records separate the requested window from estimated rise/set times. A clipped boundary has a null rise/set and a clipping flag. Empty passes are a successful result with `passes: []`.
 - Passes use the geometric zero-degree horizon. They are found at the declared step, then times and maxima are refined to one second, so a pass shorter than the step can be missed. Azimuths are true-north degrees. These are not optical visibility predictions. Planning is limited to 30 days, at least one-second steps and 250,000 samples.
 - `tonight` records list the visible part of each pass in the next dark window. Dark-window fields are null when the Sun stays above the limit for 24 hours. [Visibility estimates](visibility.md) define the criteria.
+- `track` and `look` records are served only over HTTP. Track samples use the orbit export's field names, in km and km/s in the TEME frame, and have azimuth and elevation only when the request names an observer. Elevations in these two records can be negative.
 - Error records contain `kind: "error"`, `schema_version`, and an error code and message. `command_failed` covers CLI failures; `request_failed` covers HTTP failures. Both are failures, never empty successful results.
 
-The TUI retains its original unversioned `json` report format and adds `json-v1` to the format cycle. HTTP retains `/api/location` and adds `/api/v1/position?norad_id=25544&time=2026-10-24T05:01:11Z`. The versioned endpoint uses the same position record as the CLI. The experimental web UI still uses the legacy route.
+The TUI retains its original unversioned `json` report format and adds `json-v1` to the format cycle. HTTP retains `/api/location` and adds `/api/v1/position?norad_id=25544&time=2026-10-24T05:01:11Z`. The versioned endpoint uses the same position record as the CLI. The [web app guide](web-app.md) lists the other versioned routes. The experimental UI served by `tlego server` still uses the legacy route.
 
 ## Dispatch and discovery
 

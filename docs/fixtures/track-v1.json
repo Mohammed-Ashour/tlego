@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "kind": "track",
+  "data": {
+    "name": "ISS (ZARYA)",
+    "catalog_id": "25544",
+    "frame": "TEME",
+    "step_seconds": 60,
+    "period_minutes": 92.9613927094714,
+    "sun_km": {
+      "x": -127808936.15987936,
+      "y": -69934307.61630957,
+      "z": -30314131.339889176
+    },
+    "samples": [
+      {
+        "time": "2026-10-24T05:20:00Z",
+        "x": 367.91117867963743,
+        "y": 4482.715365123097,
+        "z": 5092.039879483369,
+        "latitude_deg": 48.724767575000904,
+        "longitude_deg": -27.323450029608125,
+        "altitude_km": 427.9386954560521,
+        "speed_km_s": 7.659136498544858,
+        "sunlit": false,
+        "azimuth_deg": 271.82270890821457,
+        "elevation_deg": 2.9805415320720208
+      },
+      {
+        "time": "2026-10-24T05:21:00Z",
+        "x": -71.93450324176861,
+        "y": 4388.771593262624,
+        "z": 5185.880028956069,
+        "latitude_deg": 49.932941049074884,
+        "longitude_deg": -21.943171063026398,
+        "altitude_km": 428.4494919556639,
+        "speed_km_s": 7.6588349880575795,
+        "sunlit": false,
+        "azimuth_deg": 272.27440473975685,
+        "elevation_deg": 7.905102132518894
+      },
+      {
+        "time": "2026-10-24T05:22:00Z",
+        "x": -511.45180217747736,
+        "y": 4274.809374707966,
+        "z": 5255.998028336166,
+        "latitude_deg": 50.85503154662739,
+        "longitude_deg": -16.310263690585373,
+        "altitude_km": 428.8801203142201,
+        "speed_km_s": 7.658557647668049,
+        "sunlit": false,
+        "azimuth_deg": 272.90505220199634,
+        "elevation_deg": 14.830948207885152
+      }
+    ]
+  },
+  "provenance": {
+    "source": "file",
+    "source_format": "tle",
+    "element_epoch": "2026-10-24T05:01:11.149248Z",
+    "fetched_at": null,
+    "cache_status": "none"
+  },
+  "warnings": []
+}

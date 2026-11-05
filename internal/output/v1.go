@@ -121,6 +121,19 @@ func PassPlanV1(id string, obs orbit.Observer, start time.Time, duration, step t
 	return result
 }
 
+// DistantEpochWarning warns when a time is far enough from the element epoch that
+// predictions lose accuracy. It returns nil when the time is close enough.
+func DistantEpochWarning(epoch, at time.Time) []Warning {
+	age := at.Sub(epoch)
+	if age < 0 {
+		age = -age
+	}
+	if age <= 3*24*time.Hour {
+		return nil
+	}
+	return []Warning{{Code: "distant_epoch", Message: fmt.Sprintf("Element epoch %s is %.0f days from the requested time, so predicted times may be well off.", epoch.UTC().Format(time.RFC3339), age.Hours()/24)}}
+}
+
 // LookPointRecord is a satellite direction at one instant.
 type LookPointRecord struct {
 	At           time.Time `json:"at"`
@@ -162,6 +175,77 @@ func TonightV1(name, id string, obs orbit.Observer, window *orbit.DarkWindow, cr
 	}
 	for _, pass := range passes {
 		record.Passes = append(record.Passes, VisiblePassRecord{point(pass.Start), point(pass.Peak), point(pass.End), pass.EndsInShadow})
+	}
+	return record
+}
+
+// TrackPointRecord is one sample of a track, using the orbit export's field names.
+// Azimuth and elevation are present when the request named an observer.
+type TrackPointRecord struct {
+	Time         time.Time `json:"time"`
+	X            float64   `json:"x"`
+	Y            float64   `json:"y"`
+	Z            float64   `json:"z"`
+	LatitudeDeg  float64   `json:"latitude_deg"`
+	LongitudeDeg float64   `json:"longitude_deg"`
+	AltitudeKm   float64   `json:"altitude_km"`
+	SpeedKmS     float64   `json:"speed_km_s"`
+	Sunlit       bool      `json:"sunlit"`
+	AzimuthDeg   *float64  `json:"azimuth_deg,omitempty"`
+	ElevationDeg *float64  `json:"elevation_deg,omitempty"`
+}
+
+// Vector3Record is a Cartesian vector in km.
+type Vector3Record struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	Z float64 `json:"z"`
+}
+
+// TrackRecord is a satellite's path through a time window in the TEME frame.
+type TrackRecord struct {
+	Name          string             `json:"name"`
+	CatalogID     string             `json:"catalog_id"`
+	Frame         string             `json:"frame"`
+	StepSeconds   float64            `json:"step_seconds"`
+	PeriodMinutes float64            `json:"period_minutes"`
+	SunKm         Vector3Record      `json:"sun_km"`
+	Samples       []TrackPointRecord `json:"samples"`
+}
+
+// TrackV1 builds the transport record. The Sun vector applies at the first sample
+// and moves about one degree a day.
+func TrackV1(name, id string, step time.Duration, periodMinutes float64, samples []orbit.TrackSample) TrackRecord {
+	record := TrackRecord{Name: name, CatalogID: id, Frame: "TEME", StepSeconds: step.Seconds(), PeriodMinutes: periodMinutes, Samples: make([]TrackPointRecord, 0, len(samples))}
+	if len(samples) > 0 {
+		sun := orbit.SunPositionKm(samples[0].State.Time)
+		record.SunKm = Vector3Record{sun.X, sun.Y, sun.Z}
+	}
+	for _, sample := range samples {
+		state := sample.State
+		point := TrackPointRecord{Time: state.Time.UTC(), X: state.PositionTEMEKm.X, Y: state.PositionTEMEKm.Y, Z: state.PositionTEMEKm.Z, LatitudeDeg: state.LatDeg, LongitudeDeg: state.LonDeg, AltitudeKm: state.AltKm, SpeedKmS: state.SpeedKmS, Sunlit: sample.Sunlit}
+		if sample.Look != nil {
+			azimuth, elevation := sample.Look.AzimuthDeg, sample.Look.ElevationDeg
+			point.AzimuthDeg, point.ElevationDeg = &azimuth, &elevation
+		}
+		record.Samples = append(record.Samples, point)
+	}
+	return record
+}
+
+// LookRecord is a sampled sky path seen by an observer. Elevations can be below
+// zero when the requested window extends past the horizon.
+type LookRecord struct {
+	CatalogID string            `json:"catalog_id"`
+	Observer  ObserverRecord    `json:"observer"`
+	Points    []LookPointRecord `json:"points"`
+}
+
+// LookV1 builds the transport record.
+func LookV1(id string, obs orbit.Observer, points []orbit.LookPoint) LookRecord {
+	record := LookRecord{CatalogID: id, Observer: ObserverRecord{obs.Lat, obs.Lon, obs.Alt}, Points: make([]LookPointRecord, 0, len(points))}
+	for _, p := range points {
+		record.Points = append(record.Points, LookPointRecord{p.Time.UTC(), p.AzimuthDeg, p.ElevationDeg})
 	}
 	return record
 }

@@ -99,8 +99,8 @@ func PlanVisiblePasses(ctx context.Context, prop *Propagator, obs Observer, star
 	if err := criteria.Validate(); err != nil {
 		return nil, err
 	}
-	if duration > 0 && int64(duration/visibilityStep) > maxPlanSamples {
-		return nil, fmt.Errorf("visibility plan would exceed %d samples", maxPlanSamples)
+	if duration > 0 && int64(duration/visibilityStep) > MaxPlanSamples {
+		return nil, fmt.Errorf("visibility plan would exceed %d samples", MaxPlanSamples)
 	}
 	passes, err := PlanPassesElementsContext(ctx, prop, obs, start, duration, visibilityPassGap)
 	if err != nil {
@@ -176,13 +176,16 @@ func lookPoint(prop *Propagator, obs Observer, t time.Time) (LookPoint, bool, er
 }
 
 // PassTrack samples a pass's sky path for plotting, including both ends.
-func PassTrack(prop *Propagator, obs Observer, pass Pass, samples int) ([]LookPoint, error) {
+func PassTrack(ctx context.Context, prop *Propagator, obs Observer, pass Pass, samples int) ([]LookPoint, error) {
 	if samples < 2 {
 		samples = 2
 	}
 	span := pass.End.Sub(pass.Start)
 	points := make([]LookPoint, 0, samples)
 	for i := 0; i < samples; i++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		point, _, err := lookPoint(prop, obs, pass.Start.Add(span*time.Duration(i)/time.Duration(samples-1)))
 		if err != nil {
 			return nil, err

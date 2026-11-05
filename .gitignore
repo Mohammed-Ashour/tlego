@@ -15,3 +15,4 @@
 /examples/calendar/*.egg-info/
 /examples/calendar/__pycache__/
 /dist/
+/internal/webui/node_modules/

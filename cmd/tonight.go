@@ -14,11 +14,7 @@ import (
 )
 
 const (
-	defaultTonightID  = "25544"
-	darkSearchLimit   = 24 * time.Hour
-	oldElementsWarnAt = 3 * 24 * time.Hour
-	// A dark period ending this soon says little about the coming night.
-	shortDarkRemainder = time.Hour
+	defaultTonightID = "25544"
 )
 
 func init() { RootCmd.Commands = append(RootCmd.Commands, newTonightCommand()) }
@@ -95,32 +91,11 @@ func planTonight(ctx context.Context, c *cli.Command) error {
 		return commandError(c, err)
 	}
 	warnings = append(warnings, elementAgeWarnings(record, from)...)
-	window, found, err := orbit.NextDarkWindow(obs, from, darkSearchLimit, criteria.MaxSunElevationDeg)
+	plan, err := orbit.PlanTonight(ctx, prop, obs, from, criteria)
 	if err != nil {
 		return commandError(c, err)
 	}
-	var darkWindow *orbit.DarkWindow
-	var passes []orbit.VisiblePass
-	if found {
-		darkWindow = &window
-		passes, err = orbit.PlanVisiblePasses(ctx, prop, obs, window.Start, window.End.Sub(window.Start), criteria)
-		if err != nil {
-			return commandError(c, err)
-		}
-		if len(passes) == 0 && !window.Clipped && window.Start.Equal(from) && window.End.Sub(from) < shortDarkRemainder {
-			next, nextFound, err := orbit.NextDarkWindow(obs, window.End, darkSearchLimit, criteria.MaxSunElevationDeg)
-			if err != nil {
-				return commandError(c, err)
-			}
-			if nextFound {
-				darkWindow = &next
-				passes, err = orbit.PlanVisiblePasses(ctx, prop, obs, next.Start, next.End.Sub(next.Start), criteria)
-				if err != nil {
-					return commandError(c, err)
-				}
-			}
-		}
-	}
+	darkWindow, passes := plan.Window, plan.Passes
 	warnings = append(warnings, output.Warning{Code: "estimated_visibility", Message: "Visibility is a geometric estimate. It does not consider weather, brightness or local obstructions."})
 	if c.String("format") == "json" {
 		return emitResult(c, "tonight", output.TonightV1(record.Name, record.CatalogID, obs, darkWindow, criteria, passes), provenance, warnings)
@@ -139,20 +114,13 @@ func elementAgeWarnings(record elements.Record, at time.Time) []output.Warning {
 	if err != nil {
 		return nil
 	}
-	age := at.Sub(epoch)
-	if age < 0 {
-		age = -age
-	}
-	if age <= oldElementsWarnAt {
-		return nil
-	}
-	return []output.Warning{{Code: "distant_epoch", Message: fmt.Sprintf("Element epoch %s is %.0f days from the requested time, so predicted times may be well off.", epoch.UTC().Format(time.RFC3339), age.Hours()/24)}}
+	return output.DistantEpochWarning(epoch, at)
 }
 
 func writeTonight(w io.Writer, record elements.Record, obs orbit.Observer, window *orbit.DarkWindow, criteria orbit.Visibility, passes []orbit.VisiblePass, location *time.Location) {
 	fmt.Fprintf(w, "%s (%s) from %.4f°, %.4f°\n", record.Name, record.CatalogID, obs.Lat, obs.Lon)
 	if window == nil {
-		fmt.Fprintf(w, "The Sun stays above %.0f° for the next %.0f hours, so the sky will not be dark enough.\n", criteria.MaxSunElevationDeg, darkSearchLimit.Hours())
+		fmt.Fprintf(w, "The Sun stays above %.0f° for the next %.0f hours, so the sky will not be dark enough.\n", criteria.MaxSunElevationDeg, orbit.TonightSearchLimit().Hours())
 		return
 	}
 	dayTime := "Mon 2 Jan 15:04 MST"

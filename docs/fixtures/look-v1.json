@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0",
+  "kind": "look",
+  "data": {
+    "catalog_id": "25544",
+    "observer": {
+      "latitude_deg": 51.48,
+      "longitude_deg": 0,
+      "altitude_km": 0
+    },
+    "points": [
+      {
+        "at": "2026-10-24T05:19:16Z",
+        "azimuth_deg": 271.5486194109011,
+        "elevation_deg": 0.046429182188656895
+      },
+      {
+        "at": "2026-10-24T05:24:46Z",
+        "azimuth_deg": 7.167756473403074,
+        "elevation_deg": 85.44868359382812
+      },
+      {
+        "at": "2026-10-24T05:30:17Z",
+        "azimuth_deg": 92.18637196587844,
+        "elevation_deg": -0.03080134768496926
+      }
+    ]
+  },
+  "provenance": {
+    "source": "file",
+    "source_format": "tle",
+    "element_epoch": "2026-10-24T05:01:11.149248Z",
+    "fetched_at": null,
+    "cache_status": "none"
+  },
+  "warnings": []
+}

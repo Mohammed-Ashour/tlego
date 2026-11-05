@@ -220,7 +220,7 @@ func TestPassTrackIncludesEndsInOrder(t *testing.T) {
 	if err != nil || len(passes) == 0 {
 		t.Fatalf("passes=%d err=%v", len(passes), err)
 	}
-	track, err := PassTrack(prop, greenwich, passes[0], 20)
+	track, err := PassTrack(context.Background(), prop, greenwich, passes[0], 20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,5 +262,37 @@ func TestNextDarkWindowIgnoresZeroLengthWindow(t *testing.T) {
 	obs := Observer{Lat: 68.6724}
 	if window, ok, err := NextDarkWindow(obs, parseUTC(t, "2026-08-10T00:00:00Z"), 24*time.Hour, -6); err != nil || (ok && !window.End.After(window.Start)) {
 		t.Fatalf("window=%+v ok=%t err=%v", window, ok, err)
+	}
+}
+
+func TestPlanTonightSkipsEndingDarkPeriodWithNoPasses(t *testing.T) {
+	prop := issPropagator(t)
+	plan, err := PlanTonight(context.Background(), prop, greenwich, parseUTC(t, "2026-10-24T06:04:30Z"), DefaultVisibility())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Window == nil || plan.Window.Start.Before(parseUTC(t, "2026-10-24T17:00:00Z")) {
+		t.Fatalf("window = %+v", plan.Window)
+	}
+	if _, err := PlanTonight(context.Background(), prop, greenwich, time.Time{}, Visibility{MinElevationDeg: -1}); err == nil {
+		t.Fatal("accepted invalid criteria")
+	}
+}
+
+func TestTrackStopsAtBudgetAndCoversWindow(t *testing.T) {
+	prop := issPropagator(t)
+	start := parseUTC(t, "2026-10-24T05:00:00Z")
+	samples, err := Track(context.Background(), prop, start, time.Hour, time.Minute, 100, &greenwich)
+	if err != nil || len(samples) != 61 || samples[0].Look == nil {
+		t.Fatalf("samples=%d err=%v", len(samples), err)
+	}
+	if !samples[60].State.Time.Equal(start.Add(time.Hour)) {
+		t.Fatalf("last sample at %s", samples[60].State.Time)
+	}
+	if _, err := Track(context.Background(), prop, start, time.Hour, time.Second, 100, nil); err == nil {
+		t.Fatal("exceeded the sample budget")
+	}
+	if samples, err := Track(context.Background(), prop, start, time.Minute, time.Minute, 100, nil); err != nil || samples[0].Look != nil {
+		t.Fatalf("look without observer: %v %v", samples, err)
 	}
 }
