@@ -133,3 +133,35 @@ func TestParseArrayAndEquivalentTLE(t *testing.T) {
 		t.Fatal("normalized TLE and GP values differ")
 	}
 }
+
+func TestFromTLEReadsImpliedDecimalDragFields(t *testing.T) {
+	parsed, err := tle.ParseTLE(
+		"1 25544U 98067A   26297.20915682  .00007800  12345-5  14938-3 0  9991",
+		"2 25544  51.6335  21.6229 0006884 302.9098  57.1228 15.49030149591752", "ISS")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed.NoradID = "25544"
+	record, err := FromTLE(parsed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.BStar != 0.14938e-3 {
+		t.Errorf("BStar = %g, want 0.00014938", record.BStar)
+	}
+	if record.MeanMotionDDot != 0.12345e-5 {
+		t.Errorf("MeanMotionDDot = %g, want 0.0000012345", record.MeanMotionDDot)
+	}
+}
+
+func TestParseImpliedDecimalSignsAndZero(t *testing.T) {
+	for field, want := range map[string]float64{" 14938-3": 0.14938e-3, "-11606-4": -0.11606e-4, " 00000+0": 0, " 00000-0": 0, " 12345 0": 0.12345} {
+		got, err := parseImpliedDecimal("field", field)
+		if err != nil || got != want {
+			t.Errorf("parseImpliedDecimal(%q) = %g, %v; want %g", field, got, err, want)
+		}
+	}
+	if _, err := parseImpliedDecimal("field", " abcde-3"); err == nil {
+		t.Error("accepted non-numeric digits")
+	}
+}
