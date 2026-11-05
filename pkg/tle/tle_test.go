@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Mohammed-Ashour/tlego/internal/elements"
 	utils "github.com/Mohammed-Ashour/tlego/pkg/utils"
 )
 
@@ -124,5 +125,67 @@ func TestInvalidTLE(t *testing.T) {
 				t.Errorf("ParseTLE() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestMalformedInputNeverPanicsAndValidInputMatchesSharedParser(t *testing.T) {
+	lines := strings.Split(sampleTLE, "\n")
+	mutate := func(s string, start, end int, value string) string { return s[:start] + value + s[end:] }
+	tests := []struct {
+		name, line1, line2 string
+		publicErr          bool
+	}{
+		{"valid", lines[1], lines[2], false},
+		{"short line 1", "1 ", lines[2], true},
+		{"short line 2", lines[1], "2 ", true},
+		{"missing ID", mutate(lines[1], 2, 7, "     "), lines[2], false},
+		{"mismatched IDs", lines[1], mutate(lines[2], 2, 7, "12345"), false},
+		{"bad epoch", mutate(lines[1], 20, 23, "000"), lines[2], false},
+		{"zero mean motion", lines[1], mutate(lines[2], 52, 63, " 0.00000000"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			shared, sharedErr := elements.ParseTLE([]byte(tt.line1+"\n"+tt.line2), "")
+			public, publicErr := ParseTLE(tt.line1, tt.line2, "NAME")
+			if (publicErr != nil) != tt.publicErr {
+				t.Fatalf("public error = %v, want error %t", publicErr, tt.publicErr)
+			}
+			if (sharedErr == nil) != (tt.name == "valid") {
+				t.Fatalf("shared error = %v", sharedErr)
+			}
+			if sharedErr == nil && (public.Line1.LineString != shared[0].Line1.LineString || public.Line2.LineString != shared[0].Line2.LineString || public.Line2.MeanMotion != shared[0].Line2.MeanMotion) {
+				t.Fatalf("parsed lines differ: %#v and %#v", public, shared[0])
+			}
+		})
+	}
+}
+
+func TestPublicParsersKeepLegacyAcceptance(t *testing.T) {
+	lines := strings.Split(sampleTLE, "\n")
+	if _, err := ParseTLE(lines[1]+"\r", lines[2]+"\r", "CRLF"); err != nil {
+		t.Errorf("CRLF-split pair: %v", err)
+	}
+	alpha := "A5544" + lines[1][7:]
+	if _, err := ReadTLELine1(lines[1][:2] + alpha); err != nil {
+		t.Errorf("Alpha-5 line 1: %v", err)
+	}
+	if _, err := ReadTLELine1("1 "); err == nil || !strings.Contains(err.Error(), "too short") {
+		t.Errorf("short line error = %v", err)
+	}
+	for _, contents := range []string{"", "ONLY A NAME\n", "\n  \n", lines[1] + "\n" + lines[1]} {
+		path := t.TempDir() + "/input.tle"
+		if err := os.WriteFile(path, []byte(contents), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if parsed, err := ReadTLEFile(path); err != nil || len(parsed) != 0 {
+			t.Errorf("ReadTLEFile(%q) = %d records, %v", contents, len(parsed), err)
+		}
+	}
+	path := t.TempDir() + "/panics.tle"
+	if err := os.WriteFile(path, []byte("2 "), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ReadTLEFile(path); err == nil {
+		t.Error("accepted a line 2 with no fields")
 	}
 }

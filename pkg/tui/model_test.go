@@ -32,8 +32,8 @@ func TestTUILoadsNineDigitGPRecordWithoutSynthesizingTLE(t *testing.T) {
 	}
 	m := testModel(t)
 	m.setCurrentElement(records[0])
-	if m.currentTLE == nil || m.currentTLE.CatalogID != "234567890" || m.currentTLE.LegacyTLE != nil || m.currentSat == nil {
-		t.Fatalf("GP record was not loaded directly: %+v", m.currentTLE)
+	if m.currentEntry == nil || m.currentEntry.Record.CatalogID != "234567890" || m.currentEntry.Record.LegacyTLE != nil || m.currentSat == nil {
+		t.Fatalf("GP record was not loaded directly: %+v", m.currentEntry)
 	}
 	m.setScreen(screenDetail)
 	m.detailTab = 1
@@ -48,7 +48,7 @@ func TestTUILoadsNineDigitGPRecordWithoutSynthesizingTLE(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	msg := elementReportCmd(records[0], m.currentSat, info, "google", "json", m.currentMeta)().(reportBuiltMsg)
+	msg := elementReportCmd(records[0], m.currentSat, info, "google", "json", m.currentEntry.Meta)().(reportBuiltMsg)
 	if msg.err != nil {
 		t.Fatal(msg.err)
 	}
@@ -253,7 +253,7 @@ func TestNavigationDiscardsPendingPassCalculation(t *testing.T) {
 	m.setScreen(screenHome)
 	next, _ := m.Update(cmd())
 	m = next.(Model)
-	if m.loading || m.passesLoading || len(m.passes) > 0 {
+	if m.loading || m.passesLoading || len(m.passResult.passes) > 0 {
 		t.Fatal("navigation retained superseded operation")
 	}
 }
@@ -302,7 +302,7 @@ func TestFailedElementLoadClearsPreviousSatelliteState(t *testing.T) {
 			if m.err == nil {
 				t.Fatal("failed load did not report an error")
 			}
-			if m.currentTLE != nil || m.currentSat != nil || m.currentPos != (Position{}) || m.currentOrb != (OrbitInfo{}) {
+			if m.currentEntry != nil || m.currentSat != nil || m.currentPos != (Position{}) || m.currentOrb != (OrbitInfo{}) {
 				t.Fatal("failed load retained a satellite or derived state")
 			}
 			if !strings.Contains(m.detailView(), "No satellite loaded") {

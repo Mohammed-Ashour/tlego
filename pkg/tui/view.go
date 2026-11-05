@@ -17,13 +17,13 @@ func (m Model) View() string {
 		height = 24
 	}
 	header := fmt.Sprintf("tlego tui | %s", screenNames[m.active])
-	if m.currentMeta.Age > 0 {
-		header += " | data age " + FormatAge(m.currentMeta.Age)
+	if m.currentEntry != nil && m.currentEntry.Meta.Age > 0 {
+		header += " | data age " + FormatAge(m.currentEntry.Meta.Age)
 	}
-	if m.currentMeta.FromCache {
+	if m.currentEntry != nil && m.currentEntry.Meta.FromCache {
 		header += " | cache"
 	}
-	if m.currentMeta.Stale {
+	if m.currentEntry != nil && m.currentEntry.Meta.Stale {
 		header += " | stale"
 	}
 	content := ""
@@ -135,11 +135,11 @@ func (m Model) exploreView() string {
 }
 
 func (m Model) detailView() string {
-	if m.currentTLE == nil {
+	if m.currentEntry == nil {
 		return "No satellite loaded. Use Explore or :norad <id>."
 	}
 	elementLabel := "TLE"
-	if m.currentTLE.SourceFormat == "gp-json" {
+	if m.currentEntry.Record.SourceFormat == "gp-json" {
 		elementLabel = "GP JSON"
 	}
 	tabs := []string{"Summary", elementLabel, "Orbit", "Ground Track", "Passes"}
@@ -152,10 +152,10 @@ func (m Model) detailView() string {
 	case 0:
 		b.WriteString(m.detailSummaryView())
 	case 1:
-		if m.currentTLE.SourceFormat == "gp-json" {
+		if m.currentEntry.Record.SourceFormat == "gp-json" {
 			b.WriteString("GP JSON element data\n\n")
 		}
-		b.WriteString(m.currentTLE.String())
+		b.WriteString(m.currentEntry.Record.String())
 	case 2:
 		b.WriteString(m.detailOrbitView())
 	case 3:
@@ -167,10 +167,10 @@ func (m Model) detailView() string {
 }
 
 func (m Model) detailSummaryView() string {
-	if m.currentTLE == nil {
+	if m.currentEntry == nil {
 		return ""
 	}
-	epoch, _ := m.currentTLE.Time()
+	epoch, _ := m.currentEntry.Record.Time()
 	age := "unknown"
 	epochStr := "unknown"
 	if !epoch.IsZero() {
@@ -180,8 +180,8 @@ func (m Model) detailSummaryView() string {
 	mapURL := MapURL(m.settings.MapProvider, m.currentPos.LatDeg, m.currentPos.LonDeg)
 	return fmt.Sprintf(
 		"Name: %s\nNORAD ID: %s\nEpoch: %s (age %s)\n\nPosition:\n  Time: %s\n  Lat: %.6f°\n  Lon: %.6f°\n  Alt: %.2f km\n  Velocity: %.3f km/s\n\nOrbit class: %s\nMap: %s\n",
-		m.currentTLE.Name,
-		m.currentTLE.CatalogID,
+		m.currentEntry.Record.Name,
+		m.currentEntry.Record.CatalogID,
 		epochStr,
 		age,
 		m.currentPos.Time.Format(time.RFC3339),
@@ -229,12 +229,17 @@ func (m Model) detailPassesView() string {
 	if m.passesErr != nil {
 		return "Pass prediction failed: " + m.passesErr.Error()
 	}
-	if len(m.passes) == 0 {
+	if m.passResult.input.start.IsZero() {
 		return "No passes found. Press p to calculate."
 	}
 	var b strings.Builder
-	b.WriteString("Sampled passes (1-minute steps; * means clipped window):\n")
-	for i, pass := range m.passes {
+	b.WriteString(fmt.Sprintf("Observer: %.4f, %.4f, %.2f km | Window: %s to %s | Step: %s\n", m.passResult.input.observer.Lat, m.passResult.input.observer.Lon, m.passResult.input.observer.Alt, m.passResult.input.start.Format(time.RFC3339), m.passResult.input.start.Add(m.passResult.input.duration).Format(time.RFC3339), m.passResult.input.step))
+	if len(m.passResult.passes) == 0 {
+		b.WriteString("No passes found in this window.")
+		return b.String()
+	}
+	b.WriteString("Sampled passes (* means clipped window):\n")
+	for i, pass := range m.passResult.passes {
 		if i >= 6 {
 			break
 		}
@@ -254,7 +259,7 @@ func (m Model) detailPassesView() string {
 }
 
 func (m Model) trackView() string {
-	if m.currentTLE == nil || m.currentSat == nil {
+	if m.currentEntry == nil || m.currentSat == nil {
 		return "No satellite loaded. Use Explore or :track <id>."
 	}
 	state := "stopped"
@@ -262,7 +267,7 @@ func (m Model) trackView() string {
 		state = "running"
 	}
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Tracking %s (%s) [%s]\n", m.currentTLE.Name, m.currentTLE.CatalogID, state))
+	b.WriteString(fmt.Sprintf("Tracking %s (%s) [%s]\n", m.currentEntry.Record.Name, m.currentEntry.Record.CatalogID, state))
 	b.WriteString(fmt.Sprintf("Refresh: %s\n", m.settings.RefreshInterval()))
 	b.WriteString("Keys: space toggle, s snapshot, r reload cached data\n\n")
 	b.WriteString(fmt.Sprintf(
@@ -285,7 +290,7 @@ func (m Model) trackView() string {
 }
 
 func (m Model) predictView() string {
-	if m.currentTLE == nil || m.currentSat == nil {
+	if m.currentEntry == nil || m.currentSat == nil {
 		return "No satellite loaded. Use Explore or :norad <id>."
 	}
 	var b strings.Builder
@@ -306,7 +311,7 @@ func (m Model) predictView() string {
 }
 
 func (m Model) reportView() string {
-	if m.currentTLE == nil {
+	if m.currentEntry == nil {
 		return "No satellite loaded. Use Explore or :norad <id>."
 	}
 	var b strings.Builder

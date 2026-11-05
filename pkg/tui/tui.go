@@ -22,7 +22,11 @@ func RunContext(ctx context.Context, opts Options) error {
 	}
 	cacheDir, _ := catalog.DefaultCacheDir()
 	store := catalog.NewStore(cacheDir, settings.CacheTTL())
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	model := NewModel(opts, settings, store, settingsErr)
+	model.request.parent = ctx
+	defer model.cancelRequest()
 	p := tea.NewProgram(model, tea.WithAltScreen(), tea.WithContext(ctx))
 	_, err := p.Run()
 	return err

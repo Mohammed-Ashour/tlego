@@ -29,6 +29,9 @@ func searchSatellites(ctx context.Context, c *cli.Command) error {
 		}
 	}
 	if len(result.Records) == 0 {
+		if result.GroupsCovered < result.GroupsTotal {
+			return fmt.Errorf("no match for %q in the %d of %d groups searched; the search is incomplete", c.Args().First(), result.GroupsCovered, result.GroupsTotal)
+		}
 		fmt.Fprintf(c.Writer, "No satellites found matching keyword: %q\n", c.Args().First())
 		return nil
 	}

@@ -34,13 +34,16 @@ type noradLoadedMsg struct {
 }
 
 type searchResultsMsg struct {
-	records []elements.Record
+	entries []catalog.ElementEntry
 	warning string
 	results []TLESummary
 	err     error
 }
 
-type trackTickMsg time.Time
+type trackTickMsg struct {
+	at      time.Time
+	session uint64
+}
 
 type predictDoneMsg struct {
 	result PredictResult
@@ -49,6 +52,7 @@ type predictDoneMsg struct {
 
 type passesLoadedMsg struct {
 	passes []Pass
+	input  passInput
 	err    error
 }
 
@@ -65,17 +69,17 @@ func fetchGroupsCmd(store *catalog.Store) tea.Cmd {
 	}
 }
 
-func fetchGroupTLEsCmd(store *catalog.Store, group string) tea.Cmd {
+func fetchGroupTLEsCmd(ctx context.Context, store *catalog.Store, group string) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		records, meta, err := store.FetchGroupElements(ctx, group)
 		return groupTLEsLoadedMsg{group: group, records: records, meta: meta, err: err}
 	}
 }
 
-func fetchGroupSearchCmd(store *catalog.Store, group, query string) tea.Cmd {
-	cmd := fetchGroupTLEsCmd(store, group)
+func fetchGroupSearchCmd(ctx context.Context, store *catalog.Store, group, query string) tea.Cmd {
+	cmd := fetchGroupTLEsCmd(ctx, store, group)
 	return func() tea.Msg {
 		msg := cmd().(groupTLEsLoadedMsg)
 		msg.query = query
@@ -83,18 +87,18 @@ func fetchGroupSearchCmd(store *catalog.Store, group, query string) tea.Cmd {
 	}
 }
 
-func fetchNoradCmd(store *catalog.Store, noradID string) tea.Cmd {
+func fetchNoradCmd(ctx context.Context, store *catalog.Store, noradID string) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 		record, meta, err := store.FetchElementByNorad(ctx, noradID)
 		return noradLoadedMsg{noradID: noradID, record: record, meta: meta, err: err}
 	}
 }
 
-func searchAllGroupsCmd(store *catalog.Store, query string) tea.Cmd {
+func searchAllGroupsCmd(ctx context.Context, store *catalog.Store, query string) tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		defer cancel()
 		result, err := store.SearchElements(ctx, query)
 		if err != nil {
@@ -108,13 +112,13 @@ func searchAllGroupsCmd(store *catalog.Store, query string) tea.Cmd {
 		if len(result.Warnings) > 0 {
 			warning = fmt.Sprintf("Search coverage: %d/%d groups loaded. %s", result.GroupsCovered, result.GroupsTotal, strings.Join(result.Warnings, "; "))
 		}
-		return searchResultsMsg{results: results, records: result.Records, warning: warning}
+		return searchResultsMsg{results: results, entries: result.Entries, warning: warning}
 	}
 }
 
-func trackTickCmd(interval time.Duration) tea.Cmd {
+func trackTickCmd(interval time.Duration, session uint64) tea.Cmd {
 	return tea.Tick(interval, func(t time.Time) tea.Msg {
-		return trackTickMsg(t)
+		return trackTickMsg{at: t, session: session}
 	})
 }
 
@@ -136,10 +140,10 @@ func predictCmd(sat *orbit.Propagator, t time.Time, provider string) tea.Cmd {
 	}
 }
 
-func passesCmd(sat *orbit.Propagator, obs Observer, start time.Time, duration, step time.Duration) tea.Cmd {
+func passesCmd(ctx context.Context, sat *orbit.Propagator, input passInput) tea.Cmd {
 	return func() tea.Msg {
-		passes, err := orbit.PlanPassesElements(sat, obs, start, duration, step)
-		return passesLoadedMsg{passes: passes, err: err}
+		passes, err := orbit.PlanPassesElementsContext(ctx, sat, input.observer, input.start, input.duration, input.step)
+		return passesLoadedMsg{passes: passes, input: input, err: err}
 	}
 }
 
