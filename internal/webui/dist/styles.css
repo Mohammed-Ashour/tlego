@@ -162,6 +162,9 @@ ul { list-style: none; }
 .data-feed li { padding: 3px 0; font-size: 12px; }
 .data-values { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 12px var(--mono); }
 .data-values strong { color: var(--accent); font-weight: 600; }
+.data-source + .data-feed { margin-bottom: 4px; }
+.imagery-control { margin-top: 10px; }
+.imagery-credit { position: absolute; left: 14px; bottom: 12px; max-width: min(520px, calc(100% - 90px)); margin: 0; padding: 4px 8px; border-radius: 4px; background: rgba(10, 14, 30, .8); color: var(--soft); font-size: 11px; }
 .data-credit { margin-top: 6px; color: var(--muted); font-size: 11px; }
 .dialog::backdrop { background: rgba(4, 6, 14, .65); }
 .dialog h2 { margin-bottom: 6px; font-size: 16px; }

@@ -2,7 +2,7 @@ import { createApi, isAbort } from './api.js';
 import { createGlobe } from './globe.js';
 import {
   annotatePasses, buildUrlState, canonicalId, clamp, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
-  dataAge, describeKp, formatFrequency, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
+  dataAge, describeKp, formatFrequency, summarizeClouds, summarizeHistory, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
 } from './logic.js';
 import { sampleAt } from '../../../pkg/templates/viewer-state.js';
 import { renderSky } from './sky.js';
@@ -24,6 +24,7 @@ const state = {
   selected: null,
   observer: readStoredObserver(storage),
   utc: storage.getItem('khonsu.utc') === '1',
+  imagery: null,
   window: windowFrom(Date.now()),
   time: Date.now(),
   live: true,
@@ -862,6 +863,7 @@ function setPicking(value) {
 // Data sources
 
 let dataRequest = 0;
+let imageryLayers = [];
 
 function feedCredit(feed) {
   const parts = [feed.source.credit, feed.source.nature, `updated ${dataAge(feed.fetched_at, Date.now())}`];
@@ -911,17 +913,115 @@ function renderLaunches(feed) {
   return [list, ...feedCredit(feed)];
 }
 
+function detailList(rows) {
+  const list = element('ul');
+  list.append(...rows.filter(([, value]) => value).map(([label, value]) => element('li', null, `${label}: ${value}`)));
+  return list;
+}
+
 function renderSatelliteDetails(feed) {
   const [entry] = feed.data;
   if (!entry) return [element('p', 'note', 'Wikidata has no entry for this satellite.'), ...feedCredit(feed)];
-  const rows = [['Name', entry.name]];
-  if (entry.types.length) rows.push(['Type', entry.types.join(', ')]);
-  if (entry.operators.length) rows.push(['Operator', entry.operators.join(', ')]);
-  if (entry.countries.length) rows.push(['Country', entry.countries.join(', ')]);
-  if (entry.launch_date) rows.push(['Launched', entry.launch_date]);
+  return [detailList([['Name', entry.name], ['Type', entry.types.join(', ')], ['Operator', entry.operators.join(', ')], ['Country', entry.countries.join(', ')], ['Launched', entry.launch_date]]), ...feedCredit(feed)];
+}
+
+function renderCatalogRecord(feed) {
+  const record = feed.data;
+  if (!record) return [element('p', 'note', 'GCAT has no entry for this satellite.'), ...feedCredit(feed)];
+  return [detailList([['Name', record.name], ['Kind', record.kind], ['Bus', record.bus], ['Mass', record.mass_kg ? `${record.mass_kg.toLocaleString('en-GB')} kg` : null], ['Launched', record.launch_date], ['Owner code', record.owner], ['Manufacturer code', record.manufacturer], ['Orbit class', record.orbit_class]]), ...feedCredit(feed)];
+}
+
+function renderSpaceTrack(feed) {
+  const [record] = feed.data;
+  if (!record) return [element('p', 'note', 'Space-Track has no record for this satellite.'), ...feedCredit(feed)];
+  return [detailList([['Name', record.name], ['Object type', record.object_type], ['Radar size', record.rcs_size], ['Country code', record.country], ['Launched', record.launch_date], ['Decayed', record.decay_date], ['Element epoch', record.epoch]]), ...feedCredit(feed)];
+}
+
+function renderScenes(feed) {
+  if (!feed.data.length) return [element('p', 'note', 'Earth Search lists scenes from Sentinel-2 and Landsat satellites. This satellite is not one of them.')];
   const list = element('ul');
-  list.append(...rows.map(([label, value]) => element('li', null, `${label}: ${value}`)));
+  list.append(...feed.data.map((scene) => {
+    const cloud = scene.cloud_cover === null ? '' : `, ${Math.round(scene.cloud_cover)}% cloud`;
+    return element('li', null, `${dataTime(scene.time)}: near ${scene.center_lat.toFixed(1)}°, ${scene.center_lon.toFixed(1)}°${cloud}`);
+  }));
   return [list, ...feedCredit(feed)];
+}
+
+function renderHistory(feed) {
+  const summary = summarizeHistory(feed.data);
+  if (!summary) return [element('p', 'note', 'No observed days are available.')];
+  return [values(['Past year, strongest Kp', `${summary.strongest.kp_max.toFixed(1)} on ${summary.strongest.date}`], ['Average F10.7', String(Math.round(summary.meanFlux))]), ...feedCredit(feed)];
+}
+
+function renderEvents(feed) {
+  if (!feed.data.length) return [element('p', 'note', 'No events in the past two weeks.'), ...feedCredit(feed)];
+  const list = element('ul');
+  list.append(...feed.data.slice(0, 4).map((event) => element('li', null, `${dataTime(event.time)}: ${event.kind}${event.detail ? ` (${event.detail})` : ''}`)));
+  return [list, ...feedCredit(feed)];
+}
+
+function renderClouds(feed) {
+  const summary = summarizeClouds(feed.data);
+  if (!summary) return [element('p', 'note', 'No forecast is available.'), ...feedCredit(feed)];
+  return [values(['Cloud cover now', `${Math.round(summary.now)}%`], ['Clearest in the next day', `${Math.round(summary.clearest.percent)}% at ${dataTime(summary.clearest.time)}`]), ...feedCredit(feed)];
+}
+
+function cloudControl(token) {
+  const node = byId('data-feed-open-meteo');
+  if (!node) return;
+  if (!state.observer) {
+    node.replaceChildren(element('p', 'note', 'Set your location to check cloud cover.'));
+    return;
+  }
+  const button = element('button', 'text-button', 'Check clouds near me');
+  button.type = 'button';
+  button.addEventListener('click', () => showFeed(token, 'open-meteo', () => api.cloudCover(state.observer), renderClouds));
+  node.replaceChildren(button);
+}
+
+async function applyImagery(layerId) {
+  state.imagery = layerId;
+  const credit = byId('imagery-credit');
+  if (!layerId) {
+    credit.hidden = true;
+    await globe?.setImagery(null);
+    return;
+  }
+  const layer = imageryLayers.find((item) => item.id === layerId);
+  credit.hidden = false;
+  credit.textContent = `Loading ${layer.name}…`;
+  const url = `/api/v1/imagery?layer=${encodeURIComponent(layerId)}`;
+  try {
+    await globe?.setImagery(url, layer.transparent);
+    if (state.imagery !== layerId) return;
+    // The picture's freshness is only available from its response headers.
+    const { headers } = await fetch(url, { method: 'HEAD' });
+    if (state.imagery !== layerId) return;
+    const parts = [layer.name, layer.credit];
+    const fetchedAt = headers.get('X-Khonsu-Fetched-At');
+    if (fetchedAt) parts.push(`updated ${dataAge(fetchedAt, Date.now())}`);
+    if (headers.get('X-Khonsu-Stale') === 'true') parts.push('saved copy');
+    credit.textContent = parts.join(' · ');
+  } catch {
+    if (state.imagery === layerId) credit.textContent = `${layer.name} could not be loaded.`;
+  }
+}
+
+function imageryControl() {
+  const label = element('label', 'field imagery-control');
+  label.append(element('span', null, 'Show on the globe'));
+  const select = element('select');
+  const none = element('option', null, 'Plain globe');
+  none.value = '';
+  select.append(none, ...imageryLayers.map((layer) => {
+    const option = element('option', null, layer.name);
+    option.value = layer.id;
+    return option;
+  }));
+  select.value = state.imagery ?? '';
+  select.addEventListener('change', () => applyImagery(select.value || null));
+  label.append(select);
+  return label;
 }
 
 function renderTransmitters(feed) {
@@ -936,8 +1036,8 @@ function renderTransmitters(feed) {
   return [summary, list, ...feedCredit(feed)];
 }
 
-async function showFeed(token, categoryId, load, render) {
-  const node = byId(`data-feed-${categoryId}`);
+async function showFeed(token, sourceId, load, render) {
+  const node = byId(`data-feed-${sourceId}`);
   if (!node) return;
   node.replaceChildren(element('p', 'note', 'Loading…'));
   try {
@@ -948,10 +1048,11 @@ async function showFeed(token, categoryId, load, render) {
   }
 }
 
-function renderDataCategories(categories) {
+function renderDataCategories(categories, liveData) {
   byId('data-categories').replaceChildren(...categories.map((category) => {
     const section = element('section', 'data-category');
     section.append(element('h3', null, category.title), element('p', 'note', category.description));
+    if (category.id === 'earth-imagery' && liveData) section.append(imageryControl());
     for (const source of category.sources) {
       const row = element('div', 'data-source');
       const link = element('a', null, source.name);
@@ -959,12 +1060,11 @@ function renderDataCategories(categories) {
       link.target = '_blank';
       link.rel = 'noreferrer';
       const live = source.status === 'live';
-      row.append(link, element('span', `data-status${live ? ' is-live' : ''}`, live ? 'Live' : 'Planned'), element('p', 'note', `${source.summary} ${source.refresh}.`));
-      section.append(row);
+      row.append(link, element('span', `data-status${live ? ' is-live' : ''}`, live ? 'Live' : 'Needs account'), element('p', 'note', `${source.summary} ${source.refresh}.`));
+      const feed = element('div', 'data-feed');
+      feed.id = `data-feed-${source.id}`;
+      section.append(row, feed);
     }
-    const feed = element('div', 'data-feed');
-    feed.id = `data-feed-${category.id}`;
-    section.append(feed);
     return section;
   }));
 }
@@ -986,16 +1086,28 @@ async function openDataDialog() {
     return;
   }
   if (token !== dataRequest) return;
-  renderDataCategories(catalog.categories);
+  imageryLayers = catalog.imagery_layers;
+  renderDataCategories(catalog.categories, catalog.live_data);
   if (!catalog.live_data) {
     statusNote.textContent = 'Live data is off while serving a local file, so no provider requests are made.';
     return;
   }
-  showFeed(token, 'space-weather', () => api.spaceWeather(), renderSpaceWeather);
-  showFeed(token, 'launches', () => api.launches(), renderLaunches);
-  if (!selectedEntry()) return;
-  showFeed(token, 'missions', () => api.satelliteDetails(state.selected), renderSatelliteDetails);
-  showFeed(token, 'radio', () => api.transmitters(state.selected), renderTransmitters);
+  showFeed(token, 'noaa-swpc', () => api.spaceWeather(), renderSpaceWeather);
+  showFeed(token, 'celestrak-space-weather', () => api.spaceWeatherHistory(), renderHistory);
+  showFeed(token, 'nasa-donki', () => api.spaceEvents(), renderEvents);
+  showFeed(token, 'launch-library', () => api.launches(), renderLaunches);
+  cloudControl(token);
+  const spaceTrackReady = catalog.categories.flatMap((category) => category.sources).some((source) => source.id === 'space-track' && source.status === 'live');
+  if (!spaceTrackReady) byId('data-feed-space-track').replaceChildren(element('p', 'note', 'Set KHONSU_SPACE_TRACK_USER and KHONSU_SPACE_TRACK_PASSWORD before starting Khonsu to use your account.'));
+  if (!selectedEntry()) {
+    statusNote.textContent = 'Add a satellite to see its details here.';
+    return;
+  }
+  showFeed(token, 'wikidata', () => api.satelliteDetails(state.selected), renderSatelliteDetails);
+  showFeed(token, 'gcat', () => api.catalogRecord(state.selected), renderCatalogRecord);
+  showFeed(token, 'satnogs', () => api.transmitters(state.selected), renderTransmitters);
+  showFeed(token, 'earth-search', () => api.recentScenes(state.selected), renderScenes);
+  if (spaceTrackReady) showFeed(token, 'space-track', () => api.spaceTrack(state.selected), renderSpaceTrack);
 }
 
 function wireDataDialog() {

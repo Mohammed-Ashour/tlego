@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   annotatePasses, buildUrlState, canonicalId, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCountdown, formatDay, formatDuration,
-  dataAge, describeKp, formatFrequency, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, trailRange, validId, windowFrom,
+  dataAge, describeKp, formatFrequency, summarizeClouds, summarizeHistory, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, trailRange, validId, windowFrom,
 } from './logic.js';
 
 test('compass points cover the circle and wrap', () => {
@@ -205,4 +205,19 @@ test('data age is short and never negative', () => {
   assert.equal(dataAge('2026-11-09T11:45:00Z', now), '15 min ago');
   assert.equal(dataAge('2026-11-09T09:00:00Z', now), '3 h ago');
   assert.equal(dataAge('2026-11-01T12:00:00Z', now), '8 days ago');
+});
+
+test('history summary finds the strongest day and the average flux', () => {
+  const summary = summarizeHistory([{ date: 'a', kp_max: 2, f107: 100 }, { date: 'b', kp_max: 7.3, f107: 140 }]);
+  assert.equal(summary.strongest.date, 'b');
+  assert.equal(summary.meanFlux, 120);
+  assert.equal(summarizeHistory([]), null);
+});
+
+test('cloud summary only plans a day ahead', () => {
+  const hours = Array.from({ length: 30 }, (_, index) => ({ time: String(index), percent: index === 26 ? 0 : 50 - index }));
+  const summary = summarizeClouds(hours);
+  assert.equal(summary.now, 50);
+  assert.equal(summary.clearest.time, '23');
+  assert.equal(summarizeClouds([]), null);
 });

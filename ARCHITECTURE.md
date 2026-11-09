@@ -44,6 +44,10 @@ flowchart TD
     External -. invokes versioned built-ins .-> Run
 ```
 
+## Data Source Modules
+
+internal/sources holds one package per provider (swpc, wikidata, gcat and so on). Each exports an Info value that describes and credits the source, plus a Client built on a shared feed.Client, so any frontend can use one provider alone. feed.Client handles caching, one request at a time per provider, and pausing after failures. The sources package groups them by category and offers a Hub of all clients. CelesTrak element sets stay in internal/catalog.
+
 ## Runtime Entry Points
 
 - main.go calls cmd.Run, prints unreported errors to stderr and preserves extension exit codes.

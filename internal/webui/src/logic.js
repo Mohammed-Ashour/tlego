@@ -213,6 +213,21 @@ export function formatFrequency(hz) {
   return `${(hz / 1e6).toFixed(3)} MHz`;
 }
 
+export function summarizeHistory(days) {
+  if (!days.length) return null;
+  const strongest = days.reduce((best, day) => (day.kp_max > best.kp_max ? day : best));
+  const meanFlux = days.reduce((sum, day) => sum + day.f107, 0) / days.length;
+  return { strongest, meanFlux };
+}
+
+// Looks a day ahead, the span a person can plan an evening around.
+export function summarizeClouds(hours) {
+  const next = hours.slice(0, 24);
+  if (!next.length) return null;
+  const clearest = next.reduce((best, hour) => (hour.percent < best.percent ? hour : best));
+  return { now: next[0].percent, clearest };
+}
+
 export function dataAge(fetchedAt, now) {
   const minutes = Math.max(0, Math.round((now - new Date(fetchedAt).getTime()) / 60000));
   if (minutes < 1) return 'just now';

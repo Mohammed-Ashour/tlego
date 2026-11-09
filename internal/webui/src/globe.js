@@ -1,5 +1,5 @@
 // The 3D scene. It knows TEME positions and times, not the rest of the app.
-import { AmbientLight, BufferAttribute, BufferGeometry, DirectionalLight, Float32BufferAttribute, Group, Line, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, MeshPhongMaterial, PerspectiveCamera, Points, PointsMaterial, Raycaster, Scene, SphereGeometry, Vector2, Vector3, WebGLRenderer, BackSide } from 'three';
+import { AmbientLight, BufferAttribute, BufferGeometry, DirectionalLight, Float32BufferAttribute, Group, Line, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, MeshPhongMaterial, PerspectiveCamera, Points, PointsMaterial, Raycaster, Scene, SphereGeometry, SRGBColorSpace, TextureLoader, Vector2, Vector3, WebGLRenderer, BackSide } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import land from '../../../pkg/templates/earth-land.json';
 import { gmstAt, sampleAt } from '../../../pkg/templates/viewer-state.js';
@@ -110,6 +110,43 @@ export function createGlobe(container, { onPick, onSelect }) {
   let following = false;
   let picking = false;
   let lastTime = 0;
+
+  const imageryLoader = new TextureLoader();
+  let imagery = null;
+  let imageryRequest = 0;
+
+  function clearImagery() {
+    if (!imagery) return;
+    earth.remove(imagery);
+    imagery.material.map?.dispose();
+    imagery.material.dispose();
+    imagery.geometry.dispose();
+    imagery = null;
+  }
+
+  // Drapes a worldwide equirectangular image on the Earth, or removes it. Coastlines
+  // sit just above it, and a newer request replaces one still loading.
+  function setImagery(url, transparent = false) {
+    const request = ++imageryRequest;
+    if (!url) {
+      clearImagery();
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      imageryLoader.load(url, (texture) => {
+        if (request !== imageryRequest) {
+          texture.dispose();
+          resolve();
+          return;
+        }
+        texture.colorSpace = SRGBColorSpace;
+        clearImagery();
+        imagery = new Mesh(new SphereGeometry(1.001, 96, 64), new MeshPhongMaterial({ map: texture, transparent, specular: 0x111111, shininess: 6 }));
+        earth.add(imagery);
+        resolve();
+      }, undefined, () => reject(new Error('The image could not be loaded.')));
+    });
+  }
 
   function home(id = selected) {
     const body = bodies.get(id);
@@ -287,6 +324,7 @@ export function createGlobe(container, { onPick, onSelect }) {
   controls.update();
 
   return {
+    setImagery,
     setTrack,
     removeTrack,
     update,

@@ -13,6 +13,7 @@ import (
 	"testing/fstest"
 
 	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/sources"
 )
 
 func appHandler(t *testing.T) http.Handler {
@@ -304,9 +305,19 @@ func TestDataRoutesListSourcesButStayOfflineForLocalFiles(t *testing.T) {
 			t.Errorf("%s: status %d, want 503", path, recorder.Code)
 		}
 	}
-	recorder = httptest.NewRecorder()
-	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/transmitters?norad_id=abc", nil))
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("invalid ID: status %d", recorder.Code)
+}
+
+func TestDataRoutesRejectBadInputBeforeReachingAProvider(t *testing.T) {
+	records, err := catalog.ReadElements("../../examples/tui-demo/iss.tle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := newAppHandler(fileSource{records}, sources.NewHub(t.TempDir()), fstest.MapFS{"index.html": {Data: []byte("app")}})
+	for _, path := range []string{"/api/v1/transmitters?norad_id=abc", "/api/v1/satellite-details?norad_id=", "/api/v1/cloud-cover?lat=95&lon=0", "/api/v1/cloud-cover?lat=NaN&lon=0", "/api/v1/imagery?layer=nope"} {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusBadRequest {
+			t.Errorf("%s: status %d, want 400", path, recorder.Code)
+		}
 	}
 }

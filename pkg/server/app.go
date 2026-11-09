@@ -531,7 +531,7 @@ type AppOptions struct {
 }
 
 // newAppHandler combines the JSON API with the web app's static files.
-func newAppHandler(source elementSource, feeds *sources.Client, ui fs.FS) http.Handler {
+func newAppHandler(source elementSource, feeds *sources.Hub, ui fs.FS) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", newHandler(source))
 	registerDataRoutes(mux, feeds)
@@ -592,7 +592,7 @@ func appURL(addr net.Addr) string {
 // ServeApp runs the web app until ctx is canceled.
 func ServeApp(ctx context.Context, options AppOptions) error {
 	var source elementSource = newMemoSource(ctx, catalog.NewStore(options.CacheDir, options.CacheTTL), options.CacheTTL)
-	feeds := sources.NewClient(options.CacheDir)
+	feeds := sources.NewHub(options.CacheDir)
 	if options.Records != nil {
 		source, feeds = fileSource{options.Records}, nil
 	}
