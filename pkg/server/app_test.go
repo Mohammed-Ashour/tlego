@@ -8,11 +8,13 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
 
 	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/sources"
 )
 
 func appHandler(t *testing.T) http.Handler {
@@ -22,7 +24,7 @@ func appHandler(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 	ui := fstest.MapFS{"index.html": {Data: []byte("<html>app</html>")}}
-	return newAppHandler(fileSource{records}, ui)
+	return newAppHandler(fileSource{records}, nil, ui)
 }
 
 func request(t *testing.T, handler http.Handler, path string) (int, map[string]any) {
@@ -282,10 +284,54 @@ func TestFilesystemErrorsHideServerPaths(t *testing.T) {
 	}
 }
 
+func TestRequestErrorsHidePathsAndKeepStatus(t *testing.T) {
+	for name, cause := range map[string]error{
+		"path": &fs.PathError{Op: "mkdir", Path: "/secret/path", Err: fs.ErrPermission},
+		"link": &os.LinkError{Op: "rename", Old: "/secret/path", New: "/secret/other", Err: fs.ErrPermission},
+	} {
+		recorder := httptest.NewRecorder()
+		writeFailure(recorder, requestError{http.StatusBadGateway, fmt.Errorf("could not get data: %w", cause)})
+		if recorder.Code != http.StatusBadGateway || strings.Contains(recorder.Body.String(), "/secret/path") {
+			t.Errorf("%s: status %d, body = %s", name, recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
 func TestDeadlineMapsToGatewayTimeout(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	writeFailure(recorder, context.DeadlineExceeded)
 	if recorder.Code != http.StatusGatewayTimeout {
 		t.Fatalf("status = %d", recorder.Code)
+	}
+}
+
+func TestDataRoutesListSourcesButStayOfflineForLocalFiles(t *testing.T) {
+	handler := appHandler(t)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/sources", nil))
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"live_data":false`) || !strings.Contains(recorder.Body.String(), `"space-weather"`) {
+		t.Fatalf("sources: %d %s", recorder.Code, recorder.Body)
+	}
+	for _, path := range []string{"/api/v1/space-weather", "/api/v1/launches", "/api/v1/satellite-details?norad_id=25544", "/api/v1/transmitters?norad_id=25544"} {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusServiceUnavailable {
+			t.Errorf("%s: status %d, want 503", path, recorder.Code)
+		}
+	}
+}
+
+func TestDataRoutesRejectBadInputBeforeReachingAProvider(t *testing.T) {
+	records, err := catalog.ReadElements("../../examples/tui-demo/iss.tle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := newAppHandler(fileSource{records}, sources.NewHub(t.TempDir()), fstest.MapFS{"index.html": {Data: []byte("app")}})
+	for _, path := range []string{"/api/v1/transmitters?norad_id=abc", "/api/v1/satellite-details?norad_id=", "/api/v1/cloud-cover?lat=95&lon=0", "/api/v1/cloud-cover?lat=NaN&lon=0", "/api/v1/imagery?layer=nope"} {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusBadRequest {
+			t.Errorf("%s: status %d, want 400", path, recorder.Code)
+		}
 	}
 }

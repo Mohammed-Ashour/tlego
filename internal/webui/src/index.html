@@ -14,6 +14,7 @@
       <span class="brand"><svg class="brand-mark" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><circle cx="16" cy="10.5" r="6.5"/><path d="M3 13a13 13 0 0 0 26 0a15 15 0 0 1-26 0z"/></svg>Khonsu</span>
       <p id="data-status" class="data-status" role="status"></p>
       <div class="topbar-actions">
+        <button id="data-open" class="text-button" type="button">Data</button>
         <button id="zone-toggle" class="text-button" type="button" aria-pressed="false" title="Switch between local time and UTC">Local time</button>
         <button id="observer-open" class="text-button observer-button" type="button"><span class="observer-dot" aria-hidden="true"></span><span id="observer-label">Set location</span></button>
       </div>
@@ -36,6 +37,7 @@
       <section id="headline" class="headline" aria-live="polite"></section>
       <p id="pick-hint" class="pick-hint" role="status" hidden>Click your location on the globe, or press Escape to cancel.</p>
       <div id="scene-error" class="scene-error" role="alert" hidden></div>
+      <p id="imagery-credit" class="imagery-credit" role="status" hidden></p>
       <div class="camera-tools" aria-label="Camera controls">
         <button id="camera-follow" class="icon-button" type="button" aria-pressed="false" aria-label="Follow the selected satellite" title="Follow the selected satellite">◎</button>
         <button id="camera-home" class="icon-button" type="button" aria-label="Frame the selected satellite" title="Frame the selected satellite">⌂</button>
@@ -81,6 +83,16 @@
       <div id="time-current" class="time-current"></div>
     </footer>
   </div>
+
+  <dialog id="data-dialog" class="dialog data-dialog" aria-labelledby="data-title">
+    <div class="data-header">
+      <h2 id="data-title">Data sources</h2>
+      <button id="data-close" class="text-button" type="button">Close</button>
+    </div>
+    <p class="note">Your copy of Khonsu fetches this data, keeps a local copy to limit requests and credits each source. Khonsu doesn't redistribute it. Opening this panel sends the selected satellite's NORAD ID to Wikidata and SatNOGS, and to Space-Track if you've connected an account. For Sentinel-2 and Landsat satellites, Earth Search receives the satellite's platform name. Your location is only sent if you ask for cloud cover, and is rounded to about 10 km first.</p>
+    <p id="data-status-note" class="note"></p>
+    <div id="data-categories"></div>
+  </dialog>
 
   <dialog id="observer-dialog" class="dialog" aria-labelledby="observer-title">
     <form id="observer-form" method="dialog" novalidate>

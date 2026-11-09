@@ -2,7 +2,7 @@ import { createApi, isAbort } from './api.js';
 import { createGlobe } from './globe.js';
 import {
   annotatePasses, buildUrlState, canonicalId, clamp, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
-  lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
+  dataAge, describeKp, formatFrequency, summarizeClouds, summarizeHistory, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
 } from './logic.js';
 import { sampleAt } from '../../../pkg/templates/viewer-state.js';
 import { renderSky } from './sky.js';
@@ -24,6 +24,7 @@ const state = {
   selected: null,
   observer: readStoredObserver(storage),
   utc: storage.getItem('khonsu.utc') === '1',
+  imagery: null,
   window: windowFrom(Date.now()),
   time: Date.now(),
   live: true,
@@ -859,6 +860,280 @@ function setPicking(value) {
   globe?.setPicking(value);
 }
 
+// Data sources
+
+let dataRequest = 0;
+let imageryLayers = [];
+
+function feedCredit(feed) {
+  const parts = [feed.source.credit, feed.source.nature, `updated ${dataAge(feed.fetched_at, Date.now())}`];
+  if (feed.stale) parts.push('saved copy');
+  const credit = element('p', 'data-credit', parts.join(' · '));
+  return feed.warning ? [credit, element('p', 'note is-warning', feed.warning)] : [credit];
+}
+
+function dataFailure(error) {
+  return element('p', 'note is-warning', providerMessage(error.message || '') || 'This source could not be reached.');
+}
+
+function dataTime(isoTime) {
+  const time = Date.parse(isoTime);
+  return `${formatDay(time, state.utc)} ${formatClock(time, state.utc).slice(0, 5)} ${zoneLabel(state.utc)}`;
+}
+
+function values(...entries) {
+  const row = element('div', 'data-values');
+  for (const [label, value] of entries) {
+    const item = element('span', null, `${label} `);
+    item.append(element('strong', null, value));
+    row.append(item);
+  }
+  return row;
+}
+
+function renderSpaceWeather(feed) {
+  const { kp, flux, scales, alerts } = feed.data;
+  const latest = kp.at(-1);
+  const entries = [['Kp', `${latest.kp.toFixed(1)} ${describeKp(latest.kp)}`]];
+  if (flux.length) entries.push(['F10.7', String(Math.round(flux.at(-1).flux))]);
+  if (scales) entries.push(['Scales', `G${scales.geomagnetic.level} S${scales.solar.level} R${scales.radio.level}`]);
+  const nodes = [values(...entries)];
+  if (alerts.length) {
+    const list = element('ul');
+    list.append(...alerts.slice(0, 3).map((alert) => element('li', null, `${dataTime(alert.issued_at)}: ${alert.headline}`)));
+    nodes.push(list);
+  }
+  return [...nodes, ...feedCredit(feed)];
+}
+
+function renderLaunches(feed) {
+  if (!feed.data.length) return [element('p', 'note', 'No upcoming launches are listed.'), ...feedCredit(feed)];
+  const list = element('ul');
+  list.append(...feed.data.slice(0, 3).map((launch) => element('li', null, `${dataTime(launch.net)}: ${launch.name} (${launch.status})`)));
+  return [list, ...feedCredit(feed)];
+}
+
+function detailList(rows) {
+  const list = element('ul');
+  list.append(...rows.filter(([, value]) => value).map(([label, value]) => element('li', null, `${label}: ${value}`)));
+  return list;
+}
+
+function renderSatelliteDetails(feed) {
+  const [entry] = feed.data;
+  if (!entry) return [element('p', 'note', 'Wikidata has no entry for this satellite.'), ...feedCredit(feed)];
+  return [detailList([['Name', entry.name], ['Type', entry.types.join(', ')], ['Operator', entry.operators.join(', ')], ['Country', entry.countries.join(', ')], ['Launched', entry.launch_date]]), ...feedCredit(feed)];
+}
+
+function renderCatalogRecord(feed) {
+  const record = feed.data;
+  if (!record) return [element('p', 'note', 'GCAT has no entry for this satellite.'), ...feedCredit(feed)];
+  return [detailList([['Name', record.name], ['Kind', record.kind], ['Bus', record.bus], ['Mass', record.mass_kg ? `${record.mass_kg.toLocaleString('en-GB')} kg` : null], ['Launched', record.launch_date], ['Owner code', record.owner], ['Manufacturer code', record.manufacturer], ['Orbit class', record.orbit_class]]), ...feedCredit(feed)];
+}
+
+function renderSpaceTrack(feed) {
+  const [record] = feed.data;
+  if (!record) return [element('p', 'note', 'Space-Track has no record for this satellite.'), ...feedCredit(feed)];
+  return [detailList([['Name', record.name], ['Object type', record.object_type], ['Radar size', record.rcs_size], ['Country code', record.country], ['Launched', record.launch_date], ['Decayed', record.decay_date], ['Element epoch', record.epoch]]), ...feedCredit(feed)];
+}
+
+function renderScenes(feed) {
+  if (!feed.data.length) return [element('p', 'note', 'Earth Search lists scenes from Sentinel-2 and Landsat satellites. This satellite is not one of them.')];
+  const list = element('ul');
+  list.append(...feed.data.map((scene) => {
+    const cloud = scene.cloud_cover === null ? '' : `, ${Math.round(scene.cloud_cover)}% cloud`;
+    return element('li', null, `${dataTime(scene.time)}: near ${scene.center_lat.toFixed(1)}°, ${scene.center_lon.toFixed(1)}°${cloud}`);
+  }));
+  return [list, ...feedCredit(feed)];
+}
+
+function renderHistory(feed) {
+  const summary = summarizeHistory(feed.data);
+  if (!summary) return [element('p', 'note', 'No observed days are available.')];
+  return [values(['Past year, strongest Kp', `${summary.strongest.kp_max.toFixed(1)} on ${summary.strongest.date}`], ['Average F10.7', String(Math.round(summary.meanFlux))]), ...feedCredit(feed)];
+}
+
+function renderEvents(feed) {
+  if (!feed.data.length) return [element('p', 'note', 'No events in the past two weeks.'), ...feedCredit(feed)];
+  const list = element('ul');
+  list.append(...feed.data.slice(0, 4).map((event) => element('li', null, `${dataTime(event.time)}: ${event.kind}${event.detail ? ` (${event.detail})` : ''}`)));
+  return [list, ...feedCredit(feed)];
+}
+
+function renderClouds(feed) {
+  const summary = summarizeClouds(feed.data);
+  if (!summary) return [element('p', 'note', 'No forecast is available.'), ...feedCredit(feed)];
+  return [values(['Cloud cover now', `${Math.round(summary.now)}%`], ['Clearest in the next day', `${Math.round(summary.clearest.percent)}% at ${dataTime(summary.clearest.time)}`]), ...feedCredit(feed)];
+}
+
+function cloudControl(token) {
+  const node = byId('data-feed-open-meteo');
+  if (!node) return;
+  if (!state.observer) {
+    node.replaceChildren(element('p', 'note', 'Set your location to check cloud cover.'));
+    return;
+  }
+  // The result goes in its own child so the button keeps focus and stays for a retry.
+  const button = element('button', 'text-button', 'Check clouds near me');
+  button.type = 'button';
+  const result = element('div');
+  result.id = 'data-feed-open-meteo-result';
+  button.addEventListener('click', () => {
+    button.textContent = 'Check again';
+    showFeed(token, 'open-meteo-result', () => api.cloudCover(state.observer), renderClouds);
+  });
+  node.replaceChildren(button, result);
+}
+
+async function applyImagery(layerId) {
+  if (!globe) return;
+  state.imagery = layerId;
+  const credit = byId('imagery-credit');
+  if (!layerId) {
+    credit.hidden = true;
+    await globe.setImagery(null);
+    return;
+  }
+  const layer = imageryLayers.find((item) => item.id === layerId);
+  credit.hidden = false;
+  credit.textContent = `Loading ${layer.name}…`;
+  const url = `/api/v1/imagery?layer=${encodeURIComponent(layerId)}`;
+  try {
+    await globe.setImagery(url, layer.transparent);
+    if (state.imagery !== layerId) return;
+    // The picture's freshness is only available from its response headers.
+    const { headers } = await fetch(url, { method: 'HEAD' });
+    if (state.imagery !== layerId) return;
+    const parts = [layer.name, layer.credit];
+    const fetchedAt = headers.get('X-Khonsu-Fetched-At');
+    if (fetchedAt) parts.push(`updated ${dataAge(fetchedAt, Date.now())}`);
+    if (headers.get('X-Khonsu-Stale') === 'true') parts.push('saved copy');
+    credit.textContent = parts.join(' · ');
+  } catch {
+    if (state.imagery !== layerId) return;
+    credit.textContent = `${layer.name} could not be loaded.`;
+    // Drop the previous picture so the globe does not keep it without its credit.
+    try {
+      await globe.setImagery(null);
+    } catch {
+      // The message above is enough; a failed clean-up must not escape.
+    }
+  }
+}
+
+function imageryControl() {
+  const label = element('label', 'field imagery-control');
+  label.append(element('span', null, 'Show on the globe'));
+  const select = element('select');
+  const none = element('option', null, 'Plain globe');
+  none.value = '';
+  select.append(none, ...imageryLayers.map((layer) => {
+    const option = element('option', null, layer.name);
+    option.value = layer.id;
+    return option;
+  }));
+  select.value = state.imagery ?? '';
+  select.addEventListener('change', () => applyImagery(select.value || null));
+  label.append(select);
+  return label;
+}
+
+function renderTransmitters(feed) {
+  const active = feed.data.filter((item) => item.alive && item.status === 'active');
+  if (!active.length) return [element('p', 'note', 'SatNOGS lists no active transmitters for this satellite.'), ...feedCredit(feed)];
+  const list = element('ul');
+  list.append(...active.slice(0, 4).map((item) => {
+    const details = [formatFrequency(item.downlink_hz), item.mode].filter(Boolean).join(' · ');
+    return element('li', null, details ? `${item.description}: ${details}` : item.description);
+  }));
+  const summary = element('p', 'note', `${active.length} active transmitter${active.length === 1 ? '' : 's'}`);
+  return [summary, list, ...feedCredit(feed)];
+}
+
+async function showFeed(token, sourceId, load, render) {
+  const node = byId(`data-feed-${sourceId}`);
+  if (!node) return;
+  node.replaceChildren(element('p', 'note', 'Loading…'));
+  try {
+    const feed = await load();
+    if (token === dataRequest) node.replaceChildren(...render(feed));
+  } catch (error) {
+    if (token === dataRequest && error.name !== 'AbortError') node.replaceChildren(dataFailure(error));
+  }
+}
+
+function renderDataCategories(categories, liveData) {
+  byId('data-categories').replaceChildren(...categories.map((category) => {
+    const section = element('section', 'data-category');
+    section.append(element('h3', null, category.title), element('p', 'note', category.description));
+    if (category.id === 'earth-imagery' && liveData && globe) section.append(imageryControl());
+    for (const source of category.sources) {
+      const row = element('div', 'data-source');
+      const link = element('a', null, source.name);
+      link.href = source.url;
+      link.target = '_blank';
+      link.rel = 'noreferrer';
+      const live = source.status === 'live';
+      row.append(link, element('span', `data-status${live ? ' is-live' : ''}`, live ? 'Live' : 'Needs account'), element('p', 'note', `${source.summary} ${source.refresh}.`));
+      const feed = element('div', 'data-feed');
+      feed.id = `data-feed-${source.id}`;
+      section.append(row, feed);
+    }
+    return section;
+  }));
+}
+
+async function openDataDialog() {
+  const token = ++dataRequest;
+  const statusNote = byId('data-status-note');
+  statusNote.textContent = '';
+  statusNote.classList.remove('is-warning');
+  byId('data-dialog').showModal();
+  let catalog;
+  try {
+    catalog = await api.sources();
+  } catch (error) {
+    if (token === dataRequest && error.name !== 'AbortError') {
+      statusNote.textContent = error.message;
+      statusNote.classList.add('is-warning');
+    }
+    return;
+  }
+  if (token !== dataRequest) return;
+  imageryLayers = catalog.imagery_layers;
+  renderDataCategories(catalog.categories, catalog.live_data);
+  if (!catalog.live_data) {
+    statusNote.textContent = 'Live data is off while serving a local file, so no provider requests are made.';
+    return;
+  }
+  showFeed(token, 'noaa-swpc', () => api.spaceWeather(), renderSpaceWeather);
+  showFeed(token, 'celestrak-space-weather', () => api.spaceWeatherHistory(), renderHistory);
+  showFeed(token, 'nasa-donki', () => api.spaceEvents(), renderEvents);
+  showFeed(token, 'launch-library', () => api.launches(), renderLaunches);
+  cloudControl(token);
+  const spaceTrackReady = catalog.categories.flatMap((category) => category.sources).some((source) => source.id === 'space-track' && source.status === 'live');
+  if (!spaceTrackReady) byId('data-feed-space-track').replaceChildren(element('p', 'note', 'Run khonsu setup to connect your own free account, then restart Khonsu.'));
+  if (!selectedEntry()) {
+    statusNote.textContent = 'Add a satellite to see its details here.';
+    return;
+  }
+  showFeed(token, 'wikidata', () => api.satelliteDetails(state.selected), renderSatelliteDetails);
+  showFeed(token, 'gcat', () => api.catalogRecord(state.selected), renderCatalogRecord);
+  showFeed(token, 'satnogs', () => api.transmitters(state.selected), renderTransmitters);
+  showFeed(token, 'earth-search', () => api.recentScenes(state.selected), renderScenes);
+  if (spaceTrackReady) showFeed(token, 'space-track', () => api.spaceTrack(state.selected), renderSpaceTrack);
+}
+
+function wireDataDialog() {
+  const dialog = byId('data-dialog');
+  byId('data-open').addEventListener('click', openDataDialog);
+  byId('data-close').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => {
+    dataRequest += 1;
+    byId('data-open').focus();
+  });
+}
+
 function wireObserver() {
   const dialog = byId('observer-dialog');
   byId('observer-open').addEventListener('click', openObserverDialog);
@@ -1028,6 +1303,7 @@ async function start() {
   wireTabs();
   wireControls();
   wireObserver();
+  wireDataDialog();
   renderObserverLabel();
   renderSliderLabels();
   renderTracked();

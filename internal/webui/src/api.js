@@ -47,6 +47,17 @@ export function createApi(fetchJSON = globalThis.fetch?.bind(globalThis)) {
     report: (id) => get('/api/v1/report', { norad_id: id }, 'report'),
     passes: (id, observer, start) => get('/api/v1/passes', { norad_id: id, start: wholeSeconds(start), duration: '48h', step: '30s', ...observerParams(observer) }, 'passes'),
     tonight: (id, observer, time) => get('/api/v1/tonight', { norad_id: id, time: typeof time === 'number' ? wholeSeconds(time) : time, ...observerParams(observer) }, 'tonight'),
+    sources: () => get('/api/v1/sources', {}, 'sources'),
+    spaceWeather: () => get('/api/v1/space-weather', {}, 'space-weather'),
+    launches: () => get('/api/v1/launches', {}, 'launches'),
+    satelliteDetails: (id) => get('/api/v1/satellite-details', { norad_id: id }, 'satellite-details'),
+    transmitters: (id) => get('/api/v1/transmitters', { norad_id: id }, 'transmitters'),
+    spaceWeatherHistory: () => get('/api/v1/space-weather-history', {}, 'space-weather-history'),
+    spaceEvents: () => get('/api/v1/space-events', {}, 'space-events'),
+    catalogRecord: (id) => get('/api/v1/catalog-record', { norad_id: id }, 'catalog-record'),
+    spaceTrack: (id) => get('/api/v1/space-track', { norad_id: id }, 'space-track'),
+    recentScenes: (id) => get('/api/v1/recent-scenes', { norad_id: id }, 'recent-scenes'),
+    cloudCover: (observer) => get('/api/v1/cloud-cover', { lat: observer.lat, lon: observer.lon }, 'cloud-cover'),
     look: (id, observer, start, end) => get('/api/v1/look', { norad_id: id, start, end, samples: 64, ...observerParams(observer) }, 'look'),
   };
 }

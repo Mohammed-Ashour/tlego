@@ -200,6 +200,43 @@ export function formatDay(time, utc) {
   return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: utc ? 'UTC' : undefined }).format(time);
 }
 
+// NOAA's G1 storm scale starts at Kp 5, and Kp 4 is its "active" level.
+export function describeKp(kp) {
+  if (kp >= 5) return 'Geomagnetic storm';
+  if (kp >= 4) return 'Active';
+  return 'Quiet';
+}
+
+export function formatFrequency(hz) {
+  if (!Number.isFinite(hz) || hz <= 0) return null;
+  if (hz >= 1e9) return `${(hz / 1e9).toFixed(3)} GHz`;
+  return `${(hz / 1e6).toFixed(3)} MHz`;
+}
+
+export function summarizeHistory(days) {
+  if (!days.length) return null;
+  const strongest = days.reduce((best, day) => (day.kp_max > best.kp_max ? day : best));
+  const meanFlux = days.reduce((sum, day) => sum + day.f107, 0) / days.length;
+  return { strongest, meanFlux };
+}
+
+// Looks a day ahead, the span a person can plan an evening around.
+export function summarizeClouds(hours) {
+  const next = hours.slice(0, 24);
+  if (!next.length) return null;
+  const clearest = next.reduce((best, hour) => (hour.percent < best.percent ? hour : best));
+  return { now: next[0].percent, clearest };
+}
+
+export function dataAge(fetchedAt, now) {
+  const minutes = Math.max(0, Math.round((now - new Date(fetchedAt).getTime()) / 60000));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} days ago`;
+}
+
 export function zoneLabel(utc) {
   return utc ? 'UTC' : 'local';
 }

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/Mohammed-Ashour/khonsu/internal/elements"
 	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 	"github.com/Mohammed-Ashour/khonsu/internal/output"
+	"github.com/Mohammed-Ashour/khonsu/internal/sources"
 	"github.com/Mohammed-Ashour/khonsu/pkg/locate"
 )
 
@@ -48,6 +50,8 @@ type requestError struct {
 
 func (e requestError) Error() string { return e.err.Error() }
 
+func (e requestError) Unwrap() error { return e.err }
+
 func badRequest(format string, args ...any) error {
 	return requestError{http.StatusBadRequest, fmt.Errorf(format, args...)}
 }
@@ -56,6 +60,7 @@ func writeFailure(w http.ResponseWriter, err error) {
 	status := http.StatusUnprocessableEntity
 	var failure requestError
 	var pathErr *fs.PathError
+	var linkErr *os.LinkError
 	switch {
 	case errors.As(err, &failure):
 		status = failure.status
@@ -63,7 +68,7 @@ func writeFailure(w http.ResponseWriter, err error) {
 		status = http.StatusGatewayTimeout
 	}
 	// Filesystem errors name server paths, which clients have no use for.
-	if errors.As(err, &pathErr) {
+	if errors.As(err, &pathErr) || errors.As(err, &linkErr) {
 		err = errors.New("the satellite cache could not be used")
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -530,9 +535,10 @@ type AppOptions struct {
 }
 
 // newAppHandler combines the JSON API with the web app's static files.
-func newAppHandler(source elementSource, ui fs.FS) http.Handler {
+func newAppHandler(source elementSource, feeds *sources.Hub, ui fs.FS) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", newHandler(source))
+	registerDataRoutes(mux, feeds)
 	mux.Handle("/", http.FileServerFS(ui))
 	return securityHeaders(mux)
 }
@@ -590,8 +596,9 @@ func appURL(addr net.Addr) string {
 // ServeApp runs the web app until ctx is canceled.
 func ServeApp(ctx context.Context, options AppOptions) error {
 	var source elementSource = newMemoSource(ctx, catalog.NewStore(options.CacheDir, options.CacheTTL), options.CacheTTL)
+	feeds := sources.NewHub(options.CacheDir)
 	if options.Records != nil {
-		source = fileSource{options.Records}
+		source, feeds = fileSource{options.Records}, nil
 	}
 	listener, err := net.Listen("tcp", options.Addr)
 	if err != nil {
@@ -600,7 +607,7 @@ func ServeApp(ctx context.Context, options AppOptions) error {
 	if options.OnReady != nil {
 		options.OnReady(appURL(listener.Addr()))
 	}
-	handler := newAppHandler(source, options.UI)
+	handler := newAppHandler(source, feeds, options.UI)
 	if tcp, ok := listener.Addr().(*net.TCPAddr); ok && tcp.IP.IsLoopback() {
 		handler = loopbackHostsOnly(handler)
 	}
