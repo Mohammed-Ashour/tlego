@@ -3,7 +3,7 @@ import json
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 
-import tlego_calendar as calendar
+import khonsu_calendar as calendar
 
 
 def fixture(passes=None):
@@ -28,8 +28,8 @@ class CalendarTests(unittest.TestCase):
         first = calendar.to_ical(plan)
         self.assertEqual(first, calendar.to_ical(calendar.validate(fixture())))
         self.assertIn("DTSTART:20261025T101500Z\r\n", first)
-        self.assertIn("X-TLEGO-RISE:20261025T101500Z\r\n", first)
-        self.assertIn("X-TLEGO-SET:20261025T102500Z\r\n", first)
+        self.assertIn("X-KHONSU-RISE:20261025T101500Z\r\n", first)
+        self.assertIn("X-KHONSU-SET:20261025T102500Z\r\n", first)
         self.assertIn("no optical visibility claim", first.replace("\r\n ", ""))
         self.assertTrue(first.endswith("END:VCALENDAR\r\n"))
 
@@ -39,7 +39,7 @@ class CalendarTests(unittest.TestCase):
         ical = calendar.to_ical(calendar.validate(fixture([item])))
         self.assertIn("DTSTART:20261025T100000Z\r\n", ical)
         self.assertIn("SUMMARY:Satellite 25544 pass (clipped)\r\n", ical)
-        self.assertNotIn("X-TLEGO-RISE:", ical)
+        self.assertNotIn("X-KHONSU-RISE:", ical)
 
     def test_zero_passes_is_empty_calendar(self):
         ical = calendar.to_ical(calendar.validate(fixture([])))

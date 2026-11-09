@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
-	utils "github.com/Mohammed-Ashour/tlego/pkg/utils"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
+	utils "github.com/Mohammed-Ashour/khonsu/pkg/utils"
 )
 
 const sampleTLE = `STARLINK-1039

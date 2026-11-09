@@ -4,7 +4,7 @@
 /.local-artifacts/
 /.opencode/
 /bin/
-/tlego
+/khonsu
 /opencode-panic-*.log
 /*.html
 

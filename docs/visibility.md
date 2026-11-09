@@ -1,10 +1,10 @@
 # Visibility estimates
 
-`tlego tonight` answers whether you could see a satellite with the naked eye during the next dark period.
+`khonsu tonight` answers whether you could see a satellite with the naked eye during the next dark period.
 
 ```bash
-tlego tonight --lat 51.48 --lon 0
-tlego tonight 48274 --min-elevation 20 --max-sun-elevation -12 --format json
+khonsu tonight --lat 51.48 --lon 0
+khonsu tonight 48274 --min-elevation 20 --max-sun-elevation -12 --format json
 ```
 
 Without an ID, it checks the ISS (25544). Without `--lat` and `--lon`, it uses the observer saved in the TUI's Settings. An observer at exactly 0°, 0° counts as unset, because that is the default.

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "TLEGO JSON output v1.0",
+  "title": "Khonsu JSON output v1.0",
   "oneOf": [
     {
       "allOf": [

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 )
 
 const SchemaVersion = "1.0"

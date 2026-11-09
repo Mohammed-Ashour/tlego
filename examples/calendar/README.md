@@ -1,6 +1,6 @@
-# TLEGO pass calendar
+# Khonsu pass calendar
 
-`tlego-calendar` reads a TLEGO pass-plan JSON v1 document on stdin and writes
+`khonsu-calendar` reads a Khonsu pass-plan JSON v1 document on stdin and writes
 an RFC 5545 iCalendar file to stdout. It uses only the Python standard library
 and requires Python 3.10 or newer.
 
@@ -17,14 +17,14 @@ Or install with `pipx install ./examples/calendar` from the repository root.
 Use it directly:
 
 ```sh
-tlego-calendar < passes.json > passes.ics
+khonsu-calendar < passes.json > passes.ics
 ```
 
 For host dispatch, add the virtual environment executable directory to PATH,
-then run `tlego calendar --help` and pipe pass output through the host:
+then run `khonsu calendar --help` and pipe pass output through the host:
 
 ```sh
-tlego passes 25544 --lat 49.6 --lon 6.1 --format json | tlego calendar > passes.ics
+khonsu passes 25544 --lat 49.6 --lon 6.1 --format json | khonsu calendar > passes.ics
 ```
 
 The input schema accepts major version 1 (`1.x`) and `kind: "passes"`.

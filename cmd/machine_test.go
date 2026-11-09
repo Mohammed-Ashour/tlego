@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Mohammed-Ashour/tlego/internal/output"
+	"github.com/Mohammed-Ashour/khonsu/internal/output"
 	"github.com/urfave/cli/v3"
 )
 

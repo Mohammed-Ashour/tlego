@@ -3,14 +3,14 @@ package cmd
 import (
 	"context"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/tui"
+	"github.com/Mohammed-Ashour/khonsu/pkg/tui"
 	"github.com/urfave/cli/v3"
 )
 
 func init() {
 	RootCmd.Commands = append(RootCmd.Commands, &cli.Command{
 		Name:        "tui",
-		Usage:       "tlego tui",
+		Usage:       "khonsu tui",
 		Description: "Launch the terminal UI.",
 		Category:    "UI",
 		Flags: []cli.Flag{

@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 	"reflect"
 	"strings"
 	"testing"

@@ -6,10 +6,10 @@ import sys
 import time
 
 
-binary = sys.argv[1] if len(sys.argv) > 1 else "tlego"
+binary = sys.argv[1] if len(sys.argv) > 1 else "khonsu"
 epoch = "2026-10-24T05:01:11Z"
 print("ORBIT CLASSIFICATION | offline reports at " + epoch, flush=True)
-print("Synthetic mean elements; displayed values come from tlego report.\n", flush=True)
+print("Synthetic mean elements; displayed values come from khonsu report.\n", flush=True)
 print(f"{'Fixture':<27} {'Period/min':>10} {'Inc/deg':>8} {'Ecc':>7} {'Class':>8}", flush=True)
 print("-" * 65, flush=True)
 for name, motion, eccentricity, inclination in [

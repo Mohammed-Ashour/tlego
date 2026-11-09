@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
 )
 
 const (

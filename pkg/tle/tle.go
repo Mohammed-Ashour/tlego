@@ -5,7 +5,7 @@ import (
 	"time"
 
 	upstream "github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	utils "github.com/Mohammed-Ashour/tlego/pkg/utils"
+	utils "github.com/Mohammed-Ashour/khonsu/pkg/utils"
 )
 
 type TLELine1 struct {

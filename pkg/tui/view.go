@@ -3,7 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 	"strings"
 	"time"
 
@@ -18,7 +18,7 @@ func (m Model) View() string {
 	if height <= 0 {
 		height = 24
 	}
-	header := fmt.Sprintf("tlego tui | %s", screenNames[m.active])
+	header := fmt.Sprintf("khonsu tui | %s", screenNames[m.active])
 	if m.currentEntry != nil && m.currentEntry.Meta.Age > 0 {
 		header += " | data age " + FormatAge(m.currentEntry.Meta.Age)
 	}

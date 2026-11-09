@@ -2,7 +2,7 @@ package tui
 
 import (
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 	"time"
 )
 

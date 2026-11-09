@@ -1,4 +1,4 @@
-"""Summarize TLEGO position JSON v1 from stdin."""
+"""Summarize Khonsu position JSON v1 from stdin."""
 
 import argparse
 import json
@@ -40,7 +40,7 @@ def summarize(document):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Summarize TLEGO position JSON v1 from stdin.")
+    parser = argparse.ArgumentParser(description="Summarize Khonsu position JSON v1 from stdin.")
     parser.parse_args(argv)
     try:
         content = sys.stdin.read((32 << 20) + 1)

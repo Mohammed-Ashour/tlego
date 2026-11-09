@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
+	"github.com/Mohammed-Ashour/khonsu/pkg/tui/data"
 )
 
 func TestUncachedSatelliteCannotUseNetworkInDemo(t *testing.T) {

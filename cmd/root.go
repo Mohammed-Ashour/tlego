@@ -33,9 +33,9 @@ type Author struct {
 }
 
 var RootCmd = &cli.Command{
-	Name:        "tlego",
+	Name:        "khonsu",
 	Version:     buildVersion(),
-	Usage:       "Track satellites and predict passes from your terminal",
+	Usage:       "Follow what crosses the sky, in your browser or terminal",
 	Description: "Browse satellites, predict positions and passes, and export orbit views using current CelesTrak GP data.",
 	Authors: []any{
 		Author{

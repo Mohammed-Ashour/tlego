@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   annotatePasses, buildUrlState, canonicalId, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCountdown, formatDay, formatDuration,
-  lookAt, MAX_TRACKED, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, trailRange, validId, windowFrom,
+  lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, trailRange, validId, windowFrom,
 } from './logic.js';
 
 test('compass points cover the circle and wrap', () => {
@@ -172,4 +172,17 @@ test('passes match across a changed clipped start', () => {
   const pass = (start, end) => ({ start: new Date(start).toISOString(), end: new Date(end).toISOString() });
   assert.ok(passesOverlap(pass(100, 500), pass(200, 500)));
   assert.ok(!passesOverlap(pass(100, 200), pass(300, 400)));
+});
+
+test('legacy preferences move to the new keys without replacing newer ones', () => {
+  const memory = (entries) => {
+    const map = new Map(Object.entries(entries));
+    return { map, getItem: (key) => map.get(key) ?? null, setItem: (key, value) => map.set(key, value), removeItem: (key) => map.delete(key) };
+  };
+  const old = memory({ 'tlego.observer': '{"lat":1,"lon":2,"alt":0}', 'tlego.utc': '1' });
+  migrateStorage(old);
+  assert.deepEqual(Object.fromEntries(old.map), { 'khonsu.observer': '{"lat":1,"lon":2,"alt":0}', 'khonsu.utc': '1' });
+  const both = memory({ 'tlego.utc': '1', 'khonsu.utc': '0' });
+  migrateStorage(both);
+  assert.deepEqual(Object.fromEntries(both.map), { 'khonsu.utc': '0' });
 });

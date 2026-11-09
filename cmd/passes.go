@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
-	"github.com/Mohammed-Ashour/tlego/internal/output"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/output"
 	"github.com/urfave/cli/v3"
 )
 
@@ -42,7 +42,7 @@ func planPasses(ctx context.Context, c *cli.Command) error {
 		return commandError(c, err)
 	}
 	result := output.PassPlanV1(record.CatalogID, obs, instant, duration, step, passes)
-	warnings = append(warnings, output.Warning{Code: "sampled_passes", Message: "Pass events are estimates, and a pass shorter than the sampling step can be missed. Use tlego tonight for naked-eye visibility."})
+	warnings = append(warnings, output.Warning{Code: "sampled_passes", Message: "Pass events are estimates, and a pass shorter than the sampling step can be missed. Use khonsu tonight for naked-eye visibility."})
 	if c.String("format") == "json" {
 		return emitResult(c, "passes", result, p, warnings)
 	}

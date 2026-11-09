@@ -1,15 +1,15 @@
-# TLEGO terminal UI
+# Khonsu terminal UI
 
 Status: initial implementation. This document describes the shipped baseline, not the future shared-core or extension API.
 
 ## Entry points
 
 ```bash
-tlego tui
-tlego tui --norad 25544
-tlego tui --group "Space Stations"
-tlego tui --track 25544
-tlego tui --screen Settings
+khonsu tui
+khonsu tui --norad 25544
+khonsu tui --group "Space Stations"
+khonsu tui --track 25544
+khonsu tui --screen Settings
 ```
 
 `--track` opens Track, where Space starts updates. Track takes precedence over NORAD, then group, then screen when multiple startup options are provided. Screen names are case-insensitive.
@@ -47,7 +47,7 @@ Errors, failed-group search coverage and stale-cache warnings remain visible in 
 ## Data and persistence
 
 - The default group catalog is embedded in the binary, so installation does not require source files.
-- TUI caches use the platform user cache directory under tlego. Settings use the platform user configuration directory under tlego/tui.yaml. Absolute XDG_CONFIG_HOME overrides the configuration directory on all platforms.
+- TUI caches use the platform user cache directory under khonsu. Settings use the platform user configuration directory under khonsu/tui.yaml. Absolute XDG_CONFIG_HOME overrides the configuration directory on all platforms.
 - Fetches have a client timeout and a bounded response body. IDs and TLE structure/numeric inputs are checked before use. Validated downloads replace cache files atomically.
 - A refresh failure may use the last validated stale cache with a visible warning. Corrupt caches trigger another fetch. Explicit request cancellation remains an error.
 - Cached group/search records remain selectable offline. Global searches deduplicate catalog IDs and disclose groups that failed or used stale data.
@@ -58,7 +58,7 @@ Errors, failed-group search coverage and stale-cache warnings remain visible in 
 
 Positions are computed using UTC, displayed in degrees and km, and use the propagated velocity vector for km/s speed. Longitude is normalized to [-180,180). This corrects the TUI path only; older CLI calculations have separate tracked issues.
 
-Passes are found at one-minute steps, and their times and maxima are then refined to one second. A pass shorter than a minute can be missed. Start/end-clipped passes are marked. Configure your observer first; the default is 0 latitude, 0 longitude and 0 km altitude. These results do not establish optical visibility, precision antenna control or collision risk. Use `tlego tonight` for a naked-eye estimate.
+Passes are found at one-minute steps, and their times and maxima are then refined to one second. A pass shorter than a minute can be missed. Start/end-clipped passes are marked. Configure your observer first; the default is 0 latitude, 0 longitude and 0 km altitude. These results do not establish optical visibility, precision antenna control or collision risk. Use `khonsu tonight` for a naked-eye estimate.
 
 Orbit classes use the shared [period, shape and altitude criteria](orbit-estimates.md), and apogee/perigee are two-body estimates. Element freshness and scientific calibration remain separate concerns. Live retrieval uses GP JSON and retains catalog IDs up to nine digits. Legacy TLE caches remain usable. The element tab labels GP JSON and shows its original fields.
 
@@ -70,4 +70,4 @@ Deterministic tests cover focused text entry, settings saves, stale-result rejec
 
 ## Follow-up
 
-The review backlog is [GitHub issues 16-29](https://github.com/Mohammed-Ashour/tlego/issues). The [shared core and extension plan](https://github.com/Mohammed-Ashour/tlego/issues/29) follows this baseline. Fixes here cover only the stated TUI behavior; broader issues stay open until their complete acceptance criteria pass.
+The review backlog is [GitHub issues 16-29](https://github.com/Mohammed-Ashour/khonsu/issues). The [shared core and extension plan](https://github.com/Mohammed-Ashour/khonsu/issues/29) follows this baseline. Fixes here cover only the stated TUI behavior; broader issues stay open until their complete acceptance criteria pass.

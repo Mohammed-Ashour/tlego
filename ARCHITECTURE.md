@@ -1,8 +1,8 @@
-# TLEGO architecture
+# Khonsu architecture
 
 ## Purpose
 
-TLEGO retrieves satellite elements, computes positions and pass estimates, and exposes catalog, tracking, report and orbit visualization workflows through CLI, terminal UI and HTTP frontends. Independent executables extend the CLI.
+Khonsu retrieves satellite elements, computes positions and pass estimates, and exposes catalog, tracking, report and orbit visualization workflows through CLI, terminal UI and HTTP frontends. Independent executables extend the CLI.
 
 ## Scope and Assumptions
 
@@ -21,7 +21,7 @@ flowchart TD
     Main[main.go] --> Run[cmd.Run]
     Run --> CLI[Native CLI commands]
     Run --> Extensions[internal/extensions]
-    Extensions --> External[tlego-command executable]
+    Extensions --> External[khonsu-command executable]
     CLI --> TUI[pkg/tui]
     CLI --> HTTP[pkg/server]
     CLI --> WebUI[internal/webui]
@@ -94,7 +94,7 @@ internal/orbit.Propagator.At converts evaluation time to whole-second UTC, retai
 
 internal/output builds legacy reports with explicit generation time and encodes legacy text, JSON and CSV. Versioned JSON uses separate position/report/pass records and provenance. CLI predict/report/passes/tonight support --format json and --schema-version 1.0; stdout receives one complete successful document, while failures use JSON stderr and a nonzero status. The TUI retains legacy json and adds json-v1. Selected records carry their retrieval metadata through group and search caches. Requests inherit the program context and cancel on replacement, navigation or exit. Tracking ticks identify their session. A successful reload of the same tracked satellite resumes with one new-session tick. Pass results retain their element version, observer, window and step; observer or element changes invalidate them. Report replacement uses a checked temporary file and preserves existing permission bits. New reports keep private temporary-file permissions. Existing destination symlinks resolve to their targets before atomic replacement; unresolved links return an error. HTTP retains /api/location and adds /api/v1/position. GP reports preserve the original object in element_data and leave the legacy tle string empty. source_format identifies gp-json; no synthetic TLE is created. Field names and units are documented in docs/schema-v1.json and docs/extensions.md.
 
-For the web app, pkg/server wraps the store in a memo. A loaded group provides its satellites without further provider requests, expired elements are served at once and refreshed in the background, provider requests outlive the browser request that started them, and failures back off. The CLI, TUI and `tlego server` read the store directly.
+For the web app, pkg/server wraps the store in a memo. A loaded group provides its satellites without further provider requests, expired elements are served at once and refreshed in the background, provider requests outlive the browser request that started them, and failures back off. The CLI, TUI and `khonsu server` read the store directly.
 
 The web app requests a 25-hour sampled track for each satellite and interpolates markers between samples. It does not propagate in the browser. Its Sun direction comes from the track response, and Earth rotation from the same UTC-derived GMST as the orbit viewer. Passes, visibility and sky paths come from the same planners as the CLI.
 
@@ -102,12 +102,12 @@ The viz command accepts a live catalog ID or a validated local TLE or GP JSON fi
 
 The experimental public browser client owns one active selection request. New selections abort previous requests and reject their late responses. HTTP failures show a status message and preserve the last complete scene. Group changes clear old satellite choices, and empty choices remain disabled after failure.
 
-Unknown valid top-level commands resolve to tlego-command on PATH. Built-in names and aliases always win; invalid native flags do not trigger dispatch. Extensions inherit arguments, streams, environment and working directory. Discovery lists paths without executing code. plugin init creates standalone projects from internal/extensions/templates with a sample command, tests and installation instructions. docs/writing-extensions.md explains extension development. The Python calendar example consumes pass-plan JSON and emits an iCalendar file as an independent process.
+Unknown valid top-level commands resolve to khonsu-command on PATH. Built-in names and aliases always win; invalid native flags do not trigger dispatch. Extensions inherit arguments, streams, environment and working directory. Discovery lists paths without executing code. plugin init creates standalone projects from internal/extensions/templates with a sample command, tests and installation instructions. docs/writing-extensions.md explains extension development. The Python calendar example consumes pass-plan JSON and emits an iCalendar file as an independent process.
 
 ## Module Ownership Boundaries
 
 - Core packages do not import cmd, pkg/tui or pkg/server. UI request state and rendering remain in the frontend.
-- internal/sgp4 owns numerical SGP4 calculations and direct initialization. TLEGO owns consistent time, units, input validation and output contracts. Changes to the source-carried numerical files require comparison with the pinned upstream revision and reference-vector validation.
+- internal/sgp4 owns numerical SGP4 calculations and direct initialization. Khonsu owns consistent time, units, input validation and output contracts. Changes to the source-carried numerical files require comparison with the pinned upstream revision and reference-vector validation.
 - Settings and recent-history persistence remain TUI concerns. Selection metadata, pass input identity and tracking session identity belong to the TUI. Report generation time is explicit in the reusable builder.
 - Versioned transport records are separate from legacy exported Go/report structures. Schema additions must remain compatible within a major version.
 - Executable extensions add commands only. They do not inject TUI panels, replace providers or register in-process callbacks. They run with the user's permissions and are not sandboxed by the host.

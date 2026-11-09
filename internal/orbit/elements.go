@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
-	"github.com/Mohammed-Ashour/tlego/internal/sgp4"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/sgp4"
 )
 
 // Propagator is an immutable SGP4 model initialized directly from a mean-element record.

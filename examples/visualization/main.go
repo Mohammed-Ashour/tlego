@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
-	"github.com/Mohammed-Ashour/tlego/pkg/visual"
+	"github.com/Mohammed-Ashour/khonsu/pkg/tui/data"
+	"github.com/Mohammed-Ashour/khonsu/pkg/visual"
 )
 
 func main() {

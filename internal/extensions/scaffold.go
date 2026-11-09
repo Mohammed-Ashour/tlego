@@ -24,7 +24,7 @@ func Init(name, language, directory string) (string, error) {
 		return "", fmt.Errorf("unsupported language %q: choose go or python", language)
 	}
 	if directory == "" {
-		directory = "tlego-" + name
+		directory = "khonsu-" + name
 	}
 	target, err := filepath.Abs(directory)
 	if err != nil {
@@ -34,7 +34,7 @@ func Init(name, language, directory string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	data := struct{ Name, Command, Module string }{name, "tlego-" + name, "tlego_" + strings.ReplaceAll(strings.ToLower(name), "-", "_")}
+	data := struct{ Name, Command, Module string }{name, "khonsu-" + name, "khonsu_" + strings.ReplaceAll(strings.ToLower(name), "-", "_")}
 	files := make(map[string][]byte, len(entries))
 	for _, entry := range entries {
 		filename := strings.TrimSuffix(entry.Name(), ".tmpl")

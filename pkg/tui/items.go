@@ -3,7 +3,7 @@ package tui
 import (
 	"fmt"
 
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
 	"github.com/charmbracelet/bubbles/list"
 )
 

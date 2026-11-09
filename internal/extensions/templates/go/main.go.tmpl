@@ -1,4 +1,4 @@
-// {{.Command}} summarizes TLEGO position JSON v1 from stdin.
+// {{.Command}} summarizes Khonsu position JSON v1 from stdin.
 package main
 
 import (
@@ -47,7 +47,7 @@ func summarize(input io.Reader, output io.Writer) error {
 }
 
 func main(){
- flag.Usage=func(){fmt.Fprintln(flag.CommandLine.Output(),"Usage: {{.Command}} < position.json\nSummarize TLEGO position JSON v1 from stdin.")}
+ flag.Usage=func(){fmt.Fprintln(flag.CommandLine.Output(),"Usage: {{.Command}} < position.json\nSummarize Khonsu position JSON v1 from stdin.")}
  flag.Parse()
  if flag.NArg()!=0{fmt.Fprintln(os.Stderr,"{{.Command}}: unexpected arguments");os.Exit(2)}
  if err:=summarize(os.Stdin,os.Stdout);err!=nil{fmt.Fprintln(os.Stderr,"{{.Command}}:",err);os.Exit(1)}

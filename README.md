@@ -1,25 +1,29 @@
-# TLEGO
+<p align="center"><img src="assets/khonsu-mark.svg" width="96" alt="Khonsu logo: a full moon resting in a crescent"></p>
 
-Browse satellites, track them on a live 3D globe, and find out when you can see them. TLEGO is a single Go binary with a web app, a keyboard-driven terminal UI, a scriptable CLI and HTML orbit exports, using CelesTrak data.
+# Khonsu
+
+Follow what crosses the sky. Browse satellites, track them on a live 3D globe, and find out when you can see them. Khonsu is a single Go binary with a web app, a keyboard-driven terminal UI, a scriptable CLI and HTML orbit exports, using CelesTrak data.
+
+Khonsu is named after the ancient Egyptian moon god, whose name is usually read as "traveller". The project was previously called TLEGO; see [Coming from TLEGO](#coming-from-tlego). It is growing into a satellite explorer that teaches you about orbits and data as you use it. The [roadmap](https://github.com/Mohammed-Ashour/khonsu/labels/khonsu-roadmap) tracks that work.
 
 [![A 30-second ISS walkthrough: browse, track, predict and export a report](assets/tui-demo.gif)](assets/tui-demo.mp4)
 
-*An offline ISS walkthrough using a saved 2026-10-24 element set.* [Download the MP4](https://github.com/Mohammed-Ashour/tlego/raw/refs/heads/main/assets/tui-demo.mp4) · [Run or record the demo](docs/demos/README.md)
+*An offline ISS walkthrough using a saved 2026-10-24 element set.* [Download the MP4](https://github.com/Mohammed-Ashour/khonsu/raw/refs/heads/main/assets/tui-demo.mp4) · [Run or record the demo](docs/demos/README.md)
 
 [Get started](#get-started) · [Web app](#web-app) · [See the ISS tonight](#see-the-iss-tonight) · [Try it offline](#try-it-offline) · [Use the TUI](#use-the-tui) · [CLI commands](#cli-commands) · [Development](#development)
 
 ## Get started
 
-Download a binary from [GitHub Releases](https://github.com/Mohammed-Ashour/tlego/releases/latest), or install with Go 1.23.1 or newer:
+Download a binary from [GitHub Releases](https://github.com/Mohammed-Ashour/khonsu/releases/latest), or install with Go 1.23.1 or newer:
 
 ```bash
-go install github.com/Mohammed-Ashour/tlego@latest
+go install github.com/Mohammed-Ashour/khonsu@latest
 ```
 
 Then start the terminal UI:
 
 ```bash
-tlego tui
+khonsu tui
 ```
 
 If your shell cannot find a `go install` binary, add Go's binary installation directory to `PATH`. By default, this is the `bin` directory under `go env GOPATH`, unless you set `GOBIN`.
@@ -27,8 +31,8 @@ If your shell cannot find a `go install` binary, add Go's binary installation di
 Open the ISS directly or choose a satellite group:
 
 ```bash
-tlego tui --norad 25544
-tlego tui --group "Space Stations"
+khonsu tui --norad 25544
+khonsu tui --group "Space Stations"
 ```
 
 These commands fetch live data when a usable cache is unavailable. To see the interface without provider access, use the offline example below.
@@ -36,10 +40,10 @@ These commands fetch live data when a usable cache is unavailable. To see the in
 ## Web app
 
 ```bash
-tlego web
+khonsu web
 ```
 
-![The web app showing the ISS on a sunlit globe, with a pass on a sky plot](assets/web-app.png)
+![The web app showing the ISS over a sunlit globe, with its upcoming passes](assets/web-app.png)
 
 This starts a local server and opens your browser. Everything is in the binary, so it needs no Node and loads nothing from other sites.
 
@@ -51,14 +55,14 @@ This starts a local server and opens your browser. Everything is in the binary, 
 | Look ahead | Scrub or play through the next day, then press Live to return |
 | Share a view | Send the URL, which holds the satellites but never your location |
 
-Use `tlego web --no-open --addr 127.0.0.1:9000` to choose the address yourself. To try it without provider access, run `go run . web --file examples/tui-demo/iss.tle` from a checkout.
+Use `khonsu web --no-open --addr 127.0.0.1:9000` to choose the address yourself. To try it without provider access, run `go run . web --file examples/tui-demo/iss.tle` from a checkout.
 
 The first load of a group waits for CelesTrak. After that, its satellites appear at once. The [web app guide](docs/web-app.md) covers the options, privacy, limits and the JSON API.
 
 ## See the ISS tonight
 
 ```bash
-tlego tonight --lat 51.48 --lon 0
+khonsu tonight --lat 51.48 --lon 0
 ```
 
 With the saved ISS snapshot, adding `--file examples/tui-demo/iss.tle --time 2026-10-24T12:00:00Z --utc` from a checkout prints:
@@ -78,14 +82,14 @@ Pass another catalog ID to check a different satellite. If you have saved an obs
 ## Try it offline
 
 ```bash
-git clone https://github.com/Mohammed-Ashour/tlego.git
-cd tlego
+git clone https://github.com/Mohammed-Ashour/khonsu.git
+cd khonsu
 go run ./examples/tui-demo
 ```
 
 This runs the same TUI shown in the animation. It uses an embedded ISS snapshot, a Greenwich observer, and temporary cache/settings directories. Network requests are blocked. Your regular configuration stays untouched.
 
-The snapshot is archived; displayed positions use your machine's current clock. Use it to explore the interface, then run `tlego tui` for current data. The first `go run` may download Go dependencies even though the example itself makes no provider requests.
+The snapshot is archived; displayed positions use your machine's current clock. Use it to explore the interface, then run `khonsu tui` for current data. The first `go run` may download Go dependencies even though the example itself makes no provider requests.
 
 <a id="terminal-ui"></a>
 
@@ -123,25 +127,25 @@ flowchart TD
 
 On Reports, f changes format, r generates, Tab edits the save path, and s saves after you leave the field. In Settings, Ctrl+S saves. Observer altitude is in km.
 
-`tlego tui --track 25544` opens Track; Space starts updates. `tlego tui --screen Settings` opens observer settings directly. The default observer is 0° latitude, 0° longitude, so configure a location before using passes.
+`khonsu tui --track 25544` opens Track; Space starts updates. `khonsu tui --screen Settings` opens observer settings directly. The default observer is 0° latitude, 0° longitude, so configure a location before using passes.
 
 ### Cache and settings
 
-CLI, TUI and HTTP retrieval share validated elements in the platform user cache directory under `tlego`. If a refresh fails, it can use a valid stale cache and displays a warning. r reloads through the cache and respects its TTL; it does not force a provider download.
+CLI, TUI and HTTP retrieval share validated elements in the platform user cache directory under `khonsu`. If a refresh fails, it can use a valid stale cache and displays a warning. r reloads through the cache and respects its TTL; it does not force a provider download.
 
-Settings and recent satellites live in the platform user configuration directory under `tlego/tui.yaml`. An absolute `XDG_CONFIG_HOME` overrides the settings directory. [TUI implementation notes](docs/tui-spec.md) cover paths, startup options and behavior in detail.
+Settings and recent satellites live in the platform user configuration directory under `khonsu/tui.yaml`. An absolute `XDG_CONFIG_HOME` overrides the settings directory. [TUI implementation notes](docs/tui-spec.md) cover paths, startup options and behavior in detail.
 
 ## Satellite element formats
 
 Live commands request CelesTrak GP JSON and retain catalog IDs up to nine digits. Local files accept legacy TLE or GP JSON, including a single OMM object or a one-object array:
 
 ```bash
-tlego predict --file satellite.json --time 2026-10-24T05:01:11Z --format json
-tlego report --file satellite.json --format json
-tlego list --sat-group "Space Stations" > stations.json
+khonsu predict --file satellite.json --time 2026-10-24T05:01:11Z --format json
+khonsu report --file satellite.json --format json
+khonsu list --sat-group "Space Stations" > stations.json
 ```
 
-Existing TLE files and caches still work. `tlego tle` exports original legacy TLE text and cannot represent larger IDs. [Supported fields, compatibility and numerical checks](docs/gp-elements.md) explain the GP JSON contract.
+Existing TLE files and caches still work. `khonsu tle` exports original legacy TLE text and cannot represent larger IDs. [Supported fields, compatibility and numerical checks](docs/gp-elements.md) explain the GP JSON contract.
 
 ## CLI commands
 
@@ -149,18 +153,18 @@ CLI, TUI, HTTP and orbit exports use the same orbital core, with UTC calculation
 
 | Command | What it does |
 |---|---|
-| `tlego tle 25544` | Fetch the ISS element set |
-| `tlego list --sat-group "Space Stations"` | Fetch a configured group's elements, ignoring case |
-| `tlego search starlink` | Search names and IDs with partial-coverage warnings |
-| `tlego predict --time 2026-10-24T05:01:11Z 25544` | Predict a position |
-| `tlego report 25544 --format json` | Generate a versioned JSON report |
-| `tlego tonight --lat 51.48 --lon 0` | List naked-eye ISS passes in the next dark period |
-| `tlego passes --lat 51.48 --lon 0 25544 --format json` | Estimate passes for an observer |
-| `tlego plugin list` | Inspect executable extensions on PATH |
-| `tlego viz 25544` | Write a self-contained orbit viewer to `25544.html` |
-| `tlego web` | Open the web app in your browser |
-| `tlego server` | Start the JSON API and the older experimental UI from a checkout |
-| `tlego --help` | List all commands; add `--help` to a command for its options |
+| `khonsu tle 25544` | Fetch the ISS element set |
+| `khonsu list --sat-group "Space Stations"` | Fetch a configured group's elements, ignoring case |
+| `khonsu search starlink` | Search names and IDs with partial-coverage warnings |
+| `khonsu predict --time 2026-10-24T05:01:11Z 25544` | Predict a position |
+| `khonsu report 25544 --format json` | Generate a versioned JSON report |
+| `khonsu tonight --lat 51.48 --lon 0` | List naked-eye ISS passes in the next dark period |
+| `khonsu passes --lat 51.48 --lon 0 25544 --format json` | Estimate passes for an observer |
+| `khonsu plugin list` | Inspect executable extensions on PATH |
+| `khonsu viz 25544` | Write a self-contained orbit viewer to `25544.html` |
+| `khonsu web` | Open the web app in your browser |
+| `khonsu server` | Start the JSON API and the older experimental UI from a checkout |
+| `khonsu --help` | List all commands; add `--help` to a command for its options |
 
 All frontends use the shared catalog and cache, with validated atomic replacement and stale fallback. CLI retrieval supports `--cache-dir` and `--cache-ttl`. Position, report and pass commands accept `--file path.tle` or `--file -` for offline input. The experimental server binds `127.0.0.1:8080` by default; `--addr` changes the address, and `--static-dir` selects the checkout UI directory.
 
@@ -168,12 +172,12 @@ All frontends use the shared catalog and cache, with validated atomic replacemen
 
 [![Interactive ISS orbit viewer with UTC playback, camera controls and satellite details](assets/orbit-demo.gif)](assets/orbit-demo.mp4)
 
-[Download the orbit walkthrough MP4](https://github.com/Mohammed-Ashour/tlego/raw/refs/heads/main/assets/orbit-demo.mp4). [Static preview](assets/orbit-demo.jpg). This recording uses the saved ISS snapshot at its 2026-10-24 epoch.
+[Download the orbit walkthrough MP4](https://github.com/Mohammed-Ashour/khonsu/raw/refs/heads/main/assets/orbit-demo.mp4). [Static preview](assets/orbit-demo.jpg). This recording uses the saved ISS snapshot at its 2026-10-24 epoch.
 
 Fetch the ISS and export its orbit:
 
 ```bash
-tlego viz 25544 --output iss-orbit.html
+khonsu viz 25544 --output iss-orbit.html
 ```
 
 From a checkout, generate the same view as the video without a provider request:
@@ -190,34 +194,41 @@ The globe and trajectories use the same physical scale. Lighting is illustrative
 
 ## Current limits and next steps
 
-- CelesTrak stopped issuing 5-digit catalog numbers in July 2026, and newer objects have no TLE data. Live commands already use GP JSON and work with these IDs; only `tlego tle` is limited to legacy TLE text.
-- Passes are found at one-minute steps and refined to one second, so a shorter pass can be missed. Clipped forecast boundaries are marked. `tlego tonight` estimates naked-eye visibility without brightness or weather. Precision antenna control is not calculated.
+- CelesTrak stopped issuing 5-digit catalog numbers in July 2026, and newer objects have no TLE data. Live commands already use GP JSON and work with these IDs; only `khonsu tle` is limited to legacy TLE text.
+- Passes are found at one-minute steps and refined to one second, so a shorter pass can be missed. Clipped forecast boundaries are marked. `khonsu tonight` estimates naked-eye visibility without brightness or weather. Precision antenna control is not calculated.
 - Orbit classes use declared period, shape and altitude criteria; apogee and perigee are two-body estimates. [Criteria, reference checks and limits](docs/orbit-estimates.md) explain their meaning.
 - TUI `json` reports retain their legacy format. Select `json-v1` for the versioned report contract. [Core and extension documentation](docs/extensions.md) describes the JSON schema, compatibility and executable extensions.
 
 ## Extensions
 
-Create a standalone project with `tlego plugin init summary` or `tlego plugin init summary --language python`. The [extension authoring guide](docs/writing-extensions.md) covers the generated code, tests and PATH installation.
+Create a standalone project with `khonsu plugin init summary` or `khonsu plugin init summary --language python`. The [extension authoring guide](docs/writing-extensions.md) covers the generated code, tests and PATH installation.
 
-An executable named `tlego-calendar` on PATH runs as `tlego calendar`. Native commands take precedence, and arguments and streams pass directly to the extension.
+An executable named `khonsu-calendar` on PATH runs as `khonsu calendar`. Native commands take precedence, and arguments and streams pass directly to the extension.
 
 The [Python calendar example](examples/calendar/README.md) turns pass-plan JSON into an iCalendar file:
 
 ```bash
-tlego passes --file examples/tui-demo/iss.tle --time 2026-10-24T05:01:11Z \
-  --lat 51.48 --lon 0 --format json | tlego calendar > passes.ics
+khonsu passes --file examples/tui-demo/iss.tle --time 2026-10-24T05:01:11Z \
+  --lat 51.48 --lon 0 --format json | khonsu calendar > passes.ics
 ```
 
 Install the example first using its README. [Extension authoring and output schema](docs/extensions.md) covers discovery, failure codes and versioning.
 
-[Browse the backlog](https://github.com/Mohammed-Ashour/tlego/issues) for the current priorities and acceptance criteria.
+[Browse the backlog](https://github.com/Mohammed-Ashour/khonsu/issues) for the current priorities and acceptance criteria.
+
+## Coming from TLEGO
+
+- Install from `github.com/Mohammed-Ashour/khonsu`. The command is now `khonsu`, and release archives are named `khonsu_*`.
+- TUI settings and the web app's saved location and time zone choice carry over automatically. The catalog cache starts empty and refills on demand.
+- Rename extension executables from `tlego-<name>` to `khonsu-<name>`. They now receive `KHONSU_HOST_VERSION` and `KHONSU_EXTENSION_VERSION`.
+- JSON output is still schema 1.0, with the same fields.
 
 ## Development
 
 From a checkout:
 
 ```bash
-go build -o bin/tlego .
+go build -o bin/khonsu .
 go test ./...
 go vet ./...
 ```
@@ -230,4 +241,4 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) for the current package boundaries, [the
 
 Satellite elements come from [CelesTrak](https://celestrak.org/). Propagation uses [go-satellite-v2](https://github.com/Mohammed-Ashour/go-satellite-v2); the TUI uses [Bubble Tea](https://github.com/charmbracelet/bubbletea), commands use [urfave/cli](https://github.com/urfave/cli), and the web app and orbit viewer use [Three.js](https://threejs.org/) and [Natural Earth](https://www.naturalearthdata.com/) outlines.
 
-TLEGO is available under the [MIT license](LICENSE.md).
+Khonsu is available under the [MIT license](LICENSE.md).

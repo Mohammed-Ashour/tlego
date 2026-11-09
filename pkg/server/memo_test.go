@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
 )
 
 // fakeLive counts provider requests. Saved data models what is on disk.

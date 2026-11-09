@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/tui"
-	"github.com/Mohammed-Ashour/tlego/pkg/tui/data"
+	"github.com/Mohammed-Ashour/khonsu/pkg/tui"
+	"github.com/Mohammed-Ashour/khonsu/pkg/tui/data"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -30,7 +30,7 @@ func main() {
 type offlineTransport struct{}
 
 func (offlineTransport) RoundTrip(*http.Request) (*http.Response, error) {
-	return nil, fmt.Errorf("offline demo: this object or group is not included; use tlego tui for live data")
+	return nil, fmt.Errorf("offline demo: this object or group is not included; use khonsu tui for live data")
 }
 
 func run() error {
@@ -38,7 +38,7 @@ func run() error {
 	http.DefaultTransport = offlineTransport{}
 	defer func() { http.DefaultTransport = previousTransport }()
 
-	dir, err := os.MkdirTemp("", "tlego-demo-")
+	dir, err := os.MkdirTemp("", "khonsu-demo-")
 	if err != nil {
 		return err
 	}

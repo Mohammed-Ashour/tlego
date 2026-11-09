@@ -14,7 +14,7 @@ Use `vMAJOR.MINOR.PATCH`, or `v1.2.3-rc.1` for a prerelease. Go ignores other fo
 
 Set a repository secret named `TAP_GITHUB_TOKEN` to a fine-grained token with Contents read and write access to `Mohammed-Ashour/homebrew-tap` and `Mohammed-Ashour/scoop-bucket`. The workflow then updates both on each stable release. Prereleases leave them unchanged.
 
-Without the secret the release still succeeds. The manifests stay in the workflow's `package-manifests` artifact and can be committed by hand: `Casks/tlego.rb` in the tap and `tlego.json` in the bucket.
+Without the secret the release still succeeds. The manifests stay in the workflow's `package-manifests` artifact and can be committed by hand: `Casks/khonsu.rb` in the tap and `khonsu.json` in the bucket.
 
 The cask's install step needs a recent Homebrew. Anyone who sees an unknown `postflight_steps` error should run `brew update`.
 

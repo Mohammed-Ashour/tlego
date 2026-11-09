@@ -8,11 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 	"gopkg.in/yaml.v3"
 )
 
 const earthRadiusKm = 6378.137
+
+// legacyConfigDir holds settings saved before the project was renamed from TLEGO.
+const legacyConfigDir = "tlego"
 
 type Observer = orbit.Observer
 
@@ -60,6 +63,10 @@ func LoadSettings() (Settings, error) {
 		return DefaultSettings(), err
 	}
 	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		// The next save writes to the Khonsu path, leaving the old file alone.
+		data, err = os.ReadFile(filepath.Join(filepath.Dir(filepath.Dir(path)), legacyConfigDir, filepath.Base(path)))
+	}
 	if err != nil {
 		if os.IsNotExist(err) {
 			return DefaultSettings(), nil
@@ -143,7 +150,7 @@ func (s Settings) Validate() error {
 
 func settingsPath() (string, error) {
 	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" && filepath.IsAbs(dir) {
-		return filepath.Join(dir, "tlego", "tui.yaml"), nil
+		return filepath.Join(dir, "khonsu", "tui.yaml"), nil
 	}
 	dir, err := os.UserConfigDir()
 	if err != nil {
@@ -153,5 +160,5 @@ func settingsPath() (string, error) {
 		}
 		dir = filepath.Join(home, ".config")
 	}
-	return filepath.Join(dir, "tlego", "tui.yaml"), nil
+	return filepath.Join(dir, "khonsu", "tui.yaml"), nil
 }

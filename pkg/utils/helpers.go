@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
+	"github.com/Mohammed-Ashour/khonsu/pkg/logger"
 )
 
 // Helper function to parse scientific notation in TLE format

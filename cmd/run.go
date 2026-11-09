@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/extensions"
-	"github.com/Mohammed-Ashour/tlego/internal/output"
+	"github.com/Mohammed-Ashour/khonsu/internal/extensions"
+	"github.com/Mohammed-Ashour/khonsu/internal/output"
 	"github.com/urfave/cli/v3"
 )
 
@@ -179,7 +179,7 @@ func runExtension(ctx context.Context, args []string, name string) error {
 		return fmt.Errorf("invalid extension invocation")
 	}
 	// With terminal input the child stays in the foreground process group, so
-	// Ctrl+C reaches both processes. Absorb it in tlego, allow the child to handle
+	// Ctrl+C reaches both processes. Absorb it in khonsu, allow the child to handle
 	// it and reap normally, then force-cancel only if the child stays alive.
 	if extensions.InteractiveInput(os.Stdin) {
 		var stop context.CancelFunc

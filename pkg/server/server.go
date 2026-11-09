@@ -13,11 +13,11 @@ import (
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
-	"github.com/Mohammed-Ashour/tlego/internal/output"
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/output"
+	"github.com/Mohammed-Ashour/khonsu/pkg/logger"
 )
 
 type Satellite struct {
@@ -73,7 +73,7 @@ func (a api) listSatellites(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if meta.Stale {
-		w.Header().Set("Warning", `110 tlego "Response is stale"`)
+		w.Header().Set("Warning", `110 khonsu "Response is stale"`)
 	}
 	satellites := make([]Satellite, 0, len(records))
 	for _, record := range records {
@@ -108,7 +108,7 @@ func (a api) location(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if meta.Stale {
-		w.Header().Set("Warning", `110 tlego "Response is stale"`)
+		w.Header().Set("Warning", `110 khonsu "Response is stale"`)
 	}
 	writeJSON(w, elementLocation(record, state))
 }

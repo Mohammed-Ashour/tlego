@@ -1,11 +1,11 @@
 # GP JSON elements
 
-TLEGO requests `FORMAT=JSON` for live CLI, TUI, HTTP and orbit-export workflows. Catalog IDs stay decimal strings throughout parsing, propagation and output, with one to nine digits. Local input detects legacy TLE or GP JSON without relying on the filename.
+Khonsu requests `FORMAT=JSON` for live CLI, TUI, HTTP and orbit-export workflows. Catalog IDs stay decimal strings throughout parsing, propagation and output, with one to nine digits. Local input detects legacy TLE or GP JSON without relying on the filename.
 
 ```bash
-tlego predict --file satellite.json --time 2026-10-24T05:01:11Z --format json
-tlego report --file satellite.json --format json
-cat satellite.json | tlego passes --file - --time 2026-10-24T00:00:00Z --lat 51.48 --lon 0 --duration 24h --format json
+khonsu predict --file satellite.json --time 2026-10-24T05:01:11Z --format json
+khonsu report --file satellite.json --format json
+cat satellite.json | khonsu passes --file - --time 2026-10-24T00:00:00Z --lat 51.48 --lon 0 --duration 24h --format json
 ```
 
 ## Supported input
@@ -26,7 +26,7 @@ The legacy HTTP location endpoint retains its existing fields and adds `source_f
 
 JSON caches live under `elements/norad/*.json` and `elements/groups/*.json` inside the configured cache directory. Old `norad/*.tle` and `groups/*.tle` files remain usable while fresh, or as stale fallback if a refresh fails. Existing valid JSON takes priority. Malformed or mismatched downloads never replace a usable cache. Freshness uses retrieval time, independently of element epoch.
 
-`tlego tle` and exported legacy Go helpers retain the TLE workflow. The command cannot export GP-only records or IDs beyond the TLE limit. Use predict, report, passes or viz for those records.
+`khonsu tle` and exported legacy Go helpers retain the TLE workflow. The command cannot export GP-only records or IDs beyond the TLE limit. Use predict, report, passes or viz for those records.
 
 ## Propagation and checks
 

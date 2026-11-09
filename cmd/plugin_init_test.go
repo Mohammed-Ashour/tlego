@@ -19,7 +19,7 @@ func TestPluginInitCreatesProjectAndRejectsNativeNames(t *testing.T) {
 	if !bytes.Contains(out.Bytes(), []byte(target)) {
 		t.Fatalf("missing created path: %s", out.String())
 	}
-	if _, err := os.Stat(filepath.Join(target, "tlego_summary.py")); err != nil {
+	if _, err := os.Stat(filepath.Join(target, "khonsu_summary.py")); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"predict", "plugin", "serve", "help", "version"} {

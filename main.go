@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Mohammed-Ashour/tlego/cmd"
+	"github.com/Mohammed-Ashour/khonsu/cmd"
 )
 
 func main() {

@@ -51,9 +51,9 @@ jobs:
         run: |
           brew tap-new --no-git local/check
           mkdir -p "$(brew --repository)/Library/Taps/local/homebrew-check/Casks"
-          cp dist/homebrew/Casks/tlego.rb "$(brew --repository)/Library/Taps/local/homebrew-check/Casks/tlego.rb"
+          cp dist/homebrew/Casks/khonsu.rb "$(brew --repository)/Library/Taps/local/homebrew-check/Casks/khonsu.rb"
           brew trust local/check || true
-          brew info --cask local/check/tlego
+          brew info --cask local/check/khonsu
 
   viewer:
     runs-on: ubuntu-latest
@@ -108,15 +108,15 @@ jobs:
       - name: Build host and convert an offline pass plan
         shell: bash
         run: |
-          go build -o /tmp/tlego .
-          /tmp/tlego passes --file examples/tui-demo/iss.tle --time 2026-10-24T05:01:11Z --lat 51.48 --lon 0 --format json | /tmp/tlego calendar > /tmp/passes.ics
+          go build -o /tmp/khonsu .
+          /tmp/khonsu passes --file examples/tui-demo/iss.tle --time 2026-10-24T05:01:11Z --lat 51.48 --lon 0 --format json | /tmp/khonsu calendar > /tmp/passes.ics
           python -c 'from pathlib import Path; data=Path("/tmp/passes.ics").read_bytes(); assert data.startswith(b"BEGIN:VCALENDAR\r\n"); assert b"BEGIN:VEVENT" in data; assert data.endswith(b"END:VCALENDAR\r\n")'
       - name: Test generated Python starter
         run: |
-          /tmp/tlego plugin init summary --language python --dir /tmp/tlego-summary
-          python -m unittest discover -s /tmp/tlego-summary -v
-          python -m pip install /tmp/tlego-summary
-          /tmp/tlego summary < docs/fixtures/position-v1.json
+          /tmp/khonsu plugin init summary --language python --dir /tmp/khonsu-summary
+          python -m unittest discover -s /tmp/khonsu-summary -v
+          python -m pip install /tmp/khonsu-summary
+          /tmp/khonsu summary < docs/fixtures/position-v1.json
       - name: Validate transport fixtures
         run: |
           python - <<'PYTHON'

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 )
 
 func buildTrail(sat *orbit.Propagator, now time.Time, duration, step time.Duration) []Position {

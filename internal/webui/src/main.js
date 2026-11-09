@@ -2,7 +2,7 @@ import { createApi, isAbort } from './api.js';
 import { createGlobe } from './globe.js';
 import {
   annotatePasses, buildUrlState, canonicalId, clamp, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
-  lookAt, MAX_TRACKED, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
+  lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
 } from './logic.js';
 import { sampleAt } from '../../../pkg/templates/viewer-state.js';
 import { renderSky } from './sky.js';
@@ -17,12 +17,13 @@ const GROUP_HEAD_START_MS = 1500;
 const byId = (id) => document.getElementById(id);
 const api = createApi();
 const storage = safeStorage(() => window.localStorage);
+migrateStorage(storage);
 
 const state = {
   tracked: new Map(),
   selected: null,
   observer: readStoredObserver(storage),
-  utc: storage.getItem('tlego.utc') === '1',
+  utc: storage.getItem('khonsu.utc') === '1',
   window: windowFrom(Date.now()),
   time: Date.now(),
   live: true,
@@ -500,7 +501,7 @@ function renderActivePass() {
     return box;
   }
   const plot = element('div');
-  renderSky(plot, points, selectedEntry()?.color ?? '#b7e4d0', pass.visible);
+  renderSky(plot, points, selectedEntry()?.color ?? '#ebd193', pass.visible);
   const actions = element('div', 'sky-actions');
   const jump = element('button', 'text-button', 'Show on globe');
   jump.type = 'button';
@@ -630,7 +631,7 @@ function renderOrbit() {
   note.textContent = 'Apogee and perigee are two-body estimates.';
   const download = element('a', '', 'Download JSON report');
   download.href = `/api/v1/report?norad_id=${encodeURIComponent(state.selected)}`;
-  download.download = `tlego-${state.selected}.json`;
+  download.download = `khonsu-${state.selected}.json`;
   links.append(download);
   if (data.map_url) {
     const map = element('a', '', 'Current position on a map');
@@ -646,7 +647,7 @@ function renderInspector() {
   byId('selected-name').textContent = entry?.name ?? 'No satellite';
   byId('selected-id').textContent = entry ? `NORAD ${entry.id}` : '';
   byId('selected-swatch').style.setProperty('--color', entry?.color ?? 'transparent');
-  document.title = entry ? `${entry.name} · TLEGO` : 'TLEGO';
+  document.title = entry ? `${entry.name} · Khonsu` : 'Khonsu';
   renderNow();
   renderPasses();
   renderOrbit();
@@ -829,8 +830,8 @@ function frame(timestamp, previous) {
 
 function saveObserver(observer) {
   state.observer = observer;
-  if (observer) storage.setItem('tlego.observer', JSON.stringify(observer));
-  else storage.removeItem('tlego.observer');
+  if (observer) storage.setItem('khonsu.observer', JSON.stringify(observer));
+  else storage.removeItem('khonsu.observer');
   globe?.setObserver(observer);
   // Directions in the current tracks belong to the old location.
   for (const entry of state.tracked.values()) entry.lookStale = true;
@@ -965,7 +966,7 @@ function wireControls() {
   renderZone();
   zone.addEventListener('click', () => {
     state.utc = !state.utc;
-    storage.setItem('tlego.utc', state.utc ? '1' : '0');
+    storage.setItem('khonsu.utc', state.utc ? '1' : '0');
     renderZone();
     renderSliderLabels();
     renderTimeline();

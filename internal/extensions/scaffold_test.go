@@ -31,7 +31,7 @@ func TestInitGoStarterBuildsAndConsumesPosition(t *testing.T) {
 	if result, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("generated install: %v\n%s", err, result)
 	}
-	binary := filepath.Join(binDir, "tlego-my-summary")
+	binary := filepath.Join(binDir, "khonsu-my-summary")
 	if runtime.GOOS == "windows" {
 		binary += ".exe"
 	}
@@ -58,7 +58,7 @@ func TestInitRefusesExistingTargetsAndInvalidOptions(t *testing.T) {
 	}
 	for _, tc := range []struct{ name, language, path string }{
 		{"valid", "go", existing}, {"../escape", "go", filepath.Join(root, "bad-name")},
-		{"valid", "ruby", filepath.Join(root, "bad-language")}, {"tlego/unsafe", "python", filepath.Join(root, "bad-python")},
+		{"valid", "ruby", filepath.Join(root, "bad-language")}, {"khonsu/unsafe", "python", filepath.Join(root, "bad-python")},
 	} {
 		if _, err := Init(tc.name, tc.language, tc.path); err == nil {
 			t.Fatalf("Init(%q,%q,%q) should fail", tc.name, tc.language, tc.path)
@@ -83,10 +83,10 @@ func TestInitPythonUsesConsoleScriptAndNormalizedModule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(bytes), `tlego-My-Summary = "tlego_my_summary:main"`) {
+	if !strings.Contains(string(bytes), `khonsu-My-Summary = "khonsu_my_summary:main"`) {
 		t.Fatalf("incorrect console script: %s", bytes)
 	}
-	if _, err := os.Stat(filepath.Join(target, "tlego_my_summary.py")); err != nil {
+	if _, err := os.Stat(filepath.Join(target, "khonsu_my_summary.py")); err != nil {
 		t.Fatal(err)
 	}
 	// Python remains optional for Go consumers; the packaged smoke test exercises it.

@@ -1,4 +1,4 @@
-module github.com/Mohammed-Ashour/tlego
+module github.com/Mohammed-Ashour/khonsu
 
 go 1.22
 

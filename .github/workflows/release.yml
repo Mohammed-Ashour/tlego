@@ -23,16 +23,16 @@ jobs:
         run: go test ./...
       - name: Smoke test before publishing
         run: |
-          go build -o /tmp/tlego -ldflags "-X github.com/Mohammed-Ashour/tlego/cmd.Version=${GITHUB_REF_NAME}" .
-          /tmp/tlego --version | grep -F "${GITHUB_REF_NAME}"
-          /tmp/tlego predict --file examples/tui-demo/iss.tle --time 2026-10-24T05:01:11Z --format json > /dev/null
+          go build -o /tmp/khonsu -ldflags "-X github.com/Mohammed-Ashour/khonsu/cmd.Version=${GITHUB_REF_NAME}" .
+          /tmp/khonsu --version | grep -F "${GITHUB_REF_NAME}"
+          /tmp/khonsu predict --file examples/tui-demo/iss.tle --time 2026-10-24T05:01:11Z --format json > /dev/null
           # The web app must be served from the binary, away from the checkout.
-          (cd /tmp && /tmp/tlego web --no-open --addr 127.0.0.1:18080 --file "$GITHUB_WORKSPACE/examples/tui-demo/iss.tle" & echo $! > /tmp/tlego.pid)
+          (cd /tmp && /tmp/khonsu web --no-open --addr 127.0.0.1:18080 --file "$GITHUB_WORKSPACE/examples/tui-demo/iss.tle" & echo $! > /tmp/khonsu.pid)
           sleep 2
           curl -fsS http://127.0.0.1:18080/ | grep -q app.js
           curl -fsS -o /dev/null http://127.0.0.1:18080/app.js
           curl -fsS -o /dev/null "http://127.0.0.1:18080/api/v1/position?norad_id=25544&time=2026-10-24T05:01:11Z"
-          kill "$(cat /tmp/tlego.pid)"
+          kill "$(cat /tmp/khonsu.pid)"
       - uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser

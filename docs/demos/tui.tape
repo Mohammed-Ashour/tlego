@@ -13,7 +13,7 @@ Set TypingSpeed 55ms
 
 # Build first so the recording starts with the actual example, not compiler work.
 Hide
-Type "mkdir -p .local-artifacts && go build -o .local-artifacts/tlego-demo ./examples/tui-demo"
+Type "mkdir -p .local-artifacts && go build -o .local-artifacts/khonsu-demo ./examples/tui-demo"
 Enter
 Sleep 2s
 Type "clear"
