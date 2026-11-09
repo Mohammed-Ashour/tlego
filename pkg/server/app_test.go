@@ -22,7 +22,7 @@ func appHandler(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 	ui := fstest.MapFS{"index.html": {Data: []byte("<html>app</html>")}}
-	return newAppHandler(fileSource{records}, ui)
+	return newAppHandler(fileSource{records}, nil, ui)
 }
 
 func request(t *testing.T, handler http.Handler, path string) (int, map[string]any) {
@@ -287,5 +287,26 @@ func TestDeadlineMapsToGatewayTimeout(t *testing.T) {
 	writeFailure(recorder, context.DeadlineExceeded)
 	if recorder.Code != http.StatusGatewayTimeout {
 		t.Fatalf("status = %d", recorder.Code)
+	}
+}
+
+func TestDataRoutesListSourcesButStayOfflineForLocalFiles(t *testing.T) {
+	handler := appHandler(t)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/sources", nil))
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"live_data":false`) || !strings.Contains(recorder.Body.String(), `"space-weather"`) {
+		t.Fatalf("sources: %d %s", recorder.Code, recorder.Body)
+	}
+	for _, path := range []string{"/api/v1/space-weather", "/api/v1/launches", "/api/v1/satellite-details?norad_id=25544", "/api/v1/transmitters?norad_id=25544"} {
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusServiceUnavailable {
+			t.Errorf("%s: status %d, want 503", path, recorder.Code)
+		}
+	}
+	recorder = httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/api/v1/transmitters?norad_id=abc", nil))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("invalid ID: status %d", recorder.Code)
 	}
 }

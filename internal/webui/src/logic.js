@@ -200,6 +200,28 @@ export function formatDay(time, utc) {
   return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: utc ? 'UTC' : undefined }).format(time);
 }
 
+// NOAA's G1 storm scale starts at Kp 5, and Kp 4 is its "active" level.
+export function describeKp(kp) {
+  if (kp >= 5) return 'Geomagnetic storm';
+  if (kp >= 4) return 'Active';
+  return 'Quiet';
+}
+
+export function formatFrequency(hz) {
+  if (!Number.isFinite(hz) || hz <= 0) return null;
+  if (hz >= 1e9) return `${(hz / 1e9).toFixed(3)} GHz`;
+  return `${(hz / 1e6).toFixed(3)} MHz`;
+}
+
+export function dataAge(fetchedAt, now) {
+  const minutes = Math.max(0, Math.round((now - new Date(fetchedAt).getTime()) / 60000));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} days ago`;
+}
+
 export function zoneLabel(utc) {
   return utc ? 'UTC' : 'local';
 }

@@ -239,6 +239,6 @@ Read [ARCHITECTURE.md](ARCHITECTURE.md) for the current package boundaries, [the
 
 ## Data, dependencies and license
 
-Satellite elements come from [CelesTrak](https://celestrak.org/). Propagation uses [go-satellite-v2](https://github.com/Mohammed-Ashour/go-satellite-v2); the TUI uses [Bubble Tea](https://github.com/charmbracelet/bubbletea), commands use [urfave/cli](https://github.com/urfave/cli), and the web app and orbit viewer use [Three.js](https://threejs.org/) and [Natural Earth](https://www.naturalearthdata.com/) outlines.
+Satellite elements come from [CelesTrak](https://celestrak.org/). The web app's Data panel fetches and credits space weather from [NOAA SWPC](https://www.swpc.noaa.gov/), satellite details from [Wikidata](https://www.wikidata.org/), transmitters from [SatNOGS DB](https://db.satnogs.org/) and launches from [The Space Devs](https://thespacedevs.com/). Khonsu displays this data and doesn't redistribute it. Propagation uses [go-satellite-v2](https://github.com/Mohammed-Ashour/go-satellite-v2); the TUI uses [Bubble Tea](https://github.com/charmbracelet/bubbletea), commands use [urfave/cli](https://github.com/urfave/cli), and the web app and orbit viewer use [Three.js](https://threejs.org/) and [Natural Earth](https://www.naturalearthdata.com/) outlines.
 
 Khonsu is available under the [MIT license](LICENSE.md).

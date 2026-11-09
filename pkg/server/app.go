@@ -15,6 +15,7 @@ import (
 	"github.com/Mohammed-Ashour/khonsu/internal/elements"
 	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 	"github.com/Mohammed-Ashour/khonsu/internal/output"
+	"github.com/Mohammed-Ashour/khonsu/internal/sources"
 	"github.com/Mohammed-Ashour/khonsu/pkg/locate"
 )
 
@@ -530,9 +531,10 @@ type AppOptions struct {
 }
 
 // newAppHandler combines the JSON API with the web app's static files.
-func newAppHandler(source elementSource, ui fs.FS) http.Handler {
+func newAppHandler(source elementSource, feeds *sources.Client, ui fs.FS) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/api/", newHandler(source))
+	registerDataRoutes(mux, feeds)
 	mux.Handle("/", http.FileServerFS(ui))
 	return securityHeaders(mux)
 }
@@ -590,8 +592,9 @@ func appURL(addr net.Addr) string {
 // ServeApp runs the web app until ctx is canceled.
 func ServeApp(ctx context.Context, options AppOptions) error {
 	var source elementSource = newMemoSource(ctx, catalog.NewStore(options.CacheDir, options.CacheTTL), options.CacheTTL)
+	feeds := sources.NewClient(options.CacheDir)
 	if options.Records != nil {
-		source = fileSource{options.Records}
+		source, feeds = fileSource{options.Records}, nil
 	}
 	listener, err := net.Listen("tcp", options.Addr)
 	if err != nil {
@@ -600,7 +603,7 @@ func ServeApp(ctx context.Context, options AppOptions) error {
 	if options.OnReady != nil {
 		options.OnReady(appURL(listener.Addr()))
 	}
-	handler := newAppHandler(source, options.UI)
+	handler := newAppHandler(source, feeds, options.UI)
 	if tcp, ok := listener.Addr().(*net.TCPAddr); ok && tcp.IP.IsLoopback() {
 		handler = loopbackHostsOnly(handler)
 	}

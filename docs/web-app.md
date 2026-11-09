@@ -27,6 +27,7 @@ khonsu web --file satellites.tle            # Local elements, no provider reques
 
 - Your location stays in this browser's storage. It goes only to your Khonsu server, to calculate passes, and is never placed in the URL.
 - The app loads nothing from other sites, and a Content Security Policy enforces this. *Current position on a map* is a link you choose to follow.
+- *Data* fetches public data through your Khonsu server and credits each source. Nothing is fetched until you open it. It then sends the selected satellite's NORAD ID to Wikidata and SatNOGS, but never your location. Serving a local file with `--file` turns these requests off.
 - The server only accepts GET and HEAD, refuses API calls from other websites, and on loopback answers only to loopback host names, which blocks DNS rebinding.
 - The server listens on loopback by default and has no authentication. Binding it elsewhere prints a warning: anyone who can reach it can use it and trigger provider requests. Use a reverse proxy with rate limits if you need that.
 
@@ -51,7 +52,14 @@ The server also exposes these JSON routes. The `/api/v1` routes other than searc
 | `/api/v1/track` | `start`, `duration` (default 24h, 1m to 168h), `step` (default 1m, 1s to 1h), optional observer | Sampled path, up to 20,000 samples |
 | `/api/v1/look` | observer (required), `start` and `end` (both required in practice), `samples` (default 60, 2 to 512) | Sky path |
 | `/api/v1/search` | `q` | Plain JSON: `satellites`, `groups_covered`, `groups_total`, `truncated`, `warnings` |
+| `/api/v1/sources` | | Plain JSON: data sources grouped by category, and `live_data` |
+| `/api/v1/space-weather` | | Feed: NOAA SWPC Kp, F10.7, storm scales and recent alerts |
+| `/api/v1/launches` | | Feed: upcoming launches from Launch Library 2 |
+| `/api/v1/satellite-details` | `norad_id` | Feed: Wikidata items for the catalog number |
+| `/api/v1/transmitters` | `norad_id` | Feed: SatNOGS DB transmitters |
 | `/api/satellite-groups`, `/api/satellites?group=` | | Plain JSON lists |
+
+Feed routes return `source` (with its credit), `fetched_at`, `stale`, `warning` and `data`. Khonsu caches each response under `sources/` in the cache directory, makes one request at a time to each provider and pauses a provider after a failure, showing saved data until it recovers.
 
 ## Changing the app
 

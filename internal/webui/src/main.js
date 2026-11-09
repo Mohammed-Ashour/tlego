@@ -2,7 +2,7 @@ import { createApi, isAbort } from './api.js';
 import { createGlobe } from './globe.js';
 import {
   annotatePasses, buildUrlState, canonicalId, clamp, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
-  lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
+  dataAge, describeKp, formatFrequency, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
 } from './logic.js';
 import { sampleAt } from '../../../pkg/templates/viewer-state.js';
 import { renderSky } from './sky.js';
@@ -859,6 +859,155 @@ function setPicking(value) {
   globe?.setPicking(value);
 }
 
+// Data sources
+
+let dataRequest = 0;
+
+function feedCredit(feed) {
+  const parts = [feed.source.credit, feed.source.nature, `updated ${dataAge(feed.fetched_at, Date.now())}`];
+  if (feed.stale) parts.push('saved copy');
+  const credit = element('p', 'data-credit', parts.join(' · '));
+  return feed.warning ? [credit, element('p', 'note is-warning', feed.warning)] : [credit];
+}
+
+function dataFailure(error) {
+  return element('p', 'note is-warning', error.message || 'This source could not be reached.');
+}
+
+function dataTime(isoTime) {
+  const time = Date.parse(isoTime);
+  return `${formatDay(time, state.utc)} ${formatClock(time, state.utc).slice(0, 5)} ${zoneLabel(state.utc)}`;
+}
+
+function values(...entries) {
+  const row = element('div', 'data-values');
+  for (const [label, value] of entries) {
+    const item = element('span', null, `${label} `);
+    item.append(element('strong', null, value));
+    row.append(item);
+  }
+  return row;
+}
+
+function renderSpaceWeather(feed) {
+  const { kp, flux, scales, alerts } = feed.data;
+  const latest = kp.at(-1);
+  const entries = [['Kp', `${latest.kp.toFixed(1)} ${describeKp(latest.kp)}`]];
+  if (flux.length) entries.push(['F10.7', String(Math.round(flux.at(-1).flux))]);
+  if (scales) entries.push(['Scales', `G${scales.geomagnetic.level} S${scales.solar.level} R${scales.radio.level}`]);
+  const nodes = [values(...entries)];
+  if (alerts.length) {
+    const list = element('ul');
+    list.append(...alerts.slice(0, 3).map((alert) => element('li', null, `${dataTime(alert.issued_at)}: ${alert.headline}`)));
+    nodes.push(list);
+  }
+  return [...nodes, ...feedCredit(feed)];
+}
+
+function renderLaunches(feed) {
+  if (!feed.data.length) return [element('p', 'note', 'No upcoming launches are listed.'), ...feedCredit(feed)];
+  const list = element('ul');
+  list.append(...feed.data.slice(0, 3).map((launch) => element('li', null, `${dataTime(launch.net)}: ${launch.name} (${launch.status})`)));
+  return [list, ...feedCredit(feed)];
+}
+
+function renderSatelliteDetails(feed) {
+  const [entry] = feed.data;
+  if (!entry) return [element('p', 'note', 'Wikidata has no entry for this satellite.'), ...feedCredit(feed)];
+  const rows = [['Name', entry.name]];
+  if (entry.types.length) rows.push(['Type', entry.types.join(', ')]);
+  if (entry.operators.length) rows.push(['Operator', entry.operators.join(', ')]);
+  if (entry.countries.length) rows.push(['Country', entry.countries.join(', ')]);
+  if (entry.launch_date) rows.push(['Launched', entry.launch_date]);
+  const list = element('ul');
+  list.append(...rows.map(([label, value]) => element('li', null, `${label}: ${value}`)));
+  return [list, ...feedCredit(feed)];
+}
+
+function renderTransmitters(feed) {
+  const active = feed.data.filter((item) => item.alive && item.status === 'active');
+  if (!active.length) return [element('p', 'note', 'SatNOGS lists no active transmitters for this satellite.'), ...feedCredit(feed)];
+  const list = element('ul');
+  list.append(...active.slice(0, 4).map((item) => {
+    const details = [formatFrequency(item.downlink_hz), item.mode].filter(Boolean).join(' · ');
+    return element('li', null, details ? `${item.description}: ${details}` : item.description);
+  }));
+  const summary = element('p', 'note', `${active.length} active transmitter${active.length === 1 ? '' : 's'}`);
+  return [summary, list, ...feedCredit(feed)];
+}
+
+async function showFeed(token, categoryId, load, render) {
+  const node = byId(`data-feed-${categoryId}`);
+  if (!node) return;
+  node.replaceChildren(element('p', 'note', 'Loading…'));
+  try {
+    const feed = await load();
+    if (token === dataRequest) node.replaceChildren(...render(feed));
+  } catch (error) {
+    if (token === dataRequest && error.name !== 'AbortError') node.replaceChildren(dataFailure(error));
+  }
+}
+
+function renderDataCategories(categories) {
+  byId('data-categories').replaceChildren(...categories.map((category) => {
+    const section = element('section', 'data-category');
+    section.append(element('h3', null, category.title), element('p', 'note', category.description));
+    for (const source of category.sources) {
+      const row = element('div', 'data-source');
+      const link = element('a', null, source.name);
+      link.href = source.url;
+      link.target = '_blank';
+      link.rel = 'noreferrer';
+      const live = source.status === 'live';
+      row.append(link, element('span', `data-status${live ? ' is-live' : ''}`, live ? 'Live' : 'Planned'), element('p', 'note', `${source.summary} ${source.refresh}.`));
+      section.append(row);
+    }
+    const feed = element('div', 'data-feed');
+    feed.id = `data-feed-${category.id}`;
+    section.append(feed);
+    return section;
+  }));
+}
+
+async function openDataDialog() {
+  const token = ++dataRequest;
+  const statusNote = byId('data-status-note');
+  statusNote.textContent = '';
+  statusNote.classList.remove('is-warning');
+  byId('data-dialog').showModal();
+  let catalog;
+  try {
+    catalog = await api.sources();
+  } catch (error) {
+    if (token === dataRequest && error.name !== 'AbortError') {
+      statusNote.textContent = error.message;
+      statusNote.classList.add('is-warning');
+    }
+    return;
+  }
+  if (token !== dataRequest) return;
+  renderDataCategories(catalog.categories);
+  if (!catalog.live_data) {
+    statusNote.textContent = 'Live data is off while serving a local file, so no provider requests are made.';
+    return;
+  }
+  showFeed(token, 'space-weather', () => api.spaceWeather(), renderSpaceWeather);
+  showFeed(token, 'launches', () => api.launches(), renderLaunches);
+  if (!selectedEntry()) return;
+  showFeed(token, 'missions', () => api.satelliteDetails(state.selected), renderSatelliteDetails);
+  showFeed(token, 'radio', () => api.transmitters(state.selected), renderTransmitters);
+}
+
+function wireDataDialog() {
+  const dialog = byId('data-dialog');
+  byId('data-open').addEventListener('click', openDataDialog);
+  byId('data-close').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => {
+    dataRequest += 1;
+    byId('data-open').focus();
+  });
+}
+
 function wireObserver() {
   const dialog = byId('observer-dialog');
   byId('observer-open').addEventListener('click', openObserverDialog);
@@ -1028,6 +1177,7 @@ async function start() {
   wireTabs();
   wireControls();
   wireObserver();
+  wireDataDialog();
   renderObserverLabel();
   renderSliderLabels();
   renderTracked();
