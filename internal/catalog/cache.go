@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
 )
 
 // Waiters may cancel independently. Equivalent overlapping requests share the
@@ -198,7 +198,7 @@ func atomicCacheWrite(ctx context.Context, path string, b []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
-	f, err := os.CreateTemp(filepath.Dir(path), "tlego-*.tmp")
+	f, err := os.CreateTemp(filepath.Dir(path), "khonsu-*.tmp")
 	if err != nil {
 		return err
 	}

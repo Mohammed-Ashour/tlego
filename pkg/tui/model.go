@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -154,7 +154,7 @@ func NewModel(opts Options, settings Settings, store *catalog.Store, settingsErr
 	predictInput.Width = 40
 
 	reportPath := textinput.New()
-	reportPath.Placeholder = "tlego-report-25544.txt"
+	reportPath.Placeholder = "khonsu-report-25544.txt"
 	reportPath.Prompt = "save to: "
 	reportPath.CharLimit = 128
 	reportPath.Width = 50
@@ -1079,11 +1079,11 @@ func defaultReportPath(noradID, format string) string {
 	}
 	switch format {
 	case "json", "json-v1":
-		return fmt.Sprintf("tlego-report-%s.json", noradID)
+		return fmt.Sprintf("khonsu-report-%s.json", noradID)
 	case "csv":
-		return fmt.Sprintf("tlego-report-%s.csv", noradID)
+		return fmt.Sprintf("khonsu-report-%s.csv", noradID)
 	default:
-		return fmt.Sprintf("tlego-report-%s.txt", noradID)
+		return fmt.Sprintf("khonsu-report-%s.txt", noradID)
 	}
 }
 

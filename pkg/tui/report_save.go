@@ -48,7 +48,7 @@ func writeReportWith(path string, data []byte, create func(string, string) (repo
 			return err
 		}
 	}
-	f, err := create(filepath.Dir(path), ".tlego-report-*")
+	f, err := create(filepath.Dir(path), ".khonsu-report-*")
 	if err != nil {
 		// A writable file in a read-only directory can only be written in place,
 		// which is not atomic.

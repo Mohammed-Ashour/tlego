@@ -22,7 +22,7 @@ func TestMachineCommandParseErrorIsJSONOnStderrOnly(t *testing.T) {
 		}
 		RootCmd.Writer, RootCmd.ErrWriter = oldOut, oldErr
 	})
-	err := Run(context.Background(), []string{"tlego", "predict", "--format=json", "--unknown"})
+	err := Run(context.Background(), []string{"khonsu", "predict", "--format=json", "--unknown"})
 	if err == nil || !IsReported(err) {
 		t.Fatalf("error = %v, expected reported machine error", err)
 	}
@@ -51,7 +51,7 @@ func TestMachineCommandHelpRemainsHumanReadable(t *testing.T) {
 		}
 		RootCmd.Writer, RootCmd.ErrWriter = oldOut, oldErr
 	})
-	if err := Run(context.Background(), []string{"tlego", "predict", "--format=json", "--help"}); err != nil {
+	if err := Run(context.Background(), []string{"khonsu", "predict", "--format=json", "--help"}); err != nil {
 		t.Fatal(err)
 	}
 	if stdout.Len() == 0 || !bytes.Contains(stdout.Bytes(), []byte("predict")) {
@@ -65,11 +65,11 @@ func TestMachineCommandHelpRemainsHumanReadable(t *testing.T) {
 func TestNativePluginCommandWinsOverExecutable(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "ran")
-	if err := os.WriteFile(filepath.Join(dir, "tlego-plugin"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "khonsu-plugin"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
-	if err := Run(context.Background(), []string{"tlego", "plugin"}); err != nil {
+	if err := Run(context.Background(), []string{"khonsu", "plugin"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {
@@ -80,11 +80,11 @@ func TestNativePluginCommandWinsOverExecutable(t *testing.T) {
 func TestMalformedNativeCommandDoesNotFallBackToExtension(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "ran")
-	if err := os.WriteFile(filepath.Join(dir, "tlego-predict"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "khonsu-predict"), []byte("#!/bin/sh\ntouch '"+marker+"'\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
-	err := Run(context.Background(), []string{"tlego", "predict", "--unknown"})
+	err := Run(context.Background(), []string{"khonsu", "predict", "--unknown"})
 	if err == nil {
 		t.Fatal("expected native command usage error")
 	}

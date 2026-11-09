@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
 )
 
 var greenwich = Observer{Lat: 51.48, Lon: 0}

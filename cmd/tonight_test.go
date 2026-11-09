@@ -107,11 +107,11 @@ func TestTonightObserverSources(t *testing.T) {
 	if _, _, err := runTonight(t, "--file", tonightFixture, "--lat", "91", "--lon", "0"); err == nil {
 		t.Fatal("accepted invalid latitude")
 	}
-	if err := os.MkdirAll(filepath.Join(dir, "tlego"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "khonsu"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	settings := "observer:\n  lat: 51.48\n  lon: 0\n  alt: 0.1\n"
-	if err := os.WriteFile(filepath.Join(dir, "tlego", "tui.yaml"), []byte(settings), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "khonsu", "tui.yaml"), []byte(settings), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	stdout, _, err := runTonight(t, "--file", tonightFixture, "--time", "2026-10-24T12:00:00Z")
@@ -155,7 +155,7 @@ func TestTonightParserFailuresUseJSONErrors(t *testing.T) {
 		}
 		RootCmd.Writer, RootCmd.ErrWriter = oldOut, oldErr
 	})
-	err := Run(context.Background(), []string{"tlego", "tonight", "--format=json", "--unknown"})
+	err := Run(context.Background(), []string{"khonsu", "tonight", "--format=json", "--unknown"})
 	if err == nil || !IsReported(err) {
 		t.Fatalf("error = %v, expected reported machine error", err)
 	}

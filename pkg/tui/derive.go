@@ -8,8 +8,8 @@ import (
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/satellite"
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
-	"github.com/Mohammed-Ashour/tlego/pkg/locate"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/pkg/locate"
 )
 
 type Position = orbit.Position

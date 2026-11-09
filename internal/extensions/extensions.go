@@ -1,4 +1,4 @@
-// Package extensions implements tlego's executable command extensions.
+// Package extensions implements khonsu's executable command extensions.
 package extensions
 
 import (
@@ -48,13 +48,13 @@ func InteractiveInput(input io.Reader) bool {
 	return ok && term.IsTerminal(int(file.Fd()))
 }
 
-// Find returns the first executable tlego-name found on PATH. It deliberately
+// Find returns the first executable khonsu-name found on PATH. It deliberately
 // never searches the current directory unless that directory is explicitly on PATH.
 func Find(name string) (string, error) {
 	if !ValidName(name) {
 		return "", exec.ErrNotFound
 	}
-	command := "tlego-" + name
+	command := "khonsu-" + name
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
 		// Empty PATH entries mean the current directory in some OSes; skip them
 		// so an unconfigured local executable cannot become an extension.
@@ -98,13 +98,13 @@ func Discover() []Command {
 		for _, e := range entries {
 			base := e.Name()
 			if runtime.GOOS == "windows" {
-				if len(base) < len("tlego-") || !strings.EqualFold(base[:len("tlego-")], "tlego-") {
+				if len(base) < len("khonsu-") || !strings.EqualFold(base[:len("khonsu-")], "khonsu-") {
 					continue
 				}
-			} else if !strings.HasPrefix(base, "tlego-") {
+			} else if !strings.HasPrefix(base, "khonsu-") {
 				continue
 			}
-			name := base[len("tlego-"):]
+			name := base[len("khonsu-"):]
 			if runtime.GOOS == "windows" {
 				name = strings.ToLower(name)
 			}
@@ -193,15 +193,15 @@ func Run(ctx context.Context, argv []string, hostVersion string, stdin io.Reader
 	path, err := Find(argv[0])
 	if err != nil {
 		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, os.ErrNotExist) {
-			return &ExitError{Code: 127, Err: fmt.Errorf("tlego: extension %q not found on PATH", argv[0])}
+			return &ExitError{Code: 127, Err: fmt.Errorf("khonsu: extension %q not found on PATH", argv[0])}
 		}
-		return &ExitError{Code: 126, Err: fmt.Errorf("tlego: cannot locate extension %q: %w", argv[0], err)}
+		return &ExitError{Code: 126, Err: fmt.Errorf("khonsu: cannot locate extension %q: %w", argv[0], err)}
 	}
 	cmd := exec.Command(path, argv[1:]...)
 	interactive := InteractiveInput(stdin)
 	configureCommand(cmd, interactive)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, stdout, stderr
-	cmd.Env = append(os.Environ(), "TLEGO_HOST_VERSION="+hostVersion, "TLEGO_EXTENSION_VERSION="+Version)
+	cmd.Env = append(os.Environ(), "KHONSU_HOST_VERSION="+hostVersion, "KHONSU_EXTENSION_VERSION="+Version)
 	err = runCommand(ctx, cmd, interactive)
 	if err == nil {
 		return nil
@@ -217,5 +217,5 @@ func Run(ctx context.Context, argv []string, hostVersion string, stdin io.Reader
 		}
 		return &ExitError{Code: code, Err: err, Suppress: true}
 	}
-	return &ExitError{Code: 126, Err: fmt.Errorf("tlego: cannot run extension %q: %w", argv[0], err)}
+	return &ExitError{Code: 126, Err: fmt.Errorf("khonsu: cannot run extension %q: %w", argv[0], err)}
 }

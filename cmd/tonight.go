@@ -6,10 +6,10 @@ import (
 	"io"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
-	"github.com/Mohammed-Ashour/tlego/internal/output"
-	"github.com/Mohammed-Ashour/tlego/pkg/tui"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/output"
+	"github.com/Mohammed-Ashour/khonsu/pkg/tui"
 	"github.com/urfave/cli/v3"
 )
 
@@ -57,7 +57,7 @@ func tonightObserver(c *cli.Command) (orbit.Observer, error) {
 		}
 		obs = settings.Observer
 		if obs.Lat == 0 && obs.Lon == 0 {
-			return orbit.Observer{}, fmt.Errorf("no observer location: use --lat and --lon, or set it with tlego tui --screen Settings")
+			return orbit.Observer{}, fmt.Errorf("no observer location: use --lat and --lon, or set it with khonsu tui --screen Settings")
 		}
 		if c.IsSet("alt") {
 			obs.Alt = c.Float("alt")

@@ -13,7 +13,7 @@ export function compassPoint(azimuth) {
 // data set was downloaded too recently.
 export function providerMessage(message) {
   if (/\b403\b/.test(message)) return 'CelesTrak is limiting downloads of this data for now. Try again later.';
-  if (/Failed to fetch|NetworkError|Load failed/.test(message)) return 'The TLEGO server could not be reached.';
+  if (/Failed to fetch|NetworkError|Load failed/.test(message)) return 'The Khonsu server could not be reached.';
   return message;
 }
 
@@ -81,9 +81,19 @@ export function parseObserver({ lat, lon, alt }) {
   return { observer: { lat: latitude, lon: longitude, alt: altitude } };
 }
 
+// Moves preferences saved before the rename, without overwriting newer ones.
+export function migrateStorage(storage) {
+  for (const key of ['observer', 'utc']) {
+    const legacy = storage.getItem(`tlego.${key}`);
+    if (legacy === null) continue;
+    if (storage.getItem(`khonsu.${key}`) === null) storage.setItem(`khonsu.${key}`, legacy);
+    storage.removeItem(`tlego.${key}`);
+  }
+}
+
 export function readStoredObserver(storage) {
   try {
-    const stored = JSON.parse(storage.getItem('tlego.observer'));
+    const stored = JSON.parse(storage.getItem('khonsu.observer'));
     if (typeof stored?.lat !== 'number' || typeof stored?.lon !== 'number') return null;
     return parseObserver(stored).observer ?? null;
   } catch {

@@ -1,21 +1,21 @@
 # Core and executable extensions
 
-TLEGO keeps catalog access, orbital calculations and output records in the Go host. An extension is a separate executable named `tlego-<command>` on PATH. It can be written in any language and can run independently of the host.
+Khonsu keeps catalog access, orbital calculations and output records in the Go host. An extension is a separate executable named `khonsu-<command>` on PATH. It can be written in any language and can run independently of the host.
 
-Start with `tlego plugin init summary` for Go or `tlego plugin init summary --language python`. [The authoring guide](writing-extensions.md) walks through generation, testing, installation and consuming host data.
+Start with `khonsu plugin init summary` for Go or `khonsu plugin init summary --language python`. [The authoring guide](writing-extensions.md) walks through generation, testing, installation and consuming host data.
 
 ## Machine output
 
 `predict`, `report`, `passes` and `tonight` accept `--format json --schema-version 1.0`. Each successful invocation writes one complete JSON document to stdout. Failure leaves stdout empty, writes a JSON error to stderr, and exits nonzero. Human diagnostics and logs also use stderr. Help remains readable text.
 
 ```bash
-tlego predict --file examples/tui-demo/iss.tle \
+khonsu predict --file examples/tui-demo/iss.tle \
   --time 2026-10-24T05:01:11Z --format json
 
-tlego report --file examples/tui-demo/iss.tle \
+khonsu report --file examples/tui-demo/iss.tle \
   --time 2026-10-24T05:01:11Z --format json
 
-tlego passes --file examples/tui-demo/iss.tle \
+khonsu passes --file examples/tui-demo/iss.tle \
   --time 2026-10-24T05:01:11Z --lat 51.48 --lon 0 \
   --duration 24h --step 1m --format json
 ```
@@ -34,22 +34,22 @@ Use a catalog ID instead of `--file` for live retrieval. `--file -` reads a sing
 - `track` and `look` records are served only over HTTP. Track samples use the orbit export's field names, in km and km/s in the TEME frame, and have azimuth and elevation only when the request names an observer. Elevations in these two records can be negative.
 - Error records contain `kind: "error"`, `schema_version`, and an error code and message. `command_failed` covers CLI failures; `request_failed` covers HTTP failures. Both are failures, never empty successful results.
 
-The TUI retains its original unversioned `json` report format and adds `json-v1` to the format cycle. HTTP retains `/api/location` and adds `/api/v1/position?norad_id=25544&time=2026-10-24T05:01:11Z`. The versioned endpoint uses the same position record as the CLI. The [web app guide](web-app.md) lists the other versioned routes. The experimental UI served by `tlego server` still uses the legacy route.
+The TUI retains its original unversioned `json` report format and adds `json-v1` to the format cycle. HTTP retains `/api/location` and adds `/api/v1/position?norad_id=25544&time=2026-10-24T05:01:11Z`. The versioned endpoint uses the same position record as the CLI. The [web app guide](web-app.md) lists the other versioned routes. The experimental UI served by `khonsu server` still uses the legacy route.
 
 ## Dispatch and discovery
 
 ```bash
-tlego plugin list
-tlego calendar --help
+khonsu plugin list
+khonsu calendar --help
 ```
 
-For an unknown top-level command `calendar`, the host resolves `tlego-calendar` using PATH. Names must start with an ASCII letter and contain only ASCII letters, digits or hyphens. The resolved program runs directly with its remaining argument vector, current directory, environment, stdin, stdout and stderr. The host does not reparse extension flags or wrap extension output.
+For an unknown top-level command `calendar`, the host resolves `khonsu-calendar` using PATH. Names must start with an ASCII letter and contain only ASCII letters, digits or hyphens. The resolved program runs directly with its remaining argument vector, current directory, environment, stdin, stdout and stderr. The host does not reparse extension flags or wrap extension output.
 
 Native commands, aliases, `help`, `version` and the `plugin` management command take precedence. Invalid flags or subcommands on a native command remain native failures. Root help and discovery never execute extensions. `plugin list` shows the chosen absolute path followed by other candidates, if any. A name colliding with a built-in can still be invoked directly by its executable name.
 
 The host does not add the working directory to PATH. Explicit user PATH entries remain user-controlled. Go's implicit-current-directory lookup errors are rejected. On Windows, PATH and PATHEXT determine lookup; native executables and installed console-script `.exe` wrappers are supported. Batch `.bat`/`.cmd` files are rejected because dispatch does not invoke a shell.
 
-Extensions receive `TLEGO_HOST_VERSION` and `TLEGO_EXTENSION_VERSION=1`. The execution-contract version is independent of the output schema version.
+Extensions receive `KHONSU_HOST_VERSION` and `KHONSU_EXTENSION_VERSION=1`. The execution-contract version is independent of the output schema version.
 
 Normal child exit codes are preserved. Missing extensions return 127, lookup/launch failures return 126, and host cancellation returns 130. There is no arbitrary execution timeout. Ctrl+C cancels the invocation. Windows uses a Job Object for process cleanup. Unix commands with piped input have an isolated process group for cancellation. Interactive Unix commands share the foreground terminal group so reads and Ctrl+C work; the host reaps the child and allows two seconds after Ctrl+C before canceling it. Forced cancellation of an interactive Unix command targets the direct child, since its process group also contains the host.
 
@@ -60,13 +60,13 @@ Extensions run with the user's permissions and inherit the environment. Only ins
 [The Python example](../examples/calendar/README.md) converts a pass-plan document to an iCalendar file using only the standard library at runtime. Install its console script in a virtual environment and add the environment's executable directory to PATH:
 
 ```bash
-python3 -m venv /tmp/tlego-calendar
-/tmp/tlego-calendar/bin/python -m pip install ./examples/calendar
-export PATH="/tmp/tlego-calendar/bin:$PATH"
+python3 -m venv /tmp/khonsu-calendar
+/tmp/khonsu-calendar/bin/python -m pip install ./examples/calendar
+export PATH="/tmp/khonsu-calendar/bin:$PATH"
 
-tlego passes --file examples/tui-demo/iss.tle \
+khonsu passes --file examples/tui-demo/iss.tle \
   --time 2026-10-24T05:01:11Z --lat 51.48 --lon 0 --duration 24h \
-  --format json | tlego calendar > passes.ics
+  --format json | khonsu calendar > passes.ics
 ```
 
-On Windows, use the environment's `Scripts` directory. `tlego-calendar` also works directly with the same stdin contract. The host has no Python dependency.
+On Windows, use the environment's `Scripts` directory. `khonsu-calendar` also works directly with the same stdin contract. The host has no Python dependency.

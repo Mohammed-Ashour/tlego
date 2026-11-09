@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert TLEGO pass-plan JSON v1 from stdin to an RFC 5545 calendar."""
+"""Convert Khonsu pass-plan JSON v1 from stdin to an RFC 5545 calendar."""
 
 import argparse
 import hashlib
@@ -146,11 +146,11 @@ def _uid(plan, event):
     key = json.dumps([plan["catalog"], plan["lat"], plan["lon"], plan["alt"],
                       _ics_time(event["start"]), _ics_time(event["end"])],
                      ensure_ascii=False, separators=(",", ":"))
-    return hashlib.sha256(key.encode("utf-8")).hexdigest() + "@tlego"
+    return hashlib.sha256(key.encode("utf-8")).hexdigest() + "@khonsu"
 
 
 def to_ical(plan):
-    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//TLEGO//Pass Plan Calendar 1.0//EN", "CALSCALE:GREGORIAN"]
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Khonsu//Pass Plan Calendar 1.0//EN", "CALSCALE:GREGORIAN"]
     for event in plan["passes"]:
         clipped = event["start_clipped"] or event["end_clipped"]
         summary = f"Satellite {plan['catalog']} pass" + (" (clipped)" if clipped else "")
@@ -163,23 +163,23 @@ def to_ical(plan):
                       f"DTSTART:{_ics_time(event['start'])}", f"DTEND:{_ics_time(event['end'])}",
                       f"SUMMARY:{_escape(summary)}", f"DESCRIPTION:{_escape(description)}"])
         if event["rise"] is not None:
-            lines.append(f"X-TLEGO-RISE:{_ics_time(event['rise'])}")
+            lines.append(f"X-KHONSU-RISE:{_ics_time(event['rise'])}")
         if event["set"] is not None:
-            lines.append(f"X-TLEGO-SET:{_ics_time(event['set'])}")
-        lines.extend([f"X-TLEGO-MAXIMUM:{_ics_time(event['maximum'])}",
-                      f"X-TLEGO-MAXIMUM-ELEVATION:{event['elevation']:.3f}", "END:VEVENT"])
+            lines.append(f"X-KHONSU-SET:{_ics_time(event['set'])}")
+        lines.extend([f"X-KHONSU-MAXIMUM:{_ics_time(event['maximum'])}",
+                      f"X-KHONSU-MAXIMUM-ELEVATION:{event['elevation']:.3f}", "END:VEVENT"])
     lines.append("END:VCALENDAR")
     return "".join(_fold(line) + "\r\n" for line in lines)
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Convert TLEGO pass-plan JSON v1 from stdin to an iCalendar file on stdout.")
+    parser = argparse.ArgumentParser(description="Convert Khonsu pass-plan JSON v1 from stdin to an iCalendar file on stdout.")
     parser.parse_args(argv)
     try:
         document = json.load(sys.stdin)
         calendar = to_ical(validate(document))
     except (json.JSONDecodeError, UnicodeDecodeError, InputError) as exc:
-        print(f"tlego-calendar: {exc}", file=sys.stderr)
+        print(f"khonsu-calendar: {exc}", file=sys.stderr)
         return 2
     if hasattr(sys.stdout, "buffer"):
         sys.stdout.buffer.write(calendar.encode("utf-8"))

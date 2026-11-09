@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
 	"gopkg.in/yaml.v3"
 )
 
@@ -72,7 +72,7 @@ func DefaultCacheDir() (string, error) {
 		}
 		dir = filepath.Join(home, ".cache")
 	}
-	return filepath.Join(dir, "tlego"), nil
+	return filepath.Join(dir, "khonsu"), nil
 }
 
 func NewStore(cacheDir string, cacheTTL time.Duration) *Store {

@@ -1,4 +1,4 @@
-// Package orbit provides shared orbital calculations for TLEGO frontends.
+// Package orbit provides shared orbital calculations for Khonsu frontends.
 // SGP4 numerical calculations remain owned by the pinned satellite dependency.
 package orbit
 

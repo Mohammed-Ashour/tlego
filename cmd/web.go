@@ -11,10 +11,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
-	"github.com/Mohammed-Ashour/tlego/internal/webui"
-	"github.com/Mohammed-Ashour/tlego/pkg/server"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/webui"
+	"github.com/Mohammed-Ashour/khonsu/pkg/server"
 	"github.com/urfave/cli/v3"
 )
 
@@ -62,7 +62,7 @@ func startWeb(ctx context.Context, c *cli.Command) error {
 	return server.ServeApp(ctx, server.AppOptions{
 		Addr: c.String("addr"), UI: webui.FS(), Records: records, CacheDir: c.String("cache-dir"), CacheTTL: ttl,
 		OnReady: func(url string) {
-			fmt.Fprintf(c.Writer, "TLEGO is running at %s\nPress Ctrl+C to stop.\n", url)
+			fmt.Fprintf(c.Writer, "Khonsu is running at %s\nPress Ctrl+C to stop.\n", url)
 			if !isLoopback(c.String("addr")) {
 				fmt.Fprintln(c.ErrWriter, "Warning: this address may be reachable from other machines. The server has no authentication, and every visitor can trigger provider requests.")
 			}

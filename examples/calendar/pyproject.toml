@@ -3,13 +3,13 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tlego-calendar"
+name = "khonsu-calendar"
 version = "0.1.0"
-description = "Convert TLEGO pass-plan JSON to an iCalendar file"
+description = "Convert Khonsu pass-plan JSON to an iCalendar file"
 requires-python = ">=3.10"
 
 [project.scripts]
-tlego-calendar = "tlego_calendar:main"
+khonsu-calendar = "khonsu_calendar:main"
 
 [tool.setuptools]
-py-modules = ["tlego_calendar"]
+py-modules = ["khonsu_calendar"]

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
 )
 
 func appHandler(t *testing.T) http.Handler {

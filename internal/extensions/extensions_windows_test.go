@@ -11,8 +11,8 @@ import (
 
 func TestDiscoverSelectsAccordingToPATHEXTWithoutRunningCandidates(t *testing.T) {
 	dir := t.TempDir()
-	exe := filepath.Join(dir, "TLEGO-job.exe")
-	com := filepath.Join(dir, "tlego-job.com")
+	exe := filepath.Join(dir, "KHONSU-job.exe")
+	com := filepath.Join(dir, "khonsu-job.com")
 	for _, path := range []string{exe, com} {
 		if err := os.WriteFile(path, []byte("not executed"), 0644); err != nil {
 			t.Fatal(err)
@@ -37,7 +37,7 @@ func TestDiscoverSelectsAccordingToPATHEXTWithoutRunningCandidates(t *testing.T)
 
 func TestWindowsBatchExtensionIsNotLaunchedThroughShell(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "tlego-script.cmd"), []byte("@echo off\r\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "khonsu-script.cmd"), []byte("@echo off\r\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
@@ -56,7 +56,7 @@ func TestFindIgnoresImplicitWindowsCurrentDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	cwd := t.TempDir()
-	if err := os.WriteFile(filepath.Join(cwd, "tlego-shadow.exe"), []byte("not executed"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(cwd, "khonsu-shadow.exe"), []byte("not executed"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chdir(cwd); err != nil {
@@ -69,7 +69,7 @@ func TestFindIgnoresImplicitWindowsCurrentDirectory(t *testing.T) {
 	if _, err := Find("shadow"); err == nil {
 		t.Fatal("Find used a current-directory candidate omitted from PATH")
 	}
-	expected := filepath.Join(pathDir, "tlego-shadow.exe")
+	expected := filepath.Join(pathDir, "khonsu-shadow.exe")
 	if err := os.WriteFile(expected, []byte("not executed"), 0644); err != nil {
 		t.Fatal(err)
 	}

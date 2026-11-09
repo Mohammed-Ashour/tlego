@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
 )
 
 type Store = catalog.Store

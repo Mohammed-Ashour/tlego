@@ -2,7 +2,7 @@ package tui
 
 import (
 	"context"
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
 	tea "github.com/charmbracelet/bubbletea"
 )
 

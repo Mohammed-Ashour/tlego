@@ -59,7 +59,7 @@ func TestReportSavePreservesSymlinkAndUpdatesTarget(t *testing.T) {
 			if err != nil || after.Mode().Perm() != before.Mode().Perm() {
 				t.Fatalf("target permissions changed: %v", err)
 			}
-			leftovers, err := filepath.Glob(filepath.Join(targetDir, ".tlego-report-*"))
+			leftovers, err := filepath.Glob(filepath.Join(targetDir, ".khonsu-report-*"))
 			if err != nil || len(leftovers) != 0 {
 				t.Fatalf("temporary files=%v error=%v", leftovers, err)
 			}

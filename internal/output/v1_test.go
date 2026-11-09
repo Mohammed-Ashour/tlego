@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 )
 
 func TestV1RejectsNonfiniteAndKeepsNullPassEvents(t *testing.T) {

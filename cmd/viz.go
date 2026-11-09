@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
-	"github.com/Mohammed-Ashour/tlego/pkg/visual"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/pkg/visual"
 	"github.com/urfave/cli/v3"
 )
 

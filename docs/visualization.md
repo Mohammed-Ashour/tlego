@@ -6,13 +6,13 @@ Generate an HTML file, then open it in a browser with WebGL 2. The file contains
 
 ```bash
 # Live ISS lookup, using the validated catalog cache.
-tlego viz 25544 --output iss.html
+khonsu viz 25544 --output iss.html
 
 # Reproduce the README's ISS view from the checkout without provider access.
 go run . viz --file examples/tui-demo/iss.tle --output iss.html
 
 # Choose an explicit instant and increase the sample count.
-tlego viz --file satellites.tle --time 2026-10-24T05:01:11Z --points 720 --output orbits.html
+khonsu viz --file satellites.tle --time 2026-10-24T05:01:11Z --points 720 --output orbits.html
 ```
 
 Use one catalog ID or --file, not both. Flags may precede the ID. Output defaults to ID.html or the local input's base name with .html. --output uses the exact path supplied; its parent directory must exist. A valid export replaces an existing output atomically. Failures return nonzero and print no success path.

@@ -44,7 +44,7 @@ func TestSettingsValidateRejectsInvalidValues(t *testing.T) {
 func TestSaveSettingsRejectsInvalidValuesWithoutChangingExistingFile(t *testing.T) {
 	config := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", config)
-	path := filepath.Join(config, "tlego", "tui.yaml")
+	path := filepath.Join(config, "khonsu", "tui.yaml")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestSaveSettingsWritesLoadableSettings(t *testing.T) {
 	if got.Observer != want.Observer || got.Recent[0] != want.Recent[0] {
 		t.Fatalf("LoadSettings() = %+v, want observer/recent from %+v", got, want)
 	}
-	entries, err := os.ReadDir(filepath.Join(config, "tlego"))
+	entries, err := os.ReadDir(filepath.Join(config, "khonsu"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestSaveSettingsWritesLoadableSettings(t *testing.T) {
 func TestLoadSettingsReturnsDefaultsForInvalidSettings(t *testing.T) {
 	config := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", config)
-	path := filepath.Join(config, "tlego", "tui.yaml")
+	path := filepath.Join(config, "khonsu", "tui.yaml")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -109,5 +109,35 @@ func TestLoadSettingsReturnsDefaultsForInvalidSettings(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, DefaultSettings()) {
 		t.Fatalf("LoadSettings() returned %+v with error; want defaults %+v", got, DefaultSettings())
+	}
+}
+
+func TestLoadSettingsReadsLegacyFileUntilNewOneExists(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", config)
+	legacy := filepath.Join(config, legacyConfigDir, "tui.yaml")
+	if err := os.MkdirAll(filepath.Dir(legacy), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacy, []byte("refresh_seconds: 7\ncache_ttl_seconds: 60\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := LoadSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.RefreshSeconds != 7 {
+		t.Fatalf("RefreshSeconds = %d, want the legacy value 7", loaded.RefreshSeconds)
+	}
+	loaded.RefreshSeconds = 9
+	if err := SaveSettings(loaded); err != nil {
+		t.Fatal(err)
+	}
+	reloaded, err := LoadSettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.RefreshSeconds != 9 {
+		t.Fatalf("RefreshSeconds = %d, want the saved value 9 to win over the legacy file", reloaded.RefreshSeconds)
 	}
 }

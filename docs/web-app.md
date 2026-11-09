@@ -1,11 +1,11 @@
 # Web app
 
-`tlego web` starts a local server and opens the app in your browser. The app is embedded in the binary, so installs need no Node and no checkout.
+`khonsu web` starts a local server and opens the app in your browser. The app is embedded in the binary, so installs need no Node and no checkout.
 
 ```bash
-tlego web                                  # Live data
-tlego web --no-open --addr 127.0.0.1:9000  # Choose the address yourself
-tlego web --file satellites.tle            # Local elements, no provider requests
+khonsu web                                  # Live data
+khonsu web --no-open --addr 127.0.0.1:9000  # Choose the address yourself
+khonsu web --file satellites.tle            # Local elements, no provider requests
 ```
 
 | Flag | Default | Meaning |
@@ -25,7 +25,7 @@ tlego web --file satellites.tle            # Local elements, no provider request
 
 ## Privacy and security
 
-- Your location stays in this browser's storage. It goes only to your TLEGO server, to calculate passes, and is never placed in the URL.
+- Your location stays in this browser's storage. It goes only to your Khonsu server, to calculate passes, and is never placed in the URL.
 - The app loads nothing from other sites, and a Content Security Policy enforces this. *Current position on a map* is a link you choose to follow.
 - The server only accepts GET and HEAD, refuses API calls from other websites, and on loopback answers only to loopback host names, which blocks DNS rebinding.
 - The server listens on loopback by default and has no authentication. Binding it elsewhere prints a warning: anyone who can reach it can use it and trigger provider requests. Use a reverse proxy with rate limits if you need that.
@@ -34,7 +34,7 @@ tlego web --file satellites.tle            # Local elements, no provider request
 
 - Positions between one-minute samples are interpolated. The app does not run SGP4 in the browser.
 - The globe is a sphere. Day and night use the Sun's direction, without twilight or atmosphere modelling.
-- Visibility has the [same criteria and limits](visibility.md) as `tlego tonight`, including no weather or brightness.
+- Visibility has the [same criteria and limits](visibility.md) as `khonsu tonight`, including no weather or brightness.
 - The browser needs WebGL for the globe. Without it, the details and passes still work.
 - CelesTrak [limits repeat downloads](https://celestrak.org/usage-policy.php), and its responses can take a few seconds. Only the first request for data waits for it. A loaded group also provides all of its satellites, expired data is shown at once while newer data loads in the background, and failed requests back off. Searching uses the same saved data. Large groups such as Starlink take longer the first time.
 

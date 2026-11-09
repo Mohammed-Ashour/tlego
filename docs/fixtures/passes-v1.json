@@ -103,7 +103,7 @@
   "warnings": [
     {
       "code": "sampled_passes",
-      "message": "Pass events are estimates, and a pass shorter than the sampling step can be missed. Use tlego tonight for naked-eye visibility."
+      "message": "Pass events are estimates, and a pass shorter than the sampling step can be missed. Use khonsu tonight for naked-eye visibility."
     }
   ]
 }

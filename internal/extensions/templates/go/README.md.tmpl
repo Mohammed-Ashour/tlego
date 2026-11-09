@@ -1,6 +1,6 @@
 # {{.Command}}
 
-Summarize TLEGO position JSON v1 from stdin. This project uses only Go's standard library and works independently of TLEGO.
+Summarize Khonsu position JSON v1 from stdin. This project uses only Go's standard library and works independently of Khonsu.
 
 ## Build and test
 
@@ -12,7 +12,7 @@ go build -o {{.Command}} .
 
 On Windows use `go build -o {{.Command}}.exe .` and run `.\{{.Command}}.exe --help`.
 
-## Install and run through TLEGO
+## Install and run through Khonsu
 
 ```bash
 go install .
@@ -21,9 +21,9 @@ go install .
 Put `go env GOBIN`, or `go env GOPATH` followed by `/bin` when GOBIN is empty, on your PATH. On Windows use the corresponding `bin` directory and an `.exe` executable.
 
 ```bash
-tlego plugin list
-tlego {{.Name}} --help
-tlego predict --time 2026-10-24T05:01:11Z --format json 25544 | tlego {{.Name}}
+khonsu plugin list
+khonsu {{.Name}} --help
+khonsu predict --time 2026-10-24T05:01:11Z --format json 25544 | khonsu {{.Name}}
 ```
 
 For an offline pipeline, replace `25544` with `--file /absolute/path/to/satellite.tle`. You can also run `{{.Command}} < position.json` directly.
@@ -32,4 +32,4 @@ For an offline pipeline, replace `25544` with `--file /absolute/path/to/satellit
 
 Edit `summarize` in `main.go`. Keep stdout for results, stderr for errors and diagnostics, and return a nonzero status on failure. Validate the schema major and record kind before using fields. Ignore unfamiliar fields and warning codes within a compatible schema major. Tests should cover malformed input, incompatible versions and useful output.
 
-The host passes arguments and streams directly. It supplies `TLEGO_HOST_VERSION` and `TLEGO_EXTENSION_VERSION`. No host imports or Go SDK are required. See TLEGO's `docs/extensions.md` for the full protocol and schema.
+The host passes arguments and streams directly. It supplies `KHONSU_HOST_VERSION` and `KHONSU_EXTENSION_VERSION`. No host imports or Go SDK are required. See Khonsu's `docs/extensions.md` for the full protocol and schema.

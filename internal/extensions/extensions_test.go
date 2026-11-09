@@ -27,7 +27,7 @@ func makeExec(t *testing.T, dir, name, body string) string {
 
 func TestRunPreservesArgumentsStreamsAndEnvironment(t *testing.T) {
 	dir := t.TempDir()
-	makeExec(t, dir, "tlego-capture", `printf '%s\n' "$@"; printf 'host=%s ext=%s\n' "$TLEGO_HOST_VERSION" "$TLEGO_EXTENSION_VERSION"; read value; printf 'out:%s\n' "$value"; printf 'err:%s\n' "$value" >&2`)
+	makeExec(t, dir, "khonsu-capture", `printf '%s\n' "$@"; printf 'host=%s ext=%s\n' "$KHONSU_HOST_VERSION" "$KHONSU_EXTENSION_VERSION"; read value; printf 'out:%s\n' "$value"; printf 'err:%s\n' "$value" >&2`)
 	t.Setenv("PATH", dir)
 	var out, stderr bytes.Buffer
 	err := Run(context.Background(), []string{"capture", "a b", "", "'quote'", "--x"}, "v9", strings.NewReader("input\n"), &out, &stderr)
@@ -45,7 +45,7 @@ func TestRunPreservesArgumentsStreamsAndEnvironment(t *testing.T) {
 
 func TestRunPreservesChildExitStatus(t *testing.T) {
 	dir := t.TempDir()
-	makeExec(t, dir, "tlego-fail", "exit 23")
+	makeExec(t, dir, "khonsu-fail", "exit 23")
 	t.Setenv("PATH", dir)
 	err := Run(context.Background(), []string{"fail"}, "v", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
 	var exitErr *ExitError
@@ -56,7 +56,7 @@ func TestRunPreservesChildExitStatus(t *testing.T) {
 
 func TestRunMapsSignalExitToShellStatus(t *testing.T) {
 	dir := t.TempDir()
-	makeExec(t, dir, "tlego-interrupted", "kill -INT $$")
+	makeExec(t, dir, "khonsu-interrupted", "kill -INT $$")
 	t.Setenv("PATH", dir)
 	err := Run(context.Background(), []string{"interrupted"}, "v", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
 	var exitErr *ExitError
@@ -71,8 +71,8 @@ func TestRunCancellationStopsExtensionTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("TLEGO_TEST_SLEEP", sleep)
-	makeExec(t, dir, "tlego-wait", `"$TLEGO_TEST_SLEEP" 30 & wait`)
+	t.Setenv("KHONSU_TEST_SLEEP", sleep)
+	makeExec(t, dir, "khonsu-wait", `"$KHONSU_TEST_SLEEP" 30 & wait`)
 	t.Setenv("PATH", dir)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -100,7 +100,7 @@ func TestRunMissingAndUnlaunchable(t *testing.T) {
 		t.Fatalf("missing error = %#v", err)
 	}
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "tlego-bad"), []byte("not executable"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "khonsu-bad"), []byte("not executable"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
@@ -110,10 +110,10 @@ func TestRunMissingAndUnlaunchable(t *testing.T) {
 	}
 	if runtime.GOOS == "windows" {
 		// Windows discovers native executable suffixes, not Unix permission bits.
-		if err := os.Rename(filepath.Join(dir, "tlego-bad"), filepath.Join(dir, "tlego-bad.exe")); err != nil {
+		if err := os.Rename(filepath.Join(dir, "khonsu-bad"), filepath.Join(dir, "khonsu-bad.exe")); err != nil {
 			t.Fatal(err)
 		}
-	} else if err := os.Chmod(filepath.Join(dir, "tlego-bad"), 0755); err != nil {
+	} else if err := os.Chmod(filepath.Join(dir, "khonsu-bad"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	err = Run(context.Background(), []string{"bad"}, "v", strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{})
@@ -124,7 +124,7 @@ func TestRunMissingAndUnlaunchable(t *testing.T) {
 
 func TestFindDoesNotSearchCurrentDirectory(t *testing.T) {
 	dir := t.TempDir()
-	makeExec(t, dir, "tlego-local", "exit 0")
+	makeExec(t, dir, "khonsu-local", "exit 0")
 	t.Setenv("PATH", "")
 	old, err := os.Getwd()
 	if err != nil {
@@ -141,8 +141,8 @@ func TestFindDoesNotSearchCurrentDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	pathDir := t.TempDir()
-	pathExecutable := makeExec(t, pathDir, "tlego-selected", "exit 0")
-	makeExec(t, dir, "tlego-selected", "exit 1")
+	pathExecutable := makeExec(t, pathDir, "khonsu-selected", "exit 0")
+	makeExec(t, dir, "khonsu-selected", "exit 1")
 	t.Setenv("PATH", pathDir)
 	got, err := Find("selected")
 	if err != nil {
@@ -162,10 +162,10 @@ func TestFindDoesNotSearchCurrentDirectory(t *testing.T) {
 
 func TestDiscoverSortedAndUsesFirstPathMatch(t *testing.T) {
 	first, second := t.TempDir(), t.TempDir()
-	a := makeExec(t, first, "tlego-zeta", "exit 0")
-	b := makeExec(t, first, "tlego-alpha", "exit 0")
-	makeExec(t, second, "tlego-alpha", "exit 0")
-	if err := os.Mkdir(filepath.Join(first, "tlego-dir"), 0755); err != nil {
+	a := makeExec(t, first, "khonsu-zeta", "exit 0")
+	b := makeExec(t, first, "khonsu-alpha", "exit 0")
+	makeExec(t, second, "khonsu-alpha", "exit 0")
+	if err := os.Mkdir(filepath.Join(first, "khonsu-dir"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", first+string(os.PathListSeparator)+second)
@@ -173,7 +173,7 @@ func TestDiscoverSortedAndUsesFirstPathMatch(t *testing.T) {
 	if len(got) != 2 || got[0].Name != "alpha" || got[1].Name != "zeta" {
 		t.Fatalf("Discover = %#v", got)
 	}
-	if got[0].Executable != b || got[1].Executable != a || len(got[0].Candidates) != 2 || got[0].Candidates[1] != filepath.Join(second, "tlego-alpha") {
+	if got[0].Executable != b || got[1].Executable != a || len(got[0].Candidates) != 2 || got[0].Candidates[1] != filepath.Join(second, "khonsu-alpha") {
 		t.Fatalf("paths = %#v", got)
 	}
 }

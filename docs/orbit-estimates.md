@@ -20,7 +20,7 @@ Position output remains TEME-based, with geographic angles in degrees, altitude 
 
 ## Classification criteria
 
-`orbit_class_estimate` in schema 1.0 and the legacy `OrbitClass` string use these rules in order. These are TLEGO browsing heuristics, with explicit tolerances, rather than an operational classification standard.
+`orbit_class_estimate` in schema 1.0 and the legacy `OrbitClass` string use these rules in order. These are Khonsu browsing heuristics, with explicit tolerances, rather than an operational classification standard.
 
 | Label | Criterion |
 |---|---|
@@ -31,7 +31,7 @@ Position output remains TEME-based, with geographic angles in degrees, altitude 
 | HEO | Estimated perigee at least 35,786 km |
 | Other | Remaining orbits, including ellipses crossing the altitude bands |
 
-A sidereal day is taken as 1,436.068 minutes. [ESA's orbit guide](https://www.esa.int/Enabling_Support/Space_Transportation/Types_of_orbits) describes the geostationary period and equatorial geometry; [CelesTrak](https://www.celestrak.org/columns/v04n07/) explains why eccentricity and inclination distinguish geosynchronous and geostationary orbits. TLEGO's tolerances are project choices, not thresholds specified by those sources. GEO denotes a candidate near that geometry; it does not prove station keeping or a fixed ground longitude. HEO here means high Earth orbit, not highly elliptical orbit.
+A sidereal day is taken as 1,436.068 minutes. [ESA's orbit guide](https://www.esa.int/Enabling_Support/Space_Transportation/Types_of_orbits) describes the geostationary period and equatorial geometry; [CelesTrak](https://www.celestrak.org/columns/v04n07/) explains why eccentricity and inclination distinguish geosynchronous and geostationary orbits. Khonsu's tolerances are project choices, not thresholds specified by those sources. GEO denotes a candidate near that geometry; it does not prove station keeping or a fixed ground longitude. HEO here means high Earth orbit, not highly elliptical orbit.
 
 Earlier versions classified by average altitude alone. A circular orbit at 38,621.863 km, for example, was labeled GEO despite having a period of about 1,583.36 minutes. It is now HEO. Inclined synchronous orbits now receive GSO; cross-band transfer and Molniya-like ellipses receive Other. Output field names and types are unchanged. Consumers should accept class strings beyond the original four values.
 

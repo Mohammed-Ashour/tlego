@@ -1,16 +1,16 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 
-project_name: tlego
+project_name: khonsu
 
 before:
   hooks:
     - go mod download
 
 builds:
-  - id: tlego
+  - id: khonsu
     main: .
-    binary: tlego
+    binary: khonsu
     env:
       - CGO_ENABLED=0
     goos: [linux, darwin, windows]
@@ -18,10 +18,10 @@ builds:
     flags:
       - -trimpath
     ldflags:
-      - -s -w -X github.com/Mohammed-Ashour/tlego/cmd.Version=v{{ .Version }}
+      - -s -w -X github.com/Mohammed-Ashour/khonsu/cmd.Version=v{{ .Version }}
 
 archives:
-  - id: tlego
+  - id: khonsu
     formats: [tar.gz]
     format_overrides:
       - goos: windows
@@ -49,30 +49,30 @@ release:
 # prereleases are skipped ("auto"). A failed update fails the job after the
 # release is public; docs/releasing.md covers recovery.
 homebrew_casks:
-  - name: tlego
-    binaries: [tlego]
+  - name: khonsu
+    binaries: [khonsu]
     repository:
       owner: Mohammed-Ashour
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
-    homepage: https://github.com/Mohammed-Ashour/tlego
+    homepage: https://github.com/Mohammed-Ashour/khonsu
     description: Track satellites and predict passes in your browser or terminal
     license: MIT
     hooks:
       post:
         install_steps: |
           on_macos do
-            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/tlego"]
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/khonsu"]
           end
 
 scoops:
-  - name: tlego
+  - name: khonsu
     repository:
       owner: Mohammed-Ashour
       name: scoop-bucket
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     skip_upload: '{{ if index .Env "TAP_GITHUB_TOKEN" }}auto{{ else }}true{{ end }}'
-    homepage: https://github.com/Mohammed-Ashour/tlego
+    homepage: https://github.com/Mohammed-Ashour/khonsu
     description: Track satellites and predict passes in your browser or terminal
     license: MIT

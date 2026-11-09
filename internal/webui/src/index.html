@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>TLEGO</title>
-  <link rel="icon" href="data:,">
+  <title>Khonsu</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='%23ebd193'%3E%3Ccircle cx='16' cy='10.5' r='6.5'/%3E%3Cpath d='M3 13a13 13 0 0 0 26 0a15 15 0 0 1-26 0z'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <span class="brand"><span class="brand-mark" aria-hidden="true"><i></i></span>TLEGO</span>
+      <span class="brand"><svg class="brand-mark" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><circle cx="16" cy="10.5" r="6.5"/><path d="M3 13a13 13 0 0 0 26 0a15 15 0 0 1-26 0z"/></svg>Khonsu</span>
       <p id="data-status" class="data-status" role="status"></p>
       <div class="topbar-actions">
         <button id="zone-toggle" class="text-button" type="button" aria-pressed="false" title="Switch between local time and UTC">Local time</button>
@@ -85,7 +85,7 @@
   <dialog id="observer-dialog" class="dialog" aria-labelledby="observer-title">
     <form id="observer-form" method="dialog" novalidate>
       <h2 id="observer-title">Your location</h2>
-      <p class="note">Used to predict passes. It stays in this browser and is sent only to this TLEGO server, never in shared links.</p>
+      <p class="note">Used to predict passes. It stays in this browser and is sent only to this Khonsu server, never in shared links.</p>
       <div class="dialog-grid">
         <label class="field"><span>Latitude °</span><input id="observer-lat" inputmode="decimal" autocomplete="off" required></label>
         <label class="field"><span>Longitude °</span><input id="observer-lon" inputmode="decimal" autocomplete="off" required></label>

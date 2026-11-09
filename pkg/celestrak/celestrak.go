@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
 )
 
 // These variables remain mutable for compatibility with existing callers.

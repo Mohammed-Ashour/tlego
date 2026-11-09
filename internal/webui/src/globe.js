@@ -47,7 +47,7 @@ function earthGroup() {
     const polygons = feature.geometry.type === 'Polygon' ? [feature.geometry.coordinates] : feature.geometry.coordinates;
     for (const polygon of polygons) for (const ring of polygon) coasts.push(ring.map(([lon, lat]) => surfacePoint(lat, lon)));
   }
-  group.add(segments(coasts, 0xbfe6d6, 0.8));
+  group.add(segments(coasts, 0xd9deea, 0.8));
   return group;
 }
 

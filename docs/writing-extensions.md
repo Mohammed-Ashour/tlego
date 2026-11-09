@@ -1,24 +1,24 @@
-# Write a TLEGO extension
+# Write a Khonsu extension
 
-An extension is a command-line program named `tlego-<name>` on PATH. TLEGO runs it as `tlego <name>`. Choose any language that produces an executable or an installed console script. No SDK, manifest or host imports are required.
+An extension is a command-line program named `khonsu-<name>` on PATH. Khonsu runs it as `khonsu <name>`. Choose any language that produces an executable or an installed console script. No SDK, manifest or host imports are required.
 
 ## 1. Generate a starter
 
 ```bash
-tlego plugin init summary
+khonsu plugin init summary
 ```
 
-This creates `./tlego-summary` with a standalone Go module, a position-summary command, tests and a README. Go is the default because it builds a single executable with no runtime dependencies.
+This creates `./khonsu-summary` with a standalone Go module, a position-summary command, tests and a README. Go is the default because it builds a single executable with no runtime dependencies.
 
 For Python:
 
 ```bash
-tlego plugin init summary --language python
+khonsu plugin init summary --language python
 ```
 
-The Python starter includes `pyproject.toml`, a module, tests and a console-script entry point named `tlego-summary`. Its runtime uses only the standard library.
+The Python starter includes `pyproject.toml`, a module, tests and a console-script entry point named `khonsu-summary`. Its runtime uses only the standard library.
 
-Use `--dir /path/to/new-project` to choose the destination. Its parent directory must already exist. The initializer refuses an existing destination, even an empty directory, and runs no build, install or network commands. Names start with an ASCII letter and contain only ASCII letters, digits and hyphens. Pass `summary`, without the `tlego-` executable prefix. Native names and aliases such as `predict`, `serve` and `plugin` are reserved.
+Use `--dir /path/to/new-project` to choose the destination. Its parent directory must already exist. The initializer refuses an existing destination, even an empty directory, and runs no build, install or network commands. Names start with an ASCII letter and contain only ASCII letters, digits and hyphens. Pass `summary`, without the `khonsu-` executable prefix. Native names and aliases such as `predict`, `serve` and `plugin` are reserved.
 
 ## 2. Test the generated behavior
 
@@ -27,7 +27,7 @@ Both starters read a position JSON document from stdin and print a short summary
 For Go:
 
 ```bash
-cd tlego-summary
+cd khonsu-summary
 go test ./...
 go run . --help
 ```
@@ -35,19 +35,19 @@ go run . --help
 For Python:
 
 ```bash
-cd tlego-summary
+cd khonsu-summary
 python3 -m unittest -v
-python3 -m tlego_summary --help
+python3 -m khonsu_summary --help
 ```
 
-From a TLEGO checkout, save a deterministic input file:
+From a Khonsu checkout, save a deterministic input file:
 
 ```bash
-tlego predict --file examples/tui-demo/iss.tle \
+khonsu predict --file examples/tui-demo/iss.tle \
   --time 2026-10-24T05:01:11Z --format json > /tmp/position.json
 ```
 
-Then, from the generated project, run `go run . < /tmp/position.json` or `python3 -m tlego_summary < /tmp/position.json`. The repository also provides [position and other transport fixtures](fixtures/) for development. On Windows, save the file to a local path and pipe its contents in PowerShell, for example `Get-Content -Raw .\position.json | python -m tlego_summary`.
+Then, from the generated project, run `go run . < /tmp/position.json` or `python3 -m khonsu_summary < /tmp/position.json`. The repository also provides [position and other transport fixtures](fixtures/) for development. On Windows, save the file to a local path and pipe its contents in PowerShell, for example `Get-Content -Raw .\position.json | python -m khonsu_summary`.
 
 ## 3. Install the executable on PATH
 
@@ -63,7 +63,7 @@ Go installs into `GOBIN` when set; otherwise it uses the `bin` directory under `
 export PATH="$(go env GOPATH)/bin:$PATH"
 ```
 
-On Windows, the installed program is `tlego-summary.exe`. Add Go's binary directory to the user PATH.
+On Windows, the installed program is `khonsu-summary.exe`. Add Go's binary directory to the user PATH.
 
 For Python on macOS or Linux:
 
@@ -83,21 +83,21 @@ py -m venv .venv
 python -m pip install .
 ```
 
-Installation creates a native `tlego-summary.exe` console wrapper in `Scripts`. The host supports these wrappers; it does not execute Windows batch files through a shell.
+Installation creates a native `khonsu-summary.exe` console wrapper in `Scripts`. The host supports these wrappers; it does not execute Windows batch files through a shell.
 
 Check discovery and run the command:
 
 ```bash
-tlego plugin list
-tlego summary --help
-tlego predict --time 2026-10-24T05:01:11Z --format json 25544 | tlego summary
+khonsu plugin list
+khonsu summary --help
+khonsu predict --time 2026-10-24T05:01:11Z --format json 25544 | khonsu summary
 ```
 
-Replace `25544` with `--file /absolute/path/to/satellite.tle` for an offline pipeline. An installed `tlego-summary` works directly with the same arguments and streams. The host does not install the extension or add the project directory to PATH.
+Replace `25544` with `--file /absolute/path/to/satellite.tle` for an offline pipeline. An installed `khonsu-summary` works directly with the same arguments and streams. The host does not install the extension or add the project directory to PATH.
 
 ## 4. Replace the summary with your behavior
 
-Edit `summarize` in `main.go` or `tlego_summary.py`, then extend its tests. Keep data acquisition separate from processing so fixtures can test your behavior without network requests.
+Edit `summarize` in `main.go` or `khonsu_summary.py`, then extend its tests. Keep data acquisition separate from processing so fixtures can test your behavior without network requests.
 
 A consumer of built-in output should:
 
@@ -117,7 +117,7 @@ import subprocess
 
 def summarize_satellite(catalog_id, timestamp):
     result = subprocess.run(
-        ["tlego", "predict", "--time", timestamp, "--format", "json",
+        ["khonsu", "predict", "--time", timestamp, "--format", "json",
          "--schema-version", "1.0", catalog_id],
         capture_output=True,
         text=True,
@@ -126,12 +126,12 @@ def summarize_satellite(catalog_id, timestamp):
     return summarize(json.loads(result.stdout))
 ```
 
-Handle `subprocess.CalledProcessError` in your CLI, report its stderr and return a failure status. Pass arguments as a list and invoke the built-in command by name. Built-ins take precedence, so `tlego predict` does not dispatch back to your extension. Use the same approach with Go's `exec.CommandContext` when the extension owns retrieval.
+Handle `subprocess.CalledProcessError` in your CLI, report its stderr and return a failure status. Pass arguments as a list and invoke the built-in command by name. Built-ins take precedence, so `khonsu predict` does not dispatch back to your extension. Use the same approach with Go's `exec.CommandContext` when the extension owns retrieval.
 
 ## 5. Keep the command contract
 
-Arguments after the extension name are passed unchanged, including `--help`. Implement your own help and flags. Write results to stdout, diagnostics to stderr, and return nonzero on failure. The host preserves child exit codes and coordinates Ctrl+C. It supplies `TLEGO_HOST_VERSION` and `TLEGO_EXTENSION_VERSION=1`; these describe the host and execution contract, not the JSON schema.
+Arguments after the extension name are passed unchanged, including `--help`. Implement your own help and flags. Write results to stdout, diagnostics to stderr, and return nonzero on failure. The host preserves child exit codes and coordinates Ctrl+C. It supplies `KHONSU_HOST_VERSION` and `KHONSU_EXTENSION_VERSION=1`; these describe the host and execution contract, not the JSON schema.
 
-Before distributing an extension, test it directly and through TLEGO. Include malformed JSON, unsupported majors, missing fields, empty results, warnings and redirected streams. Test an installed console-script wrapper on Windows if that platform is supported. Distribute through your language's ordinary tooling and keep the executable name `tlego-<name>`.
+Before distributing an extension, test it directly and through Khonsu. Include malformed JSON, unsupported majors, missing fields, empty results, warnings and redirected streams. Test an installed console-script wrapper on Windows if that platform is supported. Distribute through your language's ordinary tooling and keep the executable name `khonsu-<name>`.
 
 See [the full execution contract](extensions.md#dispatch-and-discovery) for lookup, collisions, cancellation limits and exit status rules. Extensions run with the user's permissions; they cannot register in-process providers or TUI panels.

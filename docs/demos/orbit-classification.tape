@@ -13,7 +13,7 @@ Set Framerate 12
 Set TypingSpeed 35ms
 
 Hide
-Type `export PATH="$TLEGO_DEMO_BIN_DIR:$PATH"; export PS1='$ '; clear`
+Type `export PATH="$KHONSU_DEMO_BIN_DIR:$PATH"; export PS1='$ '; clear`
 Enter
 Sleep 500ms
 Show

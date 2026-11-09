@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/server"
+	"github.com/Mohammed-Ashour/khonsu/pkg/server"
 	"github.com/urfave/cli/v3"
 )
 

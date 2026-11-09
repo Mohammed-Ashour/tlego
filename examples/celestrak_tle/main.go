@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/Mohammed-Ashour/tlego/pkg/celestrak"
-	"github.com/Mohammed-Ashour/tlego/pkg/logger"
+	"github.com/Mohammed-Ashour/khonsu/pkg/celestrak"
+	"github.com/Mohammed-Ashour/khonsu/pkg/logger"
 )
 
 func main() {

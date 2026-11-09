@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/catalog"
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
-	"github.com/Mohammed-Ashour/tlego/internal/output"
+	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/output"
 )
 
 func TestReportCommandsKeepLegacyAndOfferV1(t *testing.T) {

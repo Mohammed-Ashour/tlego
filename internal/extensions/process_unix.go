@@ -36,7 +36,7 @@ func runCommand(ctx context.Context, cmd *exec.Cmd, interactive bool) error {
 				pid = -pid
 			}
 			if err := syscall.Kill(pid, syscall.SIGKILL); err != nil && err != syscall.ESRCH {
-				// The interactive process group contains tlego too, so only the
+				// The interactive process group contains khonsu too, so only the
 				// extension process is safe to signal for a programmatic cancel.
 				_ = cmd.Process.Kill()
 			}

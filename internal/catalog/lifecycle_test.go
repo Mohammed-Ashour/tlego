@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
 )
 
 type observingContext struct {
@@ -278,7 +278,7 @@ func TestCachePersistenceFailureReturnsError(t *testing.T) {
 			if err != nil || !info.IsDir() {
 				t.Fatalf("destination changed: %v", err)
 			}
-			files, err := filepath.Glob(filepath.Join(store.cacheDir, "tlego-*.tmp"))
+			files, err := filepath.Glob(filepath.Join(store.cacheDir, "khonsu-*.tmp"))
 			if err != nil || len(files) != 0 {
 				t.Fatalf("temporary files: %v, %v", files, err)
 			}

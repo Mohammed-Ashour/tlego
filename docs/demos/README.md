@@ -2,7 +2,7 @@
 
 The recording runs the real TUI with the standalone example in `examples/tui-demo`. It browses the ISS, opens its details and ground track, starts live tracking, predicts `+2h`, and generates a JSON report. The example embeds one ISS element set retrieved from [CelesTrak](https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE) on 2026-10-25, with an element epoch of 2026-10-24.
 
-The saved snapshot makes the example usable offline. Position and tracking timestamps use the recording machine's clock. Results from this archived element set are for demonstrating the interface, not current observation planning. Live data is available through the normal `tlego tui` command.
+The saved snapshot makes the example usable offline. Position and tracking timestamps use the recording machine's clock. Results from this archived element set are for demonstrating the interface, not current observation planning. Live data is available through the normal `khonsu tui` command.
 
 ## Run the example
 
@@ -37,15 +37,15 @@ The baseline is merged PR #36 at `fc471afd9b7c76747c7fc13b88247c300984b549`. Bui
 ```bash
 mkdir -p .local-artifacts/orbit-before .local-artifacts/orbit-after
 git archive fc471afd9b7c76747c7fc13b88247c300984b549 | tar -x -C .local-artifacts/orbit-before
-go build -C .local-artifacts/orbit-before -o "$PWD/.local-artifacts/orbit-before/tlego" .
-go build -o .local-artifacts/orbit-after/tlego .
+go build -C .local-artifacts/orbit-before -o "$PWD/.local-artifacts/orbit-before/khonsu" .
+go build -o .local-artifacts/orbit-after/khonsu .
 
-TLEGO_DEMO_BIN_DIR="$PWD/.local-artifacts/orbit-before" vhs \
+KHONSU_DEMO_BIN_DIR="$PWD/.local-artifacts/orbit-before" vhs \
   -o assets/orbit-classification-before.mp4 -o assets/orbit-classification-before.gif \
   docs/demos/orbit-classification.tape
-TLEGO_DEMO_BIN_DIR="$PWD/.local-artifacts/orbit-after" vhs \
+KHONSU_DEMO_BIN_DIR="$PWD/.local-artifacts/orbit-after" vhs \
   -o assets/orbit-classification-after.mp4 -o assets/orbit-classification-after.gif \
   docs/demos/orbit-classification.tape
 ```
 
-Run `python3 docs/demos/orbit-classification.py /absolute/path/to/tlego` for the same comparison without recording. The changed labels and their limits are described in [orbit estimates](../orbit-estimates.md).
+Run `python3 docs/demos/orbit-classification.py /absolute/path/to/khonsu` for the same comparison without recording. The changed labels and their limits are described in [orbit estimates](../orbit-estimates.md).

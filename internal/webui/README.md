@@ -1,6 +1,6 @@
 # Web app
 
-The browser app behind `tlego web`. `dist` is built from `src` and embedded in the binary. Commit it with any change to `src`, or to the orbit viewer files it imports from `pkg/templates`. CI checks that it matches.
+The browser app behind `khonsu web`. `dist` is built from `src` and embedded in the binary. Commit it with any change to `src`, or to the orbit viewer files it imports from `pkg/templates`. CI checks that it matches.
 
 ```bash
 npm ci

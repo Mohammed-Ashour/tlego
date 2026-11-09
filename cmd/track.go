@@ -8,14 +8,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 	"github.com/urfave/cli/v3"
 )
 
 func init() {
 	RootCmd.Commands = append(RootCmd.Commands, &cli.Command{
 		Name:        "track",
-		Usage:       "tlego track <NORAD-ID>",
+		Usage:       "khonsu track <NORAD-ID>",
 		Description: "Continuously track the real-time position of a satellite using its NORAD ID.",
 		Action:      trackSatellite,
 		Flags:       sourceFlags(),

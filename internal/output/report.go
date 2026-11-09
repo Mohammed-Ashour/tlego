@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/Mohammed-Ashour/go-satellite-v2/pkg/tle"
-	"github.com/Mohammed-Ashour/tlego/internal/elements"
-	"github.com/Mohammed-Ashour/tlego/internal/orbit"
+	"github.com/Mohammed-Ashour/khonsu/internal/elements"
+	"github.com/Mohammed-Ashour/khonsu/internal/orbit"
 )
 
 type ReportData struct {
