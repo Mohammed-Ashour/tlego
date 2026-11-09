@@ -20,6 +20,16 @@ Download a binary from [GitHub Releases](https://github.com/Mohammed-Ashour/khon
 go install github.com/Mohammed-Ashour/khonsu@latest
 ```
 
+From a checkout, `make install` does the same, and `make help` lists the other commands.
+
+Khonsu works without any setup. To connect an optional [Space-Track](https://www.space-track.org/auth/createAccount) account and save your location, run the step-by-step wizard:
+
+```bash
+khonsu setup     # or: make setup, from a checkout
+```
+
+Press Enter to skip any question. [The web app guide](docs/web-app.md#space-track-account) explains how the account is stored.
+
 Then start the terminal UI:
 
 ```bash

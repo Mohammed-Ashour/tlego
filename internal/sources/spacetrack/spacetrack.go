@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Mohammed-Ashour/khonsu/internal/accounts"
 	"github.com/Mohammed-Ashour/khonsu/internal/sources/feed"
 )
 
@@ -54,12 +55,21 @@ type Client struct {
 	login *account
 }
 
-// New uses the account named by the environment, if there is one.
-func New(f *feed.Client) *Client { return &Client{f, DefaultBase, accountFromEnv()} }
+// New uses the account from the environment or "khonsu setup", if there is one.
+func New(f *feed.Client) *Client { return &Client{f, DefaultBase, configuredAccount()} }
 
 // NewWithAccount uses an explicit account and address, such as a test server.
 func NewWithAccount(f *feed.Client, base, user, password string) *Client {
 	return &Client{f, base, newAccount(user, password)}
+}
+
+// CheckLogin confirms the account works, without using the saved session.
+func (c *Client) CheckLogin(ctx context.Context) error {
+	if c.login == nil {
+		return ErrNoAccount
+	}
+	c.login.loggedIn = time.Time{}
+	return c.logIn(ctx)
 }
 
 // Configured reports whether the user has supplied an account.
@@ -72,12 +82,16 @@ type account struct {
 	loggedIn       time.Time
 }
 
-func accountFromEnv() *account {
-	user, password := os.Getenv(UserEnv), os.Getenv(PasswordEnv)
-	if user == "" || password == "" {
+// configuredAccount prefers the environment over an account saved by "khonsu setup".
+func configuredAccount() *account {
+	if user, password := os.Getenv(UserEnv), os.Getenv(PasswordEnv); user != "" && password != "" {
+		return newAccount(user, password)
+	}
+	saved, err := accounts.Load()
+	if err != nil || saved.SpaceTrack == nil || saved.SpaceTrack.User == "" || saved.SpaceTrack.Password == "" {
 		return nil
 	}
-	return newAccount(user, password)
+	return newAccount(saved.SpaceTrack.User, saved.SpaceTrack.Password)
 }
 
 func newAccount(user, password string) *account {
@@ -156,7 +170,7 @@ func parse(body []byte) ([]Record, error) {
 }
 
 // ErrNoAccount means the user hasn't supplied an account.
-var ErrNoAccount = fmt.Errorf("connect a Space-Track account by setting %s and %s", UserEnv, PasswordEnv)
+var ErrNoAccount = fmt.Errorf("connect a Space-Track account with khonsu setup, or set %s and %s", UserEnv, PasswordEnv)
 
 // Records returns a satellite's record using the user's own account.
 func (c *Client) Records(ctx context.Context, noradID string) ([]Record, feed.Meta, error) {

@@ -70,7 +70,9 @@ Feed routes return `source` (with its credit), `fetched_at`, `stale`, `warning` 
 
 ## Space-Track account
 
-Space-Track needs your own free account. Set `KHONSU_SPACE_TRACK_USER` and `KHONSU_SPACE_TRACK_PASSWORD` before running `khonsu web`. Khonsu uses them only to log in to Space-Track and never saves them.
+Space-Track needs your own free account. Run `khonsu setup` (or `make setup` from a checkout), then restart `khonsu web`. The wizard checks the login with Space-Track and saves it to `accounts.yaml` in Khonsu's config directory. That file is not encrypted, and only your user can read it.
+
+To avoid saving a password, set `KHONSU_SPACE_TRACK_USER` and `KHONSU_SPACE_TRACK_PASSWORD` instead. They take priority over a saved account. Khonsu uses these details only to log in to Space-Track.
 
 ## Changing the app
 

@@ -46,7 +46,7 @@ flowchart TD
 
 ## Data Source Modules
 
-internal/sources holds one package per provider (swpc, wikidata, gcat and so on). Each exports an Info value that describes and credits the source, plus a Client built on a shared feed.Client, so any frontend can use one provider alone. feed.Client handles caching, one request at a time per provider, and pausing after failures. The sources package groups them by category and offers a Hub of all clients. CelesTrak element sets stay in internal/catalog.
+internal/sources holds one package per provider (swpc, wikidata, gcat and so on). Each exports an Info value that describes and credits the source, plus a Client built on a shared feed.Client, so any frontend can use one provider alone. feed.Client handles caching, one request at a time per provider, and pausing after failures. The sources package groups them by category and offers a Hub of all clients. CelesTrak element sets stay in internal/catalog. Optional provider logins saved by `khonsu setup` live in internal/accounts.
 
 ## Runtime Entry Points
 

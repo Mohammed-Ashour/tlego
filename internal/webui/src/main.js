@@ -1112,7 +1112,7 @@ async function openDataDialog() {
   showFeed(token, 'launch-library', () => api.launches(), renderLaunches);
   cloudControl(token);
   const spaceTrackReady = catalog.categories.flatMap((category) => category.sources).some((source) => source.id === 'space-track' && source.status === 'live');
-  if (!spaceTrackReady) byId('data-feed-space-track').replaceChildren(element('p', 'note', 'Set KHONSU_SPACE_TRACK_USER and KHONSU_SPACE_TRACK_PASSWORD before starting Khonsu to use your account.'));
+  if (!spaceTrackReady) byId('data-feed-space-track').replaceChildren(element('p', 'note', 'Run khonsu setup to connect your own free account, then restart Khonsu.'));
   if (!selectedEntry()) {
     statusNote.textContent = 'Add a satellite to see its details here.';
     return;

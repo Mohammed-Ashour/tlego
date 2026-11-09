@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/Mohammed-Ashour/khonsu/internal/accounts"
 	"github.com/Mohammed-Ashour/khonsu/internal/sources/feed"
 )
 
@@ -85,6 +86,7 @@ func TestUnreachableSpaceTrackIsNotARejectedAccount(t *testing.T) {
 func TestRecordsNeedsAnAccount(t *testing.T) {
 	t.Setenv(UserEnv, "")
 	t.Setenv(PasswordEnv, "")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	c := New(feed.NewClient(t.TempDir()))
 	if _, _, err := c.Records(context.Background(), "25544"); !errors.Is(err, ErrNoAccount) || c.Configured() {
 		t.Fatalf("err = %v, configured = %v", err, c.Configured())
@@ -97,5 +99,40 @@ func TestServerOutageIsNotARejectedAccount(t *testing.T) {
 	_, _, err := NewWithAccount(feed.NewClient(t.TempDir()), server.URL, "me", "secret").Records(context.Background(), "25544")
 	if err == nil || errors.Is(err, feed.ErrCredentialsRejected) {
 		t.Fatalf("err = %v, want a failure that is not a rejected account", err)
+	}
+}
+
+func TestNewUsesSavedAccountUnlessTheEnvironmentHasOne(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv(UserEnv, "")
+	t.Setenv(PasswordEnv, "")
+	if err := accounts.Save(accounts.Accounts{SpaceTrack: &accounts.SpaceTrack{User: "saved", Password: "file"}}); err != nil {
+		t.Fatal(err)
+	}
+	if c := New(feed.NewClient(t.TempDir())); !c.Configured() || c.login.user != "saved" {
+		t.Fatalf("login = %+v", c.login)
+	}
+	t.Setenv(UserEnv, "env")
+	t.Setenv(PasswordEnv, "value")
+	if c := New(feed.NewClient(t.TempDir())); c.login.user != "env" {
+		t.Fatalf("login = %+v, want the environment's account", c.login)
+	}
+}
+
+func TestCheckLoginIgnoresAnEarlierSession(t *testing.T) {
+	var logins atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		logins.Add(1)
+		w.Write([]byte(`""`))
+	}))
+	defer server.Close()
+	c := NewWithAccount(feed.NewClient(t.TempDir()), server.URL, "me", "secret")
+	for range 2 {
+		if err := c.CheckLogin(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if logins.Load() != 2 {
+		t.Fatalf("logged in %d times, want 2", logins.Load())
 	}
 }
