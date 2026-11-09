@@ -104,8 +104,12 @@ func (c *Client) logIn(ctx context.Context) error {
 	defer response.Body.Close()
 	var buffer bytes.Buffer
 	_, _ = buffer.ReadFrom(response.Body)
+	// An outage must not count as a bad account, which pauses the source for hours.
+	if response.StatusCode != http.StatusOK && response.StatusCode != http.StatusUnauthorized && response.StatusCode != http.StatusForbidden {
+		return fmt.Errorf("Space-Track login returned HTTP %d", response.StatusCode)
+	}
 	if response.StatusCode != http.StatusOK || strings.Contains(buffer.String(), "Failed") {
-		return errors.New("Space-Track did not accept the account")
+		return fmt.Errorf("Space-Track did not accept the account: %w", feed.ErrCredentialsRejected)
 	}
 	account.loggedIn = c.feed.Now()
 	return nil

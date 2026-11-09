@@ -50,6 +50,36 @@ func TestConditionsCombinesProducts(t *testing.T) {
 	}
 }
 
+func TestConditionsKeepsKpWhenContextEndsDuringOptionalProduct(t *testing.T) {
+	for _, interrupt := range []string{"deadline", "canceled"} {
+		t.Run(interrupt, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if interrupt == "deadline" {
+				ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+				defer cancel()
+			}
+			c := client(t, func(w http.ResponseWriter, r *http.Request) {
+				if strings.HasSuffix(r.URL.Path, "noaa-planetary-k-index.json") {
+					w.Write([]byte(`[{"time_tag":"2026-11-09T12:00:00","Kp":2}]`))
+					return
+				}
+				if interrupt == "canceled" {
+					cancel()
+				}
+				<-r.Context().Done()
+			})
+			weather, meta, err := c.Conditions(ctx)
+			if err != nil {
+				t.Fatalf("err = %v, want the Kp data without an error", err)
+			}
+			if len(weather.Kp) != 1 || weather.Scales != nil || meta.Warning == "" {
+				t.Fatalf("weather = %+v, meta = %+v", weather, meta)
+			}
+		})
+	}
+}
+
 func TestConditionsSurvivesMissingOptionalProduct(t *testing.T) {
 	c := client(t, func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "noaa-planetary-k-index.json") {

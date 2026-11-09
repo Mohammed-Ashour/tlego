@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -49,6 +50,8 @@ type requestError struct {
 
 func (e requestError) Error() string { return e.err.Error() }
 
+func (e requestError) Unwrap() error { return e.err }
+
 func badRequest(format string, args ...any) error {
 	return requestError{http.StatusBadRequest, fmt.Errorf(format, args...)}
 }
@@ -57,6 +60,7 @@ func writeFailure(w http.ResponseWriter, err error) {
 	status := http.StatusUnprocessableEntity
 	var failure requestError
 	var pathErr *fs.PathError
+	var linkErr *os.LinkError
 	switch {
 	case errors.As(err, &failure):
 		status = failure.status
@@ -64,7 +68,7 @@ func writeFailure(w http.ResponseWriter, err error) {
 		status = http.StatusGatewayTimeout
 	}
 	// Filesystem errors name server paths, which clients have no use for.
-	if errors.As(err, &pathErr) {
+	if errors.As(err, &pathErr) || errors.As(err, &linkErr) {
 		err = errors.New("the satellite cache could not be used")
 	}
 	w.Header().Set("Content-Type", "application/json")

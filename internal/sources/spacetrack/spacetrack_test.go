@@ -47,11 +47,38 @@ func TestRecordsLogsInOnceAndUsesTheSession(t *testing.T) {
 }
 
 func TestRejectedAccountNamesNoSecret(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"Login":"Failed"}`)) }))
-	defer server.Close()
-	_, _, err := NewWithAccount(feed.NewClient(t.TempDir()), server.URL, "me", "hunter2").Records(context.Background(), "25544")
-	if err == nil || strings.Contains(err.Error(), "hunter2") {
-		t.Fatalf("err = %v", err)
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"failed body", http.StatusOK, `{"Login":"Failed"}`},
+		{"HTTP status", http.StatusUnauthorized, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.status)
+				w.Write([]byte(tc.body))
+			}))
+			defer server.Close()
+			_, _, err := NewWithAccount(feed.NewClient(t.TempDir()), server.URL, "me", "hunter2").Records(context.Background(), "25544")
+			if !errors.Is(err, feed.ErrCredentialsRejected) {
+				t.Fatalf("err = %v, want a rejected account", err)
+			}
+			if strings.Contains(err.Error(), "hunter2") {
+				t.Fatalf("err = %v names a secret", err)
+			}
+		})
+	}
+}
+
+func TestUnreachableSpaceTrackIsNotARejectedAccount(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	url := server.URL
+	server.Close()
+	_, _, err := NewWithAccount(feed.NewClient(t.TempDir()), url, "me", "hunter2").Records(context.Background(), "25544")
+	if err == nil || errors.Is(err, feed.ErrCredentialsRejected) || strings.Contains(err.Error(), "hunter2") {
+		t.Fatalf("err = %v, want a network error that is not a rejection", err)
 	}
 }
 
@@ -61,5 +88,14 @@ func TestRecordsNeedsAnAccount(t *testing.T) {
 	c := New(feed.NewClient(t.TempDir()))
 	if _, _, err := c.Records(context.Background(), "25544"); !errors.Is(err, ErrNoAccount) || c.Configured() {
 		t.Fatalf("err = %v, configured = %v", err, c.Configured())
+	}
+}
+
+func TestServerOutageIsNotARejectedAccount(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusServiceUnavailable) }))
+	defer server.Close()
+	_, _, err := NewWithAccount(feed.NewClient(t.TempDir()), server.URL, "me", "secret").Records(context.Background(), "25544")
+	if err == nil || errors.Is(err, feed.ErrCredentialsRejected) {
+		t.Fatalf("err = %v, want a failure that is not a rejected account", err)
 	}
 }

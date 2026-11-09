@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -280,6 +281,19 @@ func TestFilesystemErrorsHideServerPaths(t *testing.T) {
 	writeFailure(recorder, fmt.Errorf("saving: %w", &fs.PathError{Op: "mkdir", Path: "/secret/cache", Err: fs.ErrPermission}))
 	if strings.Contains(recorder.Body.String(), "/secret") {
 		t.Fatalf("body = %s", recorder.Body.String())
+	}
+}
+
+func TestRequestErrorsHidePathsAndKeepStatus(t *testing.T) {
+	for name, cause := range map[string]error{
+		"path": &fs.PathError{Op: "mkdir", Path: "/secret/path", Err: fs.ErrPermission},
+		"link": &os.LinkError{Op: "rename", Old: "/secret/path", New: "/secret/other", Err: fs.ErrPermission},
+	} {
+		recorder := httptest.NewRecorder()
+		writeFailure(recorder, requestError{http.StatusBadGateway, fmt.Errorf("could not get data: %w", cause)})
+		if recorder.Code != http.StatusBadGateway || strings.Contains(recorder.Body.String(), "/secret/path") {
+			t.Errorf("%s: status %d, body = %s", name, recorder.Code, recorder.Body.String())
+		}
 	}
 }
 

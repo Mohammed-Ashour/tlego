@@ -62,6 +62,14 @@ type Entry struct {
 
 var unlabeled = regexp.MustCompile(`^Q\d+$`)
 
+// label drops a value that is only the item ID, which the label service returns when no label exists.
+func label(value string) string {
+	if unlabeled.MatchString(value) {
+		return ""
+	}
+	return value
+}
+
 func parse(body []byte) ([]Entry, error) {
 	var document struct {
 		Results *struct {
@@ -97,7 +105,7 @@ func parse(body []byte) ([]Entry, error) {
 		}
 		entry := byID[id]
 		if entry == nil {
-			entry = &Entry{WikidataID: id, URL: "https://www.wikidata.org/wiki/" + id, Name: row["itemLabel"].Value, Description: row["itemDescription"].Value, Types: []string{}, Operators: []string{}, Countries: []string{}}
+			entry = &Entry{WikidataID: id, URL: "https://www.wikidata.org/wiki/" + id, Name: label(row["itemLabel"].Value), Description: label(row["itemDescription"].Value), Types: []string{}, Operators: []string{}, Countries: []string{}}
 			byID[id] = entry
 		}
 		add(&entry.Types, row["typeLabel"].Value)
@@ -135,6 +143,6 @@ func (c *Client) Lookup(ctx context.Context, noradID string) ([]Entry, feed.Meta
   OPTIONAL { ?item wdt:P495 ?country. }
   OPTIONAL { ?item wdt:P619 ?launch. }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
-} LIMIT 200`, id)
+} LIMIT 2000`, id)
 	return feed.Get(ctx, c.feed, feed.Request{Source: ID, Key: id, URL: c.base + "?" + url.Values{"query": {query}}.Encode(), Accept: "application/sparql-results+json", TTL: entryTTL}, parse)
 }

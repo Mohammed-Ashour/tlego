@@ -68,7 +68,9 @@ func validate(body []byte) error {
 	if !bytes.HasPrefix(body, []byte("#JCAT\tSatcat\t")) {
 		return errors.New("not a GCAT table")
 	}
-	return nil
+	// find checks the required columns and that the table has data rows.
+	_, err := find(body, "")
+	return err
 }
 
 func find(body []byte, id string) (*Record, error) {
@@ -85,12 +87,14 @@ func find(body []byte, id string) (*Record, error) {
 			return nil, fmt.Errorf("GCAT table has no %s column", required)
 		}
 	}
+	rows := 0
 	for len(rest) > 0 {
 		var line []byte
 		line, rest, _ = bytes.Cut(rest, []byte("\n"))
 		if len(line) == 0 || line[0] == '#' {
 			continue
 		}
+		rows++
 		fields := strings.Split(strings.TrimRight(string(line), "\r"), "\t")
 		value := func(name string) string {
 			index := columns[name]
@@ -114,6 +118,9 @@ func find(body []byte, id string) (*Record, error) {
 			record.MassKg = &mass
 		}
 		return record, nil
+	}
+	if rows == 0 {
+		return nil, errors.New("GCAT table has no data rows")
 	}
 	return nil, nil
 }

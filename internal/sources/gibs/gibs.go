@@ -97,10 +97,14 @@ func (c *Client) Image(ctx context.Context, layer Layer) ([]byte, feed.Meta, err
 		ext = "png"
 	}
 	if layer.Daily {
-		ttl = dailyImageTTL
-		query.Set("TIME", c.feed.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02"))
+		// A saved picture expires at the next UTC midnight, so yesterday's view is never
+		// served after the day changes.
+		now := c.feed.Now().UTC()
+		midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		ttl = min(dailyImageTTL, now.Sub(midnight))
+		query.Set("TIME", now.AddDate(0, 0, -1).Format("2006-01-02"))
 	}
-	return c.feed.Fetch(ctx, feed.Request{Source: layer.SourceID, Key: layer.ID, Ext: ext, URL: c.base + "?" + query.Encode(), TTL: ttl, MaxBytes: maxImageBytes, Timeout: time.Minute, Validate: validateImage(layer)})
+	return c.feed.Fetch(ctx, feed.Request{Source: ID, Key: layer.ID, Ext: ext, URL: c.base + "?" + query.Encode(), TTL: ttl, MaxBytes: maxImageBytes, Timeout: time.Minute, Validate: validateImage(layer)})
 }
 
 // NewLayer describes a GIBS layer for one source. Transparent layers are partial

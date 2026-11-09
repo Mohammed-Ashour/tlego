@@ -2,6 +2,7 @@ package donki
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -28,6 +29,20 @@ func TestRecentMergesEventTypesNewestFirst(t *testing.T) {
 	}
 	if meta.Warning != "" || len(events) != 2 || events[0].Kind != "Geomagnetic storm" || events[0].Detail != "Kp 7" || events[1].Detail != "M1.2 N10E20" {
 		t.Fatalf("events = %+v, meta = %+v", events, meta)
+	}
+}
+
+func TestStormDetailKeepsFractionalKp(t *testing.T) {
+	var row stormRow
+	if err := json.Unmarshal([]byte(`{"startTime":"2026-11-05T03:00Z","allKpIndex":[{"kpIndex":5.67}],"link":""}`), &row); err != nil {
+		t.Fatal(err)
+	}
+	event, err := readStorm(row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event.Detail != "Kp 5.67" {
+		t.Fatalf("detail = %q", event.Detail)
 	}
 }
 

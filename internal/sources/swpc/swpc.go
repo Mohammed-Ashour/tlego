@@ -99,7 +99,7 @@ func (c *Client) Conditions(ctx context.Context) (Conditions, feed.Meta, error) 
 	}
 	result := Conditions{Kp: kp, Flux: []FluxSample{}, Alerts: []Alert{}}
 	missing := func(err error) {
-		if ctx.Err() == nil && err != nil && meta.Warning == "" {
+		if err != nil && meta.Warning == "" {
 			meta.Warning = "Some space weather products could not be read."
 		}
 	}
@@ -121,7 +121,7 @@ func (c *Client) Conditions(ctx context.Context) (Conditions, feed.Meta, error) 
 		feed.Merge(&meta, part)
 		result.Alerts = recentAlerts(alerts, c.feed.Now())
 	}
-	return result, meta, ctx.Err()
+	return result, meta, nil
 }
 
 func parseKp(body []byte) ([]KpSample, error) {

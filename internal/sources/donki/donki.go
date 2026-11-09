@@ -5,10 +5,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"math"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -121,7 +121,7 @@ func readStorm(row stormRow) (Event, error) {
 	}
 	detail := ""
 	if strongest > 0 {
-		detail = fmt.Sprintf("Kp %.0f", strongest)
+		detail = "Kp " + strconv.FormatFloat(strongest, 'f', -1, 64)
 	}
 	return Event{"Geomagnetic storm", at, detail, row.Link}, err
 }

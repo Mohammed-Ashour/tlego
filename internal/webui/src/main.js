@@ -873,7 +873,7 @@ function feedCredit(feed) {
 }
 
 function dataFailure(error) {
-  return element('p', 'note is-warning', error.message || 'This source could not be reached.');
+  return element('p', 'note is-warning', providerMessage(error.message || '') || 'This source could not be reached.');
 }
 
 function dataTime(isoTime) {
@@ -973,18 +973,25 @@ function cloudControl(token) {
     node.replaceChildren(element('p', 'note', 'Set your location to check cloud cover.'));
     return;
   }
+  // The result goes in its own child so the button keeps focus and stays for a retry.
   const button = element('button', 'text-button', 'Check clouds near me');
   button.type = 'button';
-  button.addEventListener('click', () => showFeed(token, 'open-meteo', () => api.cloudCover(state.observer), renderClouds));
-  node.replaceChildren(button);
+  const result = element('div');
+  result.id = 'data-feed-open-meteo-result';
+  button.addEventListener('click', () => {
+    button.textContent = 'Check again';
+    showFeed(token, 'open-meteo-result', () => api.cloudCover(state.observer), renderClouds);
+  });
+  node.replaceChildren(button, result);
 }
 
 async function applyImagery(layerId) {
+  if (!globe) return;
   state.imagery = layerId;
   const credit = byId('imagery-credit');
   if (!layerId) {
     credit.hidden = true;
-    await globe?.setImagery(null);
+    await globe.setImagery(null);
     return;
   }
   const layer = imageryLayers.find((item) => item.id === layerId);
@@ -992,7 +999,7 @@ async function applyImagery(layerId) {
   credit.textContent = `Loading ${layer.name}…`;
   const url = `/api/v1/imagery?layer=${encodeURIComponent(layerId)}`;
   try {
-    await globe?.setImagery(url, layer.transparent);
+    await globe.setImagery(url, layer.transparent);
     if (state.imagery !== layerId) return;
     // The picture's freshness is only available from its response headers.
     const { headers } = await fetch(url, { method: 'HEAD' });
@@ -1003,7 +1010,14 @@ async function applyImagery(layerId) {
     if (headers.get('X-Khonsu-Stale') === 'true') parts.push('saved copy');
     credit.textContent = parts.join(' · ');
   } catch {
-    if (state.imagery === layerId) credit.textContent = `${layer.name} could not be loaded.`;
+    if (state.imagery !== layerId) return;
+    credit.textContent = `${layer.name} could not be loaded.`;
+    // Drop the previous picture so the globe does not keep it without its credit.
+    try {
+      await globe.setImagery(null);
+    } catch {
+      // The message above is enough; a failed clean-up must not escape.
+    }
   }
 }
 
@@ -1052,7 +1066,7 @@ function renderDataCategories(categories, liveData) {
   byId('data-categories').replaceChildren(...categories.map((category) => {
     const section = element('section', 'data-category');
     section.append(element('h3', null, category.title), element('p', 'note', category.description));
-    if (category.id === 'earth-imagery' && liveData) section.append(imageryControl());
+    if (category.id === 'earth-imagery' && liveData && globe) section.append(imageryControl());
     for (const source of category.sources) {
       const row = element('div', 'data-source');
       const link = element('a', null, source.name);

@@ -27,7 +27,7 @@ khonsu web --file satellites.tle            # Local elements, no provider reques
 
 - Your location stays in this browser's storage. It goes only to your Khonsu server, to calculate passes, and is never placed in the URL.
 - The app loads nothing from other sites, and a Content Security Policy enforces this. *Current position on a map* is a link you choose to follow.
-- *Data* fetches public data through your Khonsu server and credits each source. Nothing is fetched until you open it. It then sends the selected satellite's NORAD ID to Wikidata and SatNOGS, and to Space-Track if you've connected an account. Cloud cover is the only feature that sends your location. It runs only when you ask, and sends coordinates rounded to about 10 km to Open-Meteo. Serving a local file with `--file` turns all of these requests off.
+- *Data* fetches public data through your Khonsu server and credits each source. Nothing is fetched until you open it. It then sends the selected satellite's NORAD ID to Wikidata and SatNOGS, and to Space-Track if you've connected an account. For Sentinel-2 and Landsat satellites, Earth Search receives the satellite's platform name. Cloud cover is the only feature that sends your location. It runs only when you ask, and sends coordinates rounded to about 10 km to Open-Meteo. Serving a local file with `--file` turns all of these requests off.
 - The server only accepts GET and HEAD, refuses API calls from other websites, and on loopback answers only to loopback host names, which blocks DNS rebinding.
 - The server listens on loopback by default and has no authentication. Binding it elsewhere prints a warning: anyone who can reach it can use it and trigger provider requests. Use a reverse proxy with rate limits if you need that.
 

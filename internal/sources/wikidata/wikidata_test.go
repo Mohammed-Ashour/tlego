@@ -38,6 +38,22 @@ func TestLookupGroupsRowsAndHidesUnlabeledValues(t *testing.T) {
 	}
 }
 
+func TestUnlabeledItemHasNoNameOrDescription(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"results":{"bindings":[
+			{"item":{"value":"http://www.wikidata.org/entity/Q12345"},"itemLabel":{"value":"Q12345"},"itemDescription":{"value":"Q12346"}}
+		]}}`))
+	}))
+	defer server.Close()
+	entries, _, err := NewAt(feed.NewClient(t.TempDir()), server.URL).Lookup(context.Background(), "25544")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name != "" || entries[0].Description != "" {
+		t.Fatalf("entries = %+v", entries)
+	}
+}
+
 func TestMalformedResponseDoesNotReplaceSavedData(t *testing.T) {
 	var body atomic.Value
 	body.Store(`{"results":{"bindings":[{"item":{"value":"http://www.wikidata.org/entity/Q1"},"itemLabel":{"value":"Good"}}]}}`)

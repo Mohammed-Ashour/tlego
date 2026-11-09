@@ -62,6 +62,10 @@ func NewClient(cacheDir string) *Client {
 	return client
 }
 
+// ErrCredentialsRejected is wrapped by a Prepare error when the provider refused the
+// user's account. That waits longestPause, while other Prepare errors wait failurePause.
+var ErrCredentialsRejected = errors.New("credentials rejected")
+
 // Request describes one provider response to fetch or reuse.
 type Request struct {
 	Source, Key, URL, Accept string
@@ -126,6 +130,7 @@ func (c *Client) Fetch(ctx context.Context, r Request) ([]byte, Meta, error) {
 		if err == nil {
 			if err = r.Validate(body); err != nil {
 				err = fmt.Errorf("unexpected response: %w", err)
+				pause = failurePause
 			}
 		}
 		if err == nil {
@@ -161,7 +166,10 @@ func (c *Client) download(ctx context.Context, r Request) ([]byte, time.Duration
 	defer cancel()
 	if r.Prepare != nil {
 		if err := r.Prepare(ctx); err != nil {
-			return nil, longestPause, err
+			if errors.Is(err, ErrCredentialsRejected) {
+				return nil, longestPause, err
+			}
+			return nil, failurePause, err
 		}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.URL, nil)
@@ -178,7 +186,7 @@ func (c *Client) download(ctx context.Context, r Request) ([]byte, time.Duration
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return nil, retryPause(response.Header.Get("Retry-After")), fmt.Errorf("provider returned HTTP %d", response.StatusCode)
+		return nil, c.retryPause(response.Header.Get("Retry-After")), fmt.Errorf("provider returned HTTP %d", response.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil {
@@ -190,12 +198,27 @@ func (c *Client) download(ctx context.Context, r Request) ([]byte, time.Duration
 	return body, 0, nil
 }
 
-func retryPause(header string) time.Duration {
-	seconds, err := strconv.Atoi(header)
-	if err != nil || seconds <= 0 {
+// retryPause reads Retry-After, in seconds or as an HTTP date, and never waits longer
+// than longestPause.
+func (c *Client) retryPause(header string) time.Duration {
+	if seconds, err := strconv.ParseInt(header, 10, 64); err == nil {
+		if seconds <= 0 {
+			return failurePause
+		}
+		if seconds > int64(longestPause/time.Second) {
+			return longestPause
+		}
+		return time.Duration(seconds) * time.Second
+	}
+	when, err := http.ParseTime(header)
+	if err != nil {
 		return failurePause
 	}
-	return min(time.Duration(seconds)*time.Second, longestPause)
+	pause := when.Sub(c.Now())
+	if pause <= 0 {
+		return failurePause
+	}
+	return min(pause, longestPause)
 }
 
 func (c *Client) readSaved(path string, r Request) ([]byte, Meta, bool) {

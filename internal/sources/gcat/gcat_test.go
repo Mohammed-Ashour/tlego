@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -36,6 +37,22 @@ func TestLookupFindsARowAndCleansItsValues(t *testing.T) {
 	}
 	if hits.Load() != 1 {
 		t.Fatalf("provider saw %d downloads, want 1", hits.Load())
+	}
+}
+
+func TestLookupRejectsTablesMissingColumnsOrRows(t *testing.T) {
+	headerOnly := table[:strings.IndexByte(table, '\n')+1]
+	for name, body := range map[string]string{
+		"missing Mass column": strings.Replace(table, "\tMass", "", 1),
+		"no data rows":        headerOnly,
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(body)) }))
+			defer server.Close()
+			if _, _, err := NewAt(feed.NewClient(t.TempDir()), server.URL).Lookup(context.Background(), "25544"); err == nil {
+				t.Fatal("Lookup accepted a table that is not usable")
+			}
+		})
 	}
 }
 
