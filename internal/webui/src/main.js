@@ -1,5 +1,6 @@
 import { createApi, isAbort } from './api.js';
 import { createGlobe } from './globe.js';
+import { createLayers } from './layers.js';
 import {
   annotatePasses, buildUrlState, canonicalId, clamp, cloudAtTime, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
   dataAge, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
@@ -26,7 +27,6 @@ const state = {
   selected: null,
   observer: readStoredObserver(storage),
   utc: storage.getItem('khonsu.utc') === '1',
-  imagery: null,
   window: windowFrom(Date.now()),
   time: Date.now(),
   live: true,
@@ -55,6 +55,7 @@ let liveDataOn = true;
 // The one api.sources() request, shared by the Data dialog, the dossier and the sky bar.
 let sourcesRequest = null;
 let catalog = null;
+let layersCatalog = null;
 let dossier = null;
 let skyBar = null;
 // Bumped on every selection change, so only the newest decides the Sees tab.
@@ -936,7 +937,6 @@ function setPicking(value) {
 // Data sources
 
 let dataRequest = 0;
-let imageryLayers = [];
 
 function feedCredit(feed) {
   const parts = [feed.source.credit, feed.source.nature, `updated ${dataAge(feed.fetched_at, Date.now())}`];
@@ -954,64 +954,11 @@ function dataTime(isoTime) {
   return `${formatDay(time, state.utc)} ${formatClock(time, state.utc).slice(0, 5)} ${zoneLabel(state.utc)}`;
 }
 
-async function applyImagery(layerId) {
-  if (!globe) return;
-  state.imagery = layerId;
-  const credit = byId('imagery-credit');
-  if (!layerId) {
-    credit.hidden = true;
-    await globe.setImagery(null);
-    return;
-  }
-  const layer = imageryLayers.find((item) => item.id === layerId);
-  credit.hidden = false;
-  credit.textContent = `Loading ${layer.name}…`;
-  const url = `/api/v1/imagery?layer=${encodeURIComponent(layerId)}`;
-  try {
-    await globe.setImagery(url, layer.transparent);
-    if (state.imagery !== layerId) return;
-    // The picture's freshness is only available from its response headers.
-    const { headers } = await fetch(url, { method: 'HEAD' });
-    if (state.imagery !== layerId) return;
-    const parts = [layer.name, layer.credit];
-    const fetchedAt = headers.get('X-Khonsu-Fetched-At');
-    if (fetchedAt) parts.push(`updated ${dataAge(fetchedAt, Date.now())}`);
-    if (headers.get('X-Khonsu-Stale') === 'true') parts.push('saved copy');
-    credit.textContent = parts.join(' · ');
-  } catch {
-    if (state.imagery !== layerId) return;
-    credit.textContent = `${layer.name} could not be loaded.`;
-    // Drop the previous picture so the globe does not keep it without its credit.
-    try {
-      await globe.setImagery(null);
-    } catch {
-      // The message above is enough; a failed clean-up must not escape.
-    }
-  }
-}
-
-function imageryControl() {
-  const label = element('label', 'field imagery-control');
-  label.append(element('span', null, 'Show on the globe'));
-  const select = element('select');
-  const none = element('option', null, 'Plain globe');
-  none.value = '';
-  select.append(none, ...imageryLayers.map((layer) => {
-    const option = element('option', null, layer.name);
-    option.value = layer.id;
-    return option;
-  }));
-  select.value = state.imagery ?? '';
-  select.addEventListener('change', () => applyImagery(select.value || null));
-  label.append(select);
-  return label;
-}
-
-function renderDataCategories(categories, liveData) {
+function renderDataCategories(categories) {
   byId('data-categories').replaceChildren(...categories.map((category) => {
     const section = element('section', 'data-category');
     section.append(element('h3', null, category.title), element('p', 'note', category.description));
-    if (category.id === 'earth-imagery' && liveData && globe) section.append(imageryControl());
+    if (category.id === 'earth-imagery') section.append(element('p', 'note', 'Choose pictures with the Layers button on the globe.'));
     for (const source of category.sources) {
       const row = element('div', 'data-source');
       const link = element('a', null, source.name);
@@ -1053,9 +1000,25 @@ async function openDataDialog() {
     return;
   }
   if (token !== dataRequest) return;
-  imageryLayers = sources.imagery_layers;
-  renderDataCategories(sources.categories, sources.live_data);
+  renderDataCategories(sources.categories);
   if (!sources.live_data) statusNote.textContent = 'Live data is off while serving a local file, so no provider requests are made.';
+}
+
+// The Layers button shows or hides the panel. Escape inside the panel closes it and returns focus to the button.
+function wireLayersPanel() {
+  const button = byId('layers-open');
+  const panel = byId('layers-panel');
+  const setOpen = (open) => {
+    panel.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+  };
+  button.addEventListener('click', () => setOpen(panel.hidden));
+  panel.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    setOpen(false);
+    button.focus();
+  });
 }
 
 function wireDataDialog() {
@@ -1241,6 +1204,7 @@ async function start() {
   // One request serves every consumer. A failure leaves catalog null, and the dossier and sky bar use their defaults.
   sourcesRequest = api.sources();
   catalog = sourcesRequest.then(sourceInfo).catch(() => null);
+  layersCatalog = sourcesRequest.then((sources) => ({ liveData: sources.live_data, layers: sources.imagery_layers })).catch(() => null);
   catalog.then((info) => {
     liveDataOn = info?.liveData !== false;
     renderPasses();
@@ -1257,8 +1221,6 @@ async function start() {
     focusScene,
     clearScene,
   });
-  skyBar = createSkyBar({ api, element, feedCredit, dataFailure, dataTime, catalog, chips: byId('sky-chips'), popover: byId('sky-popover') });
-  skyBar.start();
   try {
     globe = createGlobe(byId('scene'), {
       onPick(point) {
@@ -1282,10 +1244,34 @@ async function start() {
     sceneFailure('3D rendering is unavailable, so the globe is hidden. Enable WebGL in your browser and reload. Satellite details and passes still work.');
     for (const id of ['camera-follow', 'camera-home', 'zoom-in', 'zoom-out']) byId(id).disabled = true;
   }
+  // Created after the globe, which may be null. With no globe the panel says the layers are off.
+  const layers = createLayers({
+    element,
+    panel: byId('layers-panel'),
+    credit: byId('imagery-credit'),
+    catalog: layersCatalog,
+    storage,
+    globe,
+    dataAge,
+  });
+  layers.start();
+  skyBar = createSkyBar({
+    api,
+    element,
+    feedCredit,
+    dataFailure,
+    dataTime,
+    catalog,
+    chips: byId('sky-chips'),
+    popover: byId('sky-popover'),
+    onKp: (kp) => layers.setKp(kp),
+  });
+  skyBar.start();
   wireTabs();
   wireControls();
   wireObserver();
   wireDataDialog();
+  wireLayersPanel();
   renderObserverLabel();
   renderSliderLabels();
   renderTracked();

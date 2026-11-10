@@ -6,7 +6,8 @@ const LIVE_OFF_NOTE = 'Live data is off while serving a local file.';
 
 // Two chips in the top bar, each opening a small popover. Only one popover is open at a time.
 // Every request is kept in a store so that chips, popovers and the session cache share one state.
-export function createSkyBar({ api, element, feedCredit, dataFailure, dataTime, catalog, chips, popover, now = Date.now }) {
+// onKp(kp) gets the latest Kp after each successful space weather response, and null on failure or while live data is off.
+export function createSkyBar({ api, element, feedCredit, dataFailure, dataTime, catalog, chips, popover, onKp = () => {}, now = Date.now }) {
   const weather = newStore();
   const launches = newStore();
   const history = newStore();
@@ -184,9 +185,23 @@ export function createSkyBar({ api, element, feedCredit, dataFailure, dataTime, 
     });
   }
 
+  // Wraps the weather request so the Kp callback sees every response. An abort is not a failure.
+  function fetchWeather() {
+    return Promise.resolve(api.spaceWeather()).then(
+      (feed) => {
+        onKp(latestKp(feed.data));
+        return feed;
+      },
+      (error) => {
+        if (!isAbort(error)) onKp(null);
+        throw error;
+      },
+    );
+  }
+
   function openWeather(id) {
     if (!liveData) return;
-    whenSettled(load(weather, () => api.spaceWeather()), id);
+    whenSettled(load(weather, fetchWeather), id);
     // Fetched once per session. A failed store is retried on the next open because it has no feed.
     if (!history.feed) whenSettled(load(history, () => api.spaceWeatherHistory()), id);
     if (!events.feed) whenSettled(load(events, () => api.spaceEvents()), id);
@@ -260,9 +275,10 @@ export function createSkyBar({ api, element, feedCredit, dataFailure, dataTime, 
     liveData = info?.liveData !== false;
     if (!liveData) {
       setChipText();
+      onKp(null);
       return;
     }
-    await Promise.all([load(weather, () => api.spaceWeather()), load(launches, () => api.launches())]);
+    await Promise.all([load(weather, fetchWeather), load(launches, () => api.launches())]);
   }
 
   // Re-labels the launch chip so the countdown moves on. It uses the held data and makes no request.

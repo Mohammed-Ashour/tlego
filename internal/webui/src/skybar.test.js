@@ -82,7 +82,7 @@ const HISTORY = [{ date: '2026-11-08', kp_max: 6, f107: 130 }, { date: '2026-10-
 const EVENTS = [{ time: '2026-11-08T12:00:00Z', kind: 'Solar flare', detail: 'M1.2' }];
 const LAUNCHES = [{ name: 'Falcon 9', net: '2026-11-09T20:00:00Z', status: 'Go' }];
 
-function setup({ live = true, catalog } = {}) {
+function setup({ live = true, catalog, onKp } = {}) {
   const document = new FakeNode('document');
   globalThis.document = document;
   const calls = [];
@@ -118,6 +118,7 @@ function setup({ live = true, catalog } = {}) {
     catalog: catalog ?? Promise.resolve(live === null ? null : { liveData: live }),
     chips,
     popover,
+    onKp,
     now: () => clock.now,
   });
   return {
@@ -350,4 +351,31 @@ test('an AbortError is ignored and leaves the chip loading', async () => {
   await starting;
   await flush();
   assert.equal(env.launchChip().textContent, 'Launch …');
+});
+
+test('onKp gets the latest Kp after each weather response, and null when a refresh fails', async () => {
+  const kps = [];
+  const env = setup({ onKp: (kp) => kps.push(kp) });
+  const starting = env.bar.start();
+  await flush();
+  env.ok('spaceWeather', WEATHER);
+  env.ok('launches', LAUNCHES);
+  await starting;
+  await flush();
+  assert.deepEqual(kps, [5]);
+  env.kpChip().fire('click');
+  env.fail('spaceWeather', 'Refresh failed');
+  env.fail('spaceWeatherHistory', 'no history');
+  env.fail('spaceEvents', 'no events');
+  await flush();
+  assert.deepEqual(kps, [5, null]);
+});
+
+test('onKp gets null and no weather request is made while live data is off', async () => {
+  const kps = [];
+  const env = setup({ live: false, onKp: (kp) => kps.push(kp) });
+  await env.bar.start();
+  await flush();
+  assert.deepEqual(kps, [null]);
+  assert.equal(env.calls.includes('spaceWeather'), false);
 });
