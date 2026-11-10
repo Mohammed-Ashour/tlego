@@ -14,6 +14,10 @@ export function compassPoint(azimuth) {
 export function providerMessage(message) {
   if (/\b403\b/.test(message)) return 'CelesTrak is limiting downloads of this data for now. Try again later.';
   if (/Failed to fetch|NetworkError|Load failed/.test(message)) return 'The Khonsu server could not be reached.';
+  // An outage or slow answer. Anything loaded before still comes from its saved copy.
+  const unavailable = /deadline exceeded|Timeout exceeded|i\/o timeout|connection refused|connection reset|no such host|\b50[234]\b/i.test(message);
+  if (unavailable && /celestrak/i.test(message)) return "CelesTrak isn't answering right now. Try again in a few minutes. Anything you've loaded before still works from its saved copy.";
+  if (unavailable) return "The data provider isn't answering right now. Try again in a few minutes.";
   return message;
 }
 

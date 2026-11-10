@@ -153,7 +153,7 @@ test('windows lead the clock and refresh before running out', () => {
 });
 
 test('rate limits get a helpful message and other errors pass through', () => {
-  assert.match(providerMessage('unexpected status: 403 Forbidden'), /limiting downloads/);
+  assert.match(providerMessage('celestrak.org answered 403 Forbidden'), /limiting downloads/);
   assert.equal(providerMessage('NORAD ID 99999 is not in the local file'), 'NORAD ID 99999 is not in the local file');
 });
 
@@ -172,6 +172,10 @@ test('storage failures are contained', () => {
 
 test('connection failures get a clear message', () => {
   assert.match(providerMessage('Failed to fetch'), /could not be reached/);
+  assert.match(providerMessage('Get "https://celestrak.org/NORAD/elements/gp.php?FORMAT=JSON&GROUP=tdrss": context deadline exceeded (Client.Timeout exceeded while awaiting headers)'), /CelesTrak isn't answering/);
+  assert.match(providerMessage('celestrak.org answered 503 Service Unavailable'), /CelesTrak isn't answering/);
+  assert.match(providerMessage('could not get data from this source: context deadline exceeded'), /provider isn't answering/);
+  assert.equal(providerMessage('NORAD ID 5030 is not in the local file'), 'NORAD ID 5030 is not in the local file');
 });
 
 test('short coordinates round and never show a negative zero', () => {
