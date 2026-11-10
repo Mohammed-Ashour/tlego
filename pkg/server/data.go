@@ -84,7 +84,7 @@ func (d dataAPI) catalog(w http.ResponseWriter, _ *http.Request) {
 	if d.client != nil {
 		groups = d.client.Catalog()
 	}
-	writeJSON(w, map[string]any{"live_data": d.client != nil, "categories": groups, "imagery_layers": sources.Layers()})
+	writeJSON(w, map[string]any{"live_data": d.client != nil, "categories": groups, "imagery_layers": sources.Layers(), "imaging_satellites": earthsearch.ImagingIDs()})
 }
 
 func coordinates(r *http.Request) (float64, float64, error) {

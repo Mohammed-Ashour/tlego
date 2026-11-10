@@ -132,7 +132,7 @@ func (w *setupWizard) run(ctx context.Context) error {
 
 func (w *setupWizard) spaceTrackStep(ctx context.Context) error {
 	fmt.Fprintln(w.out, "\nStep 1 of 2: Space-Track account")
-	fmt.Fprintln(w.out, "Adds authoritative catalog records to the app's Data panel. Other sources need no account.")
+	fmt.Fprintln(w.out, "Adds authoritative catalog records to the web app's Identity tab. Other sources need no account.")
 	if os.Getenv(spacetrack.UserEnv) != "" && os.Getenv(spacetrack.PasswordEnv) != "" {
 		fmt.Fprintf(w.out, "%s and %s are set, and they take priority over a saved account.\n", spacetrack.UserEnv, spacetrack.PasswordEnv)
 	}

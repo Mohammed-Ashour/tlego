@@ -19,7 +19,11 @@ khonsu web --file satellites.tle            # Local elements, no provider reques
 
 - **Track:** add up to eight satellites from a group, by filtering, or by typing a NORAD ID. Filtering is local. *Search all groups* can make up to 44 provider requests on a cold cache, so it only runs when you press it.
 - **Locate:** set your location by typing it, using the browser's location, or clicking the globe. *Now* then shows the direction and elevation, and a line joins you to the satellite while it is above your horizon.
-- **Passes:** see the next 48 hours, with a countdown to the next visible pass and a badge on each visible one. Select a pass for its sky plot, where the white stretch is the visible part, then use *Show on globe* to jump to its peak.
+- **Passes:** see the next 48 hours, with a countdown to the next visible pass and a badge on each visible one. Select a pass for its sky plot, where the white stretch is the visible part, then use *Show on globe* to jump to its peak. *Check clouds near me* adds the forecast cloud cover to each pass.
+- **Identity:** the selected satellite's name, operator, country and launch details from Wikidata, its catalog record from GCAT, and its Space-Track record if you have an account.
+- **Radio:** the active transmitters that SatNOGS DB lists, with frequency and mode.
+- **Sees:** recent images of the satellite from Earth Search. The tab appears only for Sentinel-2 and Landsat satellites. Choose an image to mark where it was taken on the globe. The mark is blue, and the view turns to face it.
+- **Chips:** the top bar shows the latest Kp index and the time to the next launch. Select a chip to see the space weather details or the next launches.
 - **Time:** *Live* follows the clock. The slider and playback speeds cover about 25 hours, starting an hour ago. Times can be local or UTC.
 - **Share:** the URL holds the tracked satellites and the selection, so you can bookmark or send it.
 
@@ -27,7 +31,7 @@ khonsu web --file satellites.tle            # Local elements, no provider reques
 
 - Your location stays in this browser's storage. It goes only to your Khonsu server, to calculate passes, and is never placed in the URL.
 - The app loads nothing from other sites, and a Content Security Policy enforces this. *Current position on a map* is a link you choose to follow.
-- *Data* fetches public data through your Khonsu server and credits each source. Nothing is fetched until you open it. It then sends the selected satellite's NORAD ID to Wikidata and SatNOGS, and to Space-Track if you've connected an account. For Sentinel-2 and Landsat satellites, Earth Search receives the satellite's platform name. Cloud cover is the only feature that sends your location. It runs only when you ask, and sends coordinates rounded to about 10 km to Open-Meteo. Serving a local file with `--file` turns all of these requests off.
+- The *Data* dialog lists each source and credits it. Space weather and launch times are requested when the app opens, and send nothing about you or your satellites. The Identity and Radio tabs send the selected satellite's NORAD ID to Wikidata, GCAT and SatNOGS, and to Space-Track if you've connected an account. The Sees tab sends the satellite's platform name, such as `sentinel-2a`, to Earth Search, and only for Sentinel-2 and Landsat satellites. Cloud cover is the only feature that sends your location. It runs only when you ask, and sends coordinates rounded to about 10 km to Open-Meteo. Serving a local file with `--file` turns all of these requests off.
 - The server only accepts GET and HEAD, refuses API calls from other websites, and on loopback answers only to loopback host names, which blocks DNS rebinding.
 - The server listens on loopback by default and has no authentication. Binding it elsewhere prints a warning: anyone who can reach it can use it and trigger provider requests. Use a reverse proxy with rate limits if you need that.
 
@@ -35,7 +39,7 @@ khonsu web --file satellites.tle            # Local elements, no provider reques
 
 - Positions between one-minute samples are interpolated. The app does not run SGP4 in the browser.
 - The globe is a sphere. Day and night use the Sun's direction, without twilight or atmosphere modelling.
-- Visibility has the [same criteria and limits](visibility.md) as `khonsu tonight`, including no weather or brightness.
+- Visibility has the [same criteria and limits](visibility.md) as `khonsu tonight`, including no weather or brightness. Cloud cover is shown beside each pass, but it does not change which passes count as visible.
 - The browser needs WebGL for the globe. Without it, the details and passes still work.
 - CelesTrak [limits repeat downloads](https://celestrak.org/usage-policy.php), and its responses can take a few seconds. Only the first request for data waits for it. A loaded group also provides all of its satellites, expired data is shown at once while newer data loads in the background, and failed requests back off. Searching uses the same saved data. Large groups such as Starlink take longer the first time.
 
@@ -52,7 +56,7 @@ The server also exposes these JSON routes. The `/api/v1` routes other than searc
 | `/api/v1/track` | `start`, `duration` (default 24h, 1m to 168h), `step` (default 1m, 1s to 1h), optional observer | Sampled path, up to 20,000 samples |
 | `/api/v1/look` | observer (required), `start` and `end` (both required in practice), `samples` (default 60, 2 to 512) | Sky path |
 | `/api/v1/search` | `q` | Plain JSON: `satellites`, `groups_covered`, `groups_total`, `truncated`, `warnings` |
-| `/api/v1/sources` | | Plain JSON: `categories` of data sources, `imagery_layers` and `live_data` |
+| `/api/v1/sources` | | Plain JSON: `categories` of data sources, `imagery_layers`, `imaging_satellites` (the NORAD IDs that have Sees scenes) and `live_data` |
 | `/api/v1/space-weather` | | Feed: NOAA SWPC Kp, F10.7, storm scales and recent alerts |
 | `/api/v1/launches` | | Feed: upcoming launches from Launch Library 2 |
 | `/api/v1/satellite-details` | `norad_id` | Feed: Wikidata items for the catalog number |

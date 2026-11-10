@@ -220,14 +220,6 @@ export function summarizeHistory(days) {
   return { strongest, meanFlux };
 }
 
-// Looks a day ahead, the span a person can plan an evening around.
-export function summarizeClouds(hours) {
-  const next = hours.slice(0, 24);
-  if (!next.length) return null;
-  const clearest = next.reduce((best, hour) => (hour.percent < best.percent ? hour : best));
-  return { now: next[0].percent, clearest };
-}
-
 export function dataAge(fetchedAt, now) {
   const minutes = Math.max(0, Math.round((now - new Date(fetchedAt).getTime()) / 60000));
   if (minutes < 1) return 'just now';
@@ -261,4 +253,98 @@ export function windowFrom(time) {
 // Tracks are refetched two hours before the live clock would run off their end.
 export function needsNewWindow(window, time) {
   return time < window.start || time > window.end - 2 * 3600000;
+}
+
+// The latest Kp sample is the last one in the series, since samples arrive oldest first.
+export function latestKp(conditions) {
+  const samples = conditions?.kp;
+  if (!samples?.length) return null;
+  return samples[samples.length - 1].kp ?? null;
+}
+
+export function activeTransmitters(list) {
+  return (list ?? []).filter((item) => item.alive === true && item.status === 'active');
+}
+
+// Catalogue names differ in case, spacing and punctuation, so only letters and digits are compared.
+function normalizeName(name) {
+  return String(name ?? '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+}
+
+export function sameObjectName(a, b) {
+  const first = normalizeName(a);
+  const second = normalizeName(b);
+  if (!first || !second) return false;
+  return first.includes(second) || second.includes(first);
+}
+
+// Scenes from one overpass are seconds apart, so a gap of several minutes starts a new group.
+export function groupScenes(scenes, gapMs = 300000) {
+  if (!scenes?.length) return [];
+  const sorted = [...scenes].sort((a, b) => Date.parse(b.time) - Date.parse(a.time));
+  const groups = [];
+  let previousTime = null;
+  for (const scene of sorted) {
+    const at = Date.parse(scene.time);
+    if (!groups.length || previousTime - at > gapMs) groups.push([]);
+    groups[groups.length - 1].push(scene);
+    previousTime = at;
+  }
+  return groups.map((members) => {
+    const newest = members[0];
+    const clouds = members.map((scene) => scene.cloud_cover).filter((cover) => typeof cover === 'number');
+    return {
+      time: Date.parse(newest.time),
+      scenes: members,
+      lat: newest.center_lat,
+      lon: newest.center_lon,
+      minCloud: clouds.length ? Math.min(...clouds) : null,
+      maxCloud: clouds.length ? Math.max(...clouds) : null,
+    };
+  });
+}
+
+// Forecast hours are hourly, so an hour either side is the most a reading can be off.
+export function cloudAtTime(hours, timeMs) {
+  if (!hours?.length) return null;
+  let nearest = null;
+  let nearestDistance = Infinity;
+  for (const hour of hours) {
+    const distance = Math.abs(Date.parse(hour.time) - timeMs);
+    if (distance < nearestDistance) {
+      nearest = hour;
+      nearestDistance = distance;
+    }
+  }
+  return nearestDistance <= 3600000 ? nearest.percent : null;
+}
+
+export function nextLaunch(launches, nowMs) {
+  let best = null;
+  let bestTime = Infinity;
+  for (const launch of launches ?? []) {
+    const at = Date.parse(launch.net);
+    if (Number.isNaN(at) || at < nowMs) continue;
+    if (at < bestTime) {
+      best = launch;
+      bestTime = at;
+    }
+  }
+  return best;
+}
+
+// Only second, minute and hour precision are exact. Anything else means the launch time is approximate.
+export function launchLabel(launch, nowMs) {
+  const difference = Date.parse(launch.net) - nowMs;
+  const precision = String(launch.precision ?? '').toLowerCase();
+  const approximate = precision !== '' && !['second', 'minute', 'hour'].includes(precision);
+  const prefix = approximate ? 'in about' : 'in';
+  const hours = Math.round(difference / 3600000);
+  if (difference < 3600000) {
+    if (approximate) return `${prefix} ${Math.max(1, hours)} h`;
+    return `${prefix} ${Math.max(1, Math.round(difference / 60000))} min`;
+  }
+  if (difference < 36 * 3600000) return `${prefix} ${hours} h`;
+  const days = Math.round(difference / 86400000);
+  return `${prefix} ${days} ${days === 1 ? 'day' : 'days'}`;
 }

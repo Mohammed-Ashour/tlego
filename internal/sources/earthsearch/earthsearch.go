@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 
@@ -66,6 +67,17 @@ var imagingSatellites = map[string]sceneSource{
 	"60989": {"sentinel-2-l2a", "sentinel-2c"},
 	"39084": {"landsat-c2-l2", "landsat-8"},
 	"49260": {"landsat-c2-l2", "landsat-9"},
+}
+
+// ImagingIDs returns the NORAD IDs of the satellites that have scenes, sorted. The
+// IDs carry no leading zeros, the same form feed.CanonicalID gives.
+func ImagingIDs() []string {
+	ids := make([]string, 0, len(imagingSatellites))
+	for id := range imagingSatellites {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 func parseScenes(body []byte) ([]Scene, error) {
