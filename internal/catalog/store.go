@@ -370,6 +370,22 @@ func ParseElements(data []byte) ([]elements.Record, error) {
 	return out, nil
 }
 
+// celestrakRefusal turns CelesTrak's plain-text answers, such as a group it no
+// longer has, into a readable error instead of a JSON syntax error.
+func celestrakRefusal(b []byte) error {
+	text := strings.TrimSpace(string(b))
+	for _, prefix := range []string{"Invalid query", "No GP data found"} {
+		if strings.HasPrefix(text, prefix) {
+			line, _, _ := strings.Cut(text, "\n")
+			if len(line) > 160 {
+				line = line[:160]
+			}
+			return fmt.Errorf("CelesTrak has no data for this request: %s", line)
+		}
+	}
+	return nil
+}
+
 func gpJSONURL(raw string) (string, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -383,6 +399,9 @@ func gpJSONURL(raw string) (string, error) {
 
 func (s *Store) fetchElements(ctx context.Context, source, path, expectedID string) ([]elements.Record, FetchMeta, error) {
 	parse := func(b []byte) ([]elements.Record, error) {
+		if err := celestrakRefusal(b); err != nil {
+			return nil, err
+		}
 		rs, err := elements.ParseGPJSON(b)
 		if err != nil {
 			return nil, err
