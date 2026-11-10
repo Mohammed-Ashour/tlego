@@ -155,6 +155,10 @@ export function trailRange(samples, time, periodMinutes) {
     }
   });
   if (last < first) return { first: 0, count: samples.length };
+  // Samples are a step apart, so the period's ends fall between samples. One more on
+  // each side makes the ends overlap, closing the loop instead of leaving a gap.
+  first = Math.max(0, first - 1);
+  last = Math.min(samples.length - 1, last + 1);
   return { first, count: last - first + 1 };
 }
 
