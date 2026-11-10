@@ -98,7 +98,19 @@ test('trail range covers one period around the time', () => {
   const range = trailRange(samples, 100 * 60000, 90);
   assert.equal(range.first, 55);
   assert.equal(range.count, 91);
-  assert.deepEqual(trailRange(samples, 1e12, 90), { first: 0, count: 200 });
+  // Past the end of the samples, it shows the last whole orbit.
+  assert.deepEqual(trailRange(samples, 1e12, 90), { first: 109, count: 91 });
+});
+
+test('trail range keeps a whole orbit near the start of the samples', () => {
+  // A 12-hour orbit, 1 hour after the samples start: GPS satellites hit this.
+  const samples = Array.from({ length: 25 * 60 + 1 }, (_, i) => sample(i * 60, 0, 0));
+  assert.deepEqual(trailRange(samples, 60 * 60000, 720), { first: 0, count: 721 });
+  // Near the end, it slides back so the orbit stays complete.
+  assert.deepEqual(trailRange(samples, 24.5 * 3600000, 720), { first: 780, count: 721 });
+  // An orbit longer than the samples shows everything.
+  assert.deepEqual(trailRange(samples, 60 * 60000, 2000), { first: 0, count: 1501 });
+  assert.deepEqual(trailRange([], 0, 90), { first: 0, count: 0 });
 });
 
 test('passes are marked when a visible stretch overlaps them', () => {

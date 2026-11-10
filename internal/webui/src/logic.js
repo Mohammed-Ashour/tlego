@@ -134,14 +134,22 @@ export function sunlitAt(samples, time) {
   return result;
 }
 
-// Indexes of the samples within half a period of a time, for drawing one orbit.
+// Indexes of the samples covering one whole orbit around a time, for drawing it.
+// The orbit is centred on the time, but slides to stay within the samples, so a
+// satellite near the start or end of the window still shows a complete orbit.
 export function trailRange(samples, time, periodMinutes) {
-  const half = periodMinutes * 30000;
+  if (!samples.length) return { first: 0, count: 0 };
+  const period = periodMinutes * 60000;
+  const start = Date.parse(samples[0].time);
+  const end = Date.parse(samples[samples.length - 1].time);
+  if (!(period > 0) || end - start <= period) return { first: 0, count: samples.length };
+  const from = clamp(time - period / 2, start, end - period);
+  const to = from + period;
   let first = samples.length;
   let last = -1;
   samples.forEach((sample, index) => {
     const at = Date.parse(sample.time);
-    if (at >= time - half && at <= time + half) {
+    if (at >= from && at <= to) {
       first = Math.min(first, index);
       last = index;
     }
