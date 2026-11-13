@@ -14,6 +14,10 @@ export function compassPoint(azimuth) {
 export function providerMessage(message) {
   if (/\b403\b/.test(message)) return 'CelesTrak is limiting downloads of this data for now. Try again later.';
   if (/Failed to fetch|NetworkError|Load failed/.test(message)) return 'The Khonsu server could not be reached.';
+  // An outage or slow answer. Anything loaded before still comes from its saved copy.
+  const unavailable = /deadline exceeded|Timeout exceeded|i\/o timeout|connection refused|connection reset|no such host|\b50[234]\b/i.test(message);
+  if (unavailable && /celestrak/i.test(message)) return "CelesTrak isn't answering right now. Try again in a few minutes. Anything you've loaded before still works from its saved copy.";
+  if (unavailable) return "The data provider isn't answering right now. Try again in a few minutes.";
   return message;
 }
 
@@ -134,19 +138,31 @@ export function sunlitAt(samples, time) {
   return result;
 }
 
-// Indexes of the samples within half a period of a time, for drawing one orbit.
+// Indexes of the samples covering one whole orbit around a time, for drawing it.
+// The orbit is centred on the time, but slides to stay within the samples, so a
+// satellite near the start or end of the window still shows a complete orbit.
 export function trailRange(samples, time, periodMinutes) {
-  const half = periodMinutes * 30000;
+  if (!samples.length) return { first: 0, count: 0 };
+  const period = periodMinutes * 60000;
+  const start = Date.parse(samples[0].time);
+  const end = Date.parse(samples[samples.length - 1].time);
+  if (!(period > 0) || end - start <= period) return { first: 0, count: samples.length };
+  const from = clamp(time - period / 2, start, end - period);
+  const to = from + period;
   let first = samples.length;
   let last = -1;
   samples.forEach((sample, index) => {
     const at = Date.parse(sample.time);
-    if (at >= time - half && at <= time + half) {
+    if (at >= from && at <= to) {
       first = Math.min(first, index);
       last = index;
     }
   });
   if (last < first) return { first: 0, count: samples.length };
+  // Samples are a step apart, so the period's ends fall between samples. One more on
+  // each side makes the ends overlap, closing the loop instead of leaving a gap.
+  first = Math.max(0, first - 1);
+  last = Math.min(samples.length - 1, last + 1);
   return { first, count: last - first + 1 };
 }
 

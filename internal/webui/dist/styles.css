@@ -91,7 +91,9 @@ ul { list-style: none; }
 .sat-label { position: absolute; z-index: 2; transform: translate(10px, -50%); padding: 2px 6px; border-radius: 3px; background: rgba(10, 14, 30, .8); font-size: 11px; white-space: nowrap; pointer-events: none; }
 .pick-hint { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); padding: 8px 12px; border: 1px solid var(--accent); border-radius: 4px; background: rgba(10, 14, 30, .92); }
 .scene-error { position: absolute; inset: 50% auto auto 50%; width: min(420px, calc(100% - 40px)); padding: 16px; transform: translate(-50%, -50%); border: 1px solid rgba(218, 139, 127, .42); border-radius: 6px; background: rgba(12, 16, 34, .95); color: var(--danger); line-height: 1.5; }
-.camera-tools { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.camera-tools { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.layers-button { background: rgba(10, 14, 30, .8); }
+.layers-button[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
 .icon-button { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: rgba(10, 14, 30, .8); color: var(--soft); cursor: pointer; font-size: 16px; line-height: 1; }
 .icon-button:hover { border-color: rgba(235, 209, 147, .6); color: var(--accent); }
 .icon-button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
@@ -183,8 +185,8 @@ ul { list-style: none; }
 .data-source .data-status.is-live { background: rgba(235, 209, 147, .18); color: var(--accent); }
 .data-values { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 12px var(--mono); }
 .data-values strong { color: var(--accent); font-weight: 600; }
-.imagery-control { margin-top: 10px; }
-.imagery-credit { position: absolute; left: 14px; bottom: 12px; max-width: min(520px, calc(100% - 90px)); margin: 0; padding: 4px 8px; border-radius: 4px; background: rgba(10, 14, 30, .8); color: var(--soft); font-size: 11px; }
+.imagery-credit { position: absolute; left: 14px; bottom: 12px; z-index: 1; display: flex; flex-direction: column; gap: 3px; max-width: min(520px, calc(100% - 90px)); max-height: 40%; overflow-y: auto; margin: 0; padding: 4px 8px; border-radius: 4px; background: rgba(10, 14, 30, .8); color: var(--soft); font-size: 11px; }
+.credit-line { display: block; line-height: 1.4; overflow-wrap: anywhere; }
 .data-credit { margin-top: 6px; color: var(--muted); font-size: 11px; }
 .dialog::backdrop { background: rgba(4, 6, 14, .65); }
 .dialog h2 { margin-bottom: 6px; font-size: 16px; }
@@ -193,6 +195,23 @@ ul { list-style: none; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .form-error { margin-top: 8px; color: var(--danger); font-size: 12px; }
 .form-error:empty { display: none; }
+
+/* The panel floats below the headline and above the credit. It stops short of the camera tools. */
+.viewport .layers-panel { position: absolute; top: 170px; left: 14px; z-index: 4; width: min(300px, calc(100% - 28px)); max-height: max(120px, calc(100% - 310px)); overflow-y: auto; overscroll-behavior: contain; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: rgba(12, 17, 36, .96); box-shadow: 0 12px 32px rgba(0, 0, 0, .45); scrollbar-width: thin; scrollbar-color: #39425e transparent; }
+.layers-panel .eyebrow { margin-bottom: 2px; }
+.layer-group { min-width: 0; margin: 12px 0 0; padding: 0; border: 0; }
+.layer-group legend { margin-bottom: 2px; padding: 0; color: var(--muted); font: 600 10px/1.3 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.layer-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 2px 8px; padding: 6px 0; cursor: pointer; }
+.layer-row input { flex: none; width: 14px; height: 14px; margin: 3px 0 0; accent-color: var(--accent); cursor: pointer; }
+.layer-row > span:not(.note) { flex: 1 1 0; min-width: 0; color: var(--ink); line-height: 1.4; }
+.layer-row > .note { flex-basis: 100%; padding-left: 22px; }
+.layers-panel .aurora-controls { padding-left: 22px; margin-top: 8px; }
+.layers-panel input[type="range"] { width: 100%; margin: 4px 0; accent-color: var(--accent); cursor: pointer; }
+.aurora-controls button { min-height: 30px; margin-top: 6px; padding: 0 9px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--soft); font-size: 12px; cursor: pointer; }
+.aurora-controls button:hover { border-color: rgba(235, 209, 147, .55); color: var(--accent); }
+.layer-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.layer-presets button { min-height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--soft); font-size: 12px; cursor: pointer; }
+.layer-presets button:hover { border-color: rgba(235, 209, 147, .55); color: var(--accent); }
 
 @media (max-width: 1040px) {
   .app { height: auto; min-height: 100dvh; grid-template: 52px 56dvh auto auto auto / minmax(0, 1fr); grid-template-areas: "top" "view" "time" "inspector" "catalog"; }
@@ -219,4 +238,6 @@ ul { list-style: none; }
   .observer-button { max-width: 130px; }
   .headline { top: 8px; left: 8px; right: 8px; max-width: none; padding: 8px 10px; }
   .headline-main { font-size: 14px; }
+  /* Leaves room on the right for the camera tools column. */
+  .viewport .layers-panel { left: 8px; right: 86px; width: auto; }
 }

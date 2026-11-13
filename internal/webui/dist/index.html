@@ -38,8 +38,10 @@
       <section id="headline" class="headline" aria-live="polite"></section>
       <p id="pick-hint" class="pick-hint" role="status" hidden>Click your location on the globe, or press Escape to cancel.</p>
       <div id="scene-error" class="scene-error" role="alert" hidden></div>
+      <section id="layers-panel" class="layers-panel panel" aria-label="Globe layers" hidden></section>
       <p id="imagery-credit" class="imagery-credit" role="status" hidden></p>
       <div class="camera-tools" aria-label="Camera controls">
+        <button id="layers-open" class="text-button layers-button" type="button" aria-expanded="false" aria-controls="layers-panel">Layers</button>
         <button id="camera-follow" class="icon-button" type="button" aria-pressed="false" aria-label="Follow the selected satellite" title="Follow the selected satellite">◎</button>
         <button id="camera-home" class="icon-button" type="button" aria-label="Frame the selected satellite" title="Frame the selected satellite">⌂</button>
         <button id="zoom-in" class="icon-button" type="button" aria-label="Zoom in" title="Zoom in">+</button>

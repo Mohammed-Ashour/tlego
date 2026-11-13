@@ -1,9 +1,10 @@
 // The 3D scene. It knows TEME positions and times, not the rest of the app.
-import { AmbientLight, BufferAttribute, BufferGeometry, DirectionalLight, Float32BufferAttribute, Group, Line, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, MeshPhongMaterial, PerspectiveCamera, Points, PointsMaterial, Raycaster, Scene, SphereGeometry, SRGBColorSpace, TextureLoader, Vector2, Vector3, WebGLRenderer, BackSide } from 'three';
+import { AmbientLight, BufferAttribute, BufferGeometry, CanvasTexture, DirectionalLight, Float32BufferAttribute, Group, Line, LineBasicMaterial, LineDashedMaterial, LineSegments, Mesh, MeshBasicMaterial, MeshPhongMaterial, PerspectiveCamera, Points, PointsMaterial, Raycaster, Scene, SphereGeometry, SRGBColorSpace, Texture, Vector2, Vector3, WebGLRenderer, BackSide } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import land from '../../../pkg/templates/earth-land.json';
 import { gmstAt, sampleAt } from '../../../pkg/templates/viewer-state.js';
 import { trailRange } from './logic.js';
+import { auroraRings } from './aurora.js';
 
 const EARTH_RADIUS_KM = 6378.137;
 
@@ -115,41 +116,141 @@ export function createGlobe(container, { onPick, onSelect }) {
   let picking = false;
   let lastTime = 0;
 
-  const imageryLoader = new TextureLoader();
-  let imagery = null;
-  let imageryRequest = 0;
+  // Imagery layers, bottom first. Each entry has { id, url, transparent, request, status,
+  // texture, mesh }. The request is the setLayers call that last wanted the entry.
+  let imageryStack = [];
+  let layerRequest = 0;
 
-  function clearImagery() {
-    if (!imagery) return;
-    earth.remove(imagery);
-    imagery.material.map?.dispose();
-    imagery.material.dispose();
-    imagery.geometry.dispose();
-    imagery = null;
+  // Layers sit above the Earth and below the coastlines (1.002). The cap keeps them there.
+  const LAYER_BASE_RADIUS = 1.001;
+  const LAYER_STEP = 0.0001;
+  const LAYER_TOP_RADIUS = 1.0019;
+
+  function restackLayers() {
+    imageryStack.forEach((entry, index) => {
+      if (!entry.mesh) return;
+      entry.mesh.scale.setScalar(Math.min(LAYER_TOP_RADIUS, LAYER_BASE_RADIUS + LAYER_STEP * (index + 1)));
+      entry.mesh.renderOrder = index;
+    });
   }
 
-  // Drapes a worldwide equirectangular image on the Earth, or removes it. Coastlines
-  // sit just above it, and a newer request replaces one still loading.
-  function setImagery(url, transparent = false) {
-    const request = ++imageryRequest;
-    if (!url) {
-      clearImagery();
-      return Promise.resolve();
-    }
+  function disposeLayer(entry) {
+    if (!entry.mesh) return;
+    earth.remove(entry.mesh);
+    entry.mesh.geometry.dispose();
+    entry.mesh.material.dispose();
+    entry.texture.dispose();
+    entry.mesh = null;
+  }
+
+  function loadImage(url) {
     return new Promise((resolve, reject) => {
-      imageryLoader.load(url, (texture) => {
-        if (request !== imageryRequest) {
-          texture.dispose();
-          resolve();
-          return;
-        }
-        texture.colorSpace = SRGBColorSpace;
-        clearImagery();
-        imagery = new Mesh(new SphereGeometry(1.001, 96, 64), new MeshPhongMaterial({ map: texture, transparent, specular: 0x111111, shininess: 6 }));
-        earth.add(imagery);
-        resolve();
-      }, undefined, () => reject(new Error('The image could not be loaded.')));
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error('The image could not be loaded.'));
+      image.src = url;
     });
+  }
+
+  // Feathers the alpha edge of a transparent picture so overlapping discs blend without hard
+  // rims. A blurred copy of the picture masks the original, applied twice so the edge fades
+  // fully. The blur also fades the picture's outer border, which is transparent in these
+  // pictures. Where ctx.filter is unsupported the edge stays hard.
+  function featherEdges(image) {
+    const { naturalWidth: width, naturalHeight: height } = image;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+
+    const mask = document.createElement('canvas');
+    mask.width = width;
+    mask.height = height;
+    const maskContext = mask.getContext('2d');
+    maskContext.filter = 'blur(10px)';
+    maskContext.drawImage(image, 0, 0);
+
+    context.globalCompositeOperation = 'destination-in';
+    context.drawImage(mask, 0, 0);
+    context.drawImage(mask, 0, 0);
+    return canvas;
+  }
+
+  async function layerTexture(url, transparent) {
+    const image = await loadImage(url);
+    const texture = transparent ? new CanvasTexture(featherEdges(image)) : new Texture(image);
+    texture.colorSpace = SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  }
+
+  function startLayer(layer, request) {
+    const entry = { id: layer.id, url: layer.url, transparent: layer.transparent, request, status: null, texture: null, mesh: null };
+    entry.status = layerTexture(layer.url, layer.transparent).then((texture) => {
+      // A newer setLayers call that dropped this layer makes this load stale.
+      if (entry.request !== layerRequest) {
+        texture.dispose();
+        return new Error('This layer was replaced before it loaded.');
+      }
+      entry.texture = texture;
+      entry.mesh = new Mesh(
+        new SphereGeometry(1, 96, 64),
+        new MeshPhongMaterial({ map: texture, transparent: layer.transparent, depthWrite: !layer.transparent, specular: 0x111111, shininess: 6 }),
+      );
+      earth.add(entry.mesh);
+      restackLayers();
+      return 'ok';
+    }, (error) => error);
+    return entry;
+  }
+
+  // Sets the picture stack, bottom first. Layers already shown with the same id, url and
+  // transparency are kept without reloading. Resolves to each id mapped to 'ok' or its Error.
+  function setLayers(layers) {
+    const request = ++layerRequest;
+    const previous = imageryStack;
+    const seen = new Set();
+    const next = [];
+    for (const layer of layers) {
+      if (seen.has(layer.id)) continue;
+      seen.add(layer.id);
+      const transparent = Boolean(layer.transparent);
+      const kept = previous.find((entry) => entry.id === layer.id && entry.url === layer.url && entry.transparent === transparent);
+      if (kept) {
+        kept.request = request;
+        next.push(kept);
+      } else {
+        next.push(startLayer({ id: layer.id, url: layer.url, transparent }, request));
+      }
+    }
+    for (const entry of previous) {
+      if (!next.includes(entry)) disposeLayer(entry);
+    }
+    imageryStack = next;
+    restackLayers();
+    return Promise.all(next.map((entry) => entry.status.then((status) => [entry.id, status]))).then(Object.fromEntries);
+  }
+
+  // The rings are children of Earth, so they turn with it. Replaced on each call.
+  let auroraLines = [];
+
+  function setAurora(kp) {
+    for (const line of auroraLines) {
+      earth.remove(line);
+      line.geometry.dispose();
+      line.material.dispose();
+    }
+    auroraLines = [];
+    if (!Number.isFinite(kp)) return;
+    for (const ring of auroraRings(kp)) {
+      const geometry = new BufferGeometry().setFromPoints(ring.map(({ lat, lon }) => surfacePoint(lat, lon, 1.004)));
+      const material = new LineDashedMaterial({ color: 0x9fdcae, transparent: true, opacity: 0.8, dashSize: 0.03, gapSize: 0.02 });
+      const line = new Line(geometry, material);
+      line.computeLineDistances();
+      earth.add(line);
+      auroraLines.push(line);
+    }
   }
 
   // Puts the camera on the side of Earth facing a direction, from a distance that keeps it in frame.
@@ -352,7 +453,8 @@ export function createGlobe(container, { onPick, onSelect }) {
   controls.update();
 
   return {
-    setImagery,
+    setLayers,
+    setAurora,
     setTrack,
     removeTrack,
     update,

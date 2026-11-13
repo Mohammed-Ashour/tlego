@@ -480,7 +480,7 @@ func (s *Store) downloadBytes(ctx context.Context, source string) ([]byte, error
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status: %s", resp.Status)
+		return nil, fmt.Errorf("%s answered %s", req.URL.Host, resp.Status)
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, maxTLEPayloadSize+1))
 	if err != nil {
