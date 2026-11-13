@@ -14,6 +14,7 @@
       <span class="brand"><svg class="brand-mark" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><circle cx="16" cy="10.5" r="6.5"/><path d="M3 13a13 13 0 0 0 26 0a15 15 0 0 1-26 0z"/></svg>Khonsu</span>
       <p id="data-status" class="data-status" role="status"></p>
       <div class="topbar-actions">
+        <div id="sky-chips" class="sky-chips"></div>
         <button id="data-open" class="text-button" type="button">Data</button>
         <button id="zone-toggle" class="text-button" type="button" aria-pressed="false" title="Switch between local time and UTC">Local time</button>
         <button id="observer-open" class="text-button observer-button" type="button"><span class="observer-dot" aria-hidden="true"></span><span id="observer-label">Set location</span></button>
@@ -55,6 +56,9 @@
         <button id="tab-now" class="tab" role="tab" type="button" aria-selected="true" aria-controls="panel-now">Now</button>
         <button id="tab-passes" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-passes" tabindex="-1">Passes</button>
         <button id="tab-orbit" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-orbit" tabindex="-1">Orbit</button>
+        <button id="tab-identity" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-identity" tabindex="-1">Identity</button>
+        <button id="tab-radio" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-radio" tabindex="-1">Radio</button>
+        <button id="tab-sees" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-sees" tabindex="-1" hidden>Sees</button>
       </div>
       <section id="panel-now" class="tab-panel" role="tabpanel" aria-labelledby="tab-now">
         <dl id="now-readouts" class="readouts"></dl>
@@ -68,6 +72,9 @@
         <p id="orbit-note" class="note"></p>
         <div id="orbit-links" class="link-row"></div>
       </section>
+      <section id="panel-identity" class="tab-panel" role="tabpanel" aria-labelledby="tab-identity" hidden></section>
+      <section id="panel-radio" class="tab-panel" role="tabpanel" aria-labelledby="tab-radio" hidden></section>
+      <section id="panel-sees" class="tab-panel" role="tabpanel" aria-labelledby="tab-sees" hidden></section>
     </aside>
 
     <footer class="timeline" aria-label="Timeline">
@@ -89,7 +96,7 @@
       <h2 id="data-title">Data sources</h2>
       <button id="data-close" class="text-button" type="button">Close</button>
     </div>
-    <p class="note">Your copy of Khonsu fetches this data, keeps a local copy to limit requests and credits each source. Khonsu doesn't redistribute it. Opening this panel sends the selected satellite's NORAD ID to Wikidata and SatNOGS, and to Space-Track if you've connected an account. For Sentinel-2 and Landsat satellites, Earth Search receives the satellite's platform name. Your location is only sent if you ask for cloud cover, and is rounded to about 10 km first.</p>
+    <p class="note">Your copy of Khonsu fetches this data, keeps a local copy to limit requests and credits each source. Khonsu doesn't redistribute it. Space weather and launch times are requested when the app opens and send nothing about you or your satellites. The Identity and Radio tabs send the selected satellite's NORAD ID to Wikidata and SatNOGS, and to Space-Track if you've connected an account. For Sentinel-2 and Landsat satellites, the Sees tab sends the platform name to Earth Search. Your location is only sent if you ask for cloud cover, and is rounded to about 10 km first.</p>
     <p id="data-status-note" class="note"></p>
     <div id="data-categories"></div>
   </dialog>
@@ -115,6 +122,8 @@
       </div>
     </form>
   </dialog>
+
+  <div id="sky-popover" class="sky-popover" role="dialog" aria-label="Sky conditions" hidden></div>
   <script src="app.js"></script>
 </body>
 </html>

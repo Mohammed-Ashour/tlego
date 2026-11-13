@@ -100,8 +100,9 @@ ul { list-style: none; }
 .inspector-title > div { min-width: 0; }
 .inspector-title h1 { font-size: 16px; font-weight: 600; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .swatch { flex: none; width: 10px; height: 10px; margin-top: 5px; border-radius: 50%; background: var(--color, var(--muted)); }
-.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
-.tab { flex: 1; min-height: 34px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); cursor: pointer; }
+.tabs { display: flex; border-bottom: 1px solid var(--line); }
+/* Six tabs share the 288px inspector. Labels are short enough to fit, and the ellipsis is only a fallback. */
+.tab { flex: 1 1 auto; min-width: 0; min-height: 34px; padding: 0 5px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
 .tab:hover { color: var(--ink); }
 .tab[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); }
 .tab-panel { padding-top: 12px; }
@@ -134,6 +135,29 @@ ul { list-style: none; }
 .sky-visible { stroke: #fff; stroke-width: 3.5; stroke-opacity: .85; stroke-linecap: round; }
 .sky-peak { stroke: #fff; stroke-width: 1; }
 .sky-actions { display: flex; justify-content: center; margin-top: 8px; }
+.cloud-check { margin-top: 12px; }
+.cloud-check .note { margin-top: 6px; }
+.scene-list { display: grid; gap: 2px; margin-top: 6px; }
+.scene-row { width: 100%; display: grid; gap: 2px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.scene-row:hover { background: rgba(170, 184, 222, .08); }
+.scene-row[aria-pressed="true"] { background: rgba(170, 184, 222, .13); }
+.scene-row strong { font: 12px var(--mono); }
+.scene-row span { color: var(--muted); font-size: 11px; }
+.dossier-block + .dossier-block { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.dossier-heading { margin: 0 0 4px; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.tab-panel ul, .sky-popover ul { margin-top: 6px; }
+.tab-panel li, .sky-popover li { padding: 3px 0; font-size: 12px; }
+.sky-chips { display: flex; flex: none; gap: 6px; }
+.sky-chips:empty { display: none; }
+.sky-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 26px; padding: 2px 9px; border: 1px solid transparent; border-radius: 9px; background: rgba(170, 184, 222, .13); color: var(--soft); font-size: 11px; white-space: nowrap; cursor: pointer; }
+.sky-chip:hover { border-color: rgba(235, 209, 147, .55); color: var(--accent); }
+.sky-chip[aria-expanded="true"] { border-color: var(--accent); background: rgba(235, 209, 147, .18); color: var(--accent); }
+.sky-chip strong { font: 600 11px var(--mono); }
+.sky-popover { position: fixed; top: 60px; right: 12px; z-index: 5; width: min(320px, calc(100vw - 24px)); max-height: calc(100dvh - 72px); overflow-y: auto; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--raised); box-shadow: 0 12px 32px rgba(0, 0, 0, .45); color: var(--ink); scrollbar-width: thin; scrollbar-color: #39425e transparent; }
+.sky-title { color: var(--accent); font: 600 10px/1.3 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.sky-block + .sky-block { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.sky-popover .note { margin-top: 6px; }
+.sky-meta { color: var(--muted); font-size: 11px; }
 
 .timeline { grid-area: time; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-top: 1px solid var(--line); background: #0c1124; }
 .live-button { display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 11px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--muted); cursor: pointer; }
@@ -154,15 +178,11 @@ ul { list-style: none; }
 .data-source { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; margin-top: 10px; }
 .data-source a { color: var(--ink); font-weight: 600; }
 .data-source .note { grid-column: 1 / -1; }
-.data-status { align-self: start; padding: 1px 7px; border-radius: 9px; font-size: 10px; background: rgba(170, 184, 222, .13); color: var(--soft); }
-.data-status.is-live { background: rgba(235, 209, 147, .18); color: var(--accent); }
-.data-feed { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--raised); }
-.data-feed:empty { display: none; }
-.data-feed ul { margin-top: 6px; }
-.data-feed li { padding: 3px 0; font-size: 12px; }
+/* The same class marks the topbar status text, so the pill is limited to the source list. */
+.data-source .data-status { align-self: start; padding: 1px 7px; border-radius: 9px; font-size: 10px; background: rgba(170, 184, 222, .13); color: var(--soft); }
+.data-source .data-status.is-live { background: rgba(235, 209, 147, .18); color: var(--accent); }
 .data-values { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 12px var(--mono); }
 .data-values strong { color: var(--accent); font-weight: 600; }
-.data-source + .data-feed { margin-bottom: 4px; }
 .imagery-control { margin-top: 10px; }
 .imagery-credit { position: absolute; left: 14px; bottom: 12px; max-width: min(520px, calc(100% - 90px)); margin: 0; padding: 4px 8px; border-radius: 4px; background: rgba(10, 14, 30, .8); color: var(--soft); font-size: 11px; }
 .data-credit { margin-top: 6px; color: var(--muted); font-size: 11px; }
@@ -187,9 +207,12 @@ ul { list-style: none; }
   .headline-sub { display: none; }
 }
 @media (max-width: 560px) {
-  .data-status { display: none; }
-  .topbar-actions { min-width: 0; }
+  .topbar .data-status { display: none; }
+  /* The actions scroll sideways rather than push the page wider than the phone screen. */
+  .topbar-actions { min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 4px 3px; }
+  .topbar-actions::-webkit-scrollbar { display: none; }
   .topbar-actions .text-button { padding: 0 8px; }
+  .sky-popover { top: 56px; right: 8px; }
   .brand { letter-spacing: .02em; }
   .pick-hint { top: auto; bottom: 8px; width: calc(100% - 16px); }
   .topbar { justify-content: space-between; gap: 8px; padding: 0 10px; }

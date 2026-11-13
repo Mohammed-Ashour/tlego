@@ -98,6 +98,10 @@ export function createGlobe(container, { onPick, onSelect }) {
   const observerMarker = new Mesh(new SphereGeometry(0.012, 12, 10), new MeshBasicMaterial({ color: 0xffffff }));
   observerMarker.visible = false;
   earth.add(observerMarker);
+  // A scene from the Sees tab. It is blue so it is not mistaken for the white observer marker.
+  const pointMarker = new Mesh(new SphereGeometry(0.014, 12, 10), new MeshBasicMaterial({ color: 0x4da3ff }));
+  pointMarker.visible = false;
+  earth.add(pointMarker);
   const sightGeometry = new BufferGeometry();
   sightGeometry.setAttribute('position', new BufferAttribute(new Float32Array(6), 3));
   const sightLine = new Line(sightGeometry, new LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 }));
@@ -148,15 +152,39 @@ export function createGlobe(container, { onPick, onSelect }) {
     });
   }
 
-  function home(id = selected) {
-    const body = bodies.get(id);
-    const direction = body ? body.marker.position.clone() : new Vector3(0.68, 0.42, 0.76);
-    if (direction.lengthSq() < 1e-6) direction.set(0.68, 0.42, 0.76);
+  // Puts the camera on the side of Earth facing a direction, from a distance that keeps it in frame.
+  function frameDirection(direction) {
     // Include the orbit's height, so high satellites stay in frame.
     const distance = Math.max(3.6, Math.min(controls.maxDistance, direction.length() * 2.6));
     camera.position.copy(direction.normalize().add(new Vector3(0, 0.35, 0)).normalize().multiplyScalar(distance));
     controls.target.set(0, 0, 0);
     controls.update();
+  }
+
+  function home(id = selected) {
+    const body = bodies.get(id);
+    const direction = body ? body.marker.position.clone() : new Vector3(0.68, 0.42, 0.76);
+    if (direction.lengthSq() < 1e-6) direction.set(0.68, 0.42, 0.76);
+    frameDirection(direction);
+  }
+
+  function setFollowing(value) {
+    following = value;
+    controls.enableRotate = !value;
+  }
+
+  // Turns to the point where it is at the current time, and stops following the satellite.
+  function showPoint(lat, lon) {
+    pointMarker.position.copy(surfacePoint(lat, lon, 1.003));
+    pointMarker.visible = true;
+    setFollowing(false);
+    // The point is a child of Earth, so its world position depends on the rotation for this time.
+    earth.updateMatrixWorld(true);
+    frameDirection(pointMarker.getWorldPosition(new Vector3()));
+  }
+
+  function clearPoint() {
+    pointMarker.visible = false;
   }
 
   function setTrack(id, track, color) {
@@ -332,14 +360,13 @@ export function createGlobe(container, { onPick, onSelect }) {
     setSightLine,
     selectedScreenPosition,
     home,
+    showPoint,
+    clearPoint,
     select(id) {
       selected = id;
       highlight();
     },
-    setFollowing(value) {
-      following = value;
-      controls.enableRotate = !value;
-    },
+    setFollowing,
     setPicking(value) {
       picking = value;
       canvas.classList.toggle('is-picking', value);

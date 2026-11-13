@@ -9,12 +9,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
 
 	"github.com/Mohammed-Ashour/khonsu/internal/catalog"
 	"github.com/Mohammed-Ashour/khonsu/internal/sources"
+	"github.com/Mohammed-Ashour/khonsu/internal/sources/earthsearch"
 )
 
 func appHandler(t *testing.T) http.Handler {
@@ -318,6 +320,24 @@ func TestDataRoutesListSourcesButStayOfflineForLocalFiles(t *testing.T) {
 		if recorder.Code != http.StatusServiceUnavailable {
 			t.Errorf("%s: status %d, want 503", path, recorder.Code)
 		}
+	}
+}
+
+func TestSourcesListSatellitesWithScenes(t *testing.T) {
+	status, body := request(t, appHandler(t), "/api/v1/sources")
+	if status != http.StatusOK {
+		t.Fatalf("status = %d", status)
+	}
+	raw, _ := body["imaging_satellites"].([]any)
+	var got []string
+	for _, id := range raw {
+		got = append(got, fmt.Sprint(id))
+	}
+	if want := earthsearch.ImagingIDs(); !slices.Equal(got, want) {
+		t.Fatalf("imaging_satellites = %v, want %v", got, want)
+	}
+	if !slices.Contains(got, "40697") || !slices.IsSorted(got) {
+		t.Fatalf("imaging_satellites = %v, want sorted IDs including 40697", got)
 	}
 }
 

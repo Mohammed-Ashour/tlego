@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  annotatePasses, buildUrlState, canonicalId, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCountdown, formatDay, formatDuration,
-  dataAge, describeKp, formatFrequency, summarizeClouds, summarizeHistory, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, trailRange, validId, windowFrom,
+  annotatePasses, activeTransmitters, buildUrlState, canonicalId, cloudAtTime, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCountdown, formatDay, formatDuration,
+  dataAge, describeKp, formatFrequency, groupScenes, latestKp, launchLabel, nextLaunch, sameObjectName, summarizeHistory, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, trailRange, validId, windowFrom,
 } from './logic.js';
 
 test('compass points cover the circle and wrap', () => {
@@ -214,10 +214,155 @@ test('history summary finds the strongest day and the average flux', () => {
   assert.equal(summarizeHistory([]), null);
 });
 
-test('cloud summary only plans a day ahead', () => {
-  const hours = Array.from({ length: 30 }, (_, index) => ({ time: String(index), percent: index === 26 ? 0 : 50 - index }));
-  const summary = summarizeClouds(hours);
-  assert.equal(summary.now, 50);
-  assert.equal(summary.clearest.time, '23');
-  assert.equal(summarizeClouds([]), null);
+test('latest Kp is the last sample, or null when there is none', () => {
+  assert.equal(latestKp({ kp: [{ time: '2026-11-09T00:00:00Z', kp: 2 }, { time: '2026-11-09T03:00:00Z', kp: 4.33 }] }), 4.33);
+  assert.equal(latestKp({ kp: [] }), null);
+  assert.equal(latestKp({}), null);
+  assert.equal(latestKp(undefined), null);
+});
+
+test('only alive, active transmitters are kept in order', () => {
+  const list = [
+    { id: 1, alive: true, status: 'active' },
+    { id: 2, alive: false, status: 'active' },
+    { id: 3, alive: true, status: 'inactive' },
+    { id: 4, alive: true, status: 'active' },
+    { id: 5, alive: 'true', status: 'active' },
+  ];
+  assert.deepEqual(activeTransmitters(list).map((item) => item.id), [1, 4]);
+  assert.deepEqual(activeTransmitters(null), []);
+  assert.deepEqual(activeTransmitters(undefined), []);
+});
+
+test('object names match across punctuation and spacing', () => {
+  assert.equal(sameObjectName('Sentinel-2A', 'SENTINEL 2A'), true);
+  assert.equal(sameObjectName('International Space Station', 'Zarya'), false);
+  assert.equal(sameObjectName('', 'x'), false);
+  assert.equal(sameObjectName(null, 'x'), false);
+  assert.equal(sameObjectName('ISS', 'ISS (ZARYA)'), true);
+  assert.equal(sameObjectName('---', '!!!'), false);
+});
+
+test('scenes seconds apart form one group, newest first', () => {
+  const groups = groupScenes([
+    { id: 'early', time: '2026-11-09T10:00:10Z', cloud_cover: 20, center_lat: 1, center_lon: 2 },
+    { id: 'late', time: '2026-11-09T10:00:25Z', cloud_cover: 40, center_lat: 3, center_lon: 4 },
+  ]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].time, Date.parse('2026-11-09T10:00:25Z'));
+  assert.deepEqual(groups[0].scenes.map((scene) => scene.id), ['late', 'early']);
+  assert.equal(groups[0].lat, 3);
+  assert.equal(groups[0].lon, 4);
+  assert.equal(groups[0].minCloud, 20);
+  assert.equal(groups[0].maxCloud, 40);
+});
+
+test('a scene an hour later starts its own group', () => {
+  const groups = groupScenes([
+    { id: 'a', time: '2026-11-09T10:00:00Z', cloud_cover: 10, center_lat: 0, center_lon: 0 },
+    { id: 'b', time: '2026-11-09T11:00:00Z', cloud_cover: 60, center_lat: 5, center_lon: 6 },
+  ]);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].scenes[0].id, 'b');
+  assert.equal(groups[0].lat, 5);
+  assert.equal(groups[1].scenes[0].id, 'a');
+  assert.equal(groups[1].minCloud, 10);
+});
+
+test('groups chain across gaps and respect the gap limit', () => {
+  const at = (minutes) => ({ id: String(minutes), time: new Date(Date.parse('2026-11-09T10:00:00Z') + minutes * 60000).toISOString(), cloud_cover: null, center_lat: 0, center_lon: 0 });
+  // Each neighbour is 4 minutes apart, so the chain stays one group even though it spans 8 minutes.
+  assert.equal(groupScenes([at(0), at(4), at(8)]).length, 1);
+  // Exactly the gap joins; one millisecond more starts a new group.
+  assert.equal(groupScenes([at(0), at(5)]).length, 1);
+  assert.equal(groupScenes([at(0), { ...at(5), time: new Date(Date.parse('2026-11-09T10:05:00Z') + 1).toISOString() }]).length, 2);
+  assert.equal(groupScenes([at(0), at(2)], 60000).length, 2);
+});
+
+test('group cloud range ignores nulls and is null when all are unknown', () => {
+  const scene = (id, cloud) => ({ id, time: '2026-11-09T10:00:00Z', cloud_cover: cloud, center_lat: 0, center_lon: 0 });
+  const mixed = groupScenes([scene('a', null), scene('b', 10), scene('c', 30)]);
+  assert.equal(mixed[0].minCloud, 10);
+  assert.equal(mixed[0].maxCloud, 30);
+  const unknown = groupScenes([scene('a', null), scene('b', null)]);
+  assert.equal(unknown[0].minCloud, null);
+  assert.equal(unknown[0].maxCloud, null);
+  assert.deepEqual(groupScenes([]), []);
+  assert.deepEqual(groupScenes(undefined), []);
+});
+
+const hoursFrom = () => [
+  { time: '2026-11-09T12:00:00Z', percent: 40 },
+  { time: '2026-11-09T13:00:00Z', percent: 80 },
+];
+
+test('cloud cover is read at the nearest hour within an hour', () => {
+  const hours = hoursFrom();
+  const at = (iso) => Date.parse(iso);
+  assert.equal(cloudAtTime(hours, at('2026-11-09T13:00:00Z')), 80);
+  assert.equal(cloudAtTime(hours, at('2026-11-09T12:30:00Z')), 40);
+  assert.equal(cloudAtTime(hours, at('2026-11-09T14:00:00Z')), 80);
+  assert.equal(cloudAtTime(hours, at('2026-11-09T14:01:00Z')), null);
+  assert.equal(cloudAtTime([], 0), null);
+  assert.equal(cloudAtTime(undefined, 0), null);
+});
+
+test('next launch is the earliest future launch, whatever the order', () => {
+  const now = Date.parse('2026-11-09T12:00:00Z');
+  const launches = [
+    { name: 'late', net: '2026-11-10T08:00:00Z', status: 'Go', precision: 'Second' },
+    { name: 'past', net: '2026-11-09T11:00:00Z', status: 'Go', precision: 'Second' },
+    { name: 'broken', net: 'not a date', status: 'Go', precision: 'Second' },
+    { name: 'soon', net: '2026-11-09T14:00:00Z', status: 'Go', precision: 'Second' },
+  ];
+  assert.equal(nextLaunch(launches, now).name, 'soon');
+  assert.equal(nextLaunch([launches[0]], now).name, 'late');
+  assert.equal(nextLaunch([{ name: 'now', net: '2026-11-09T12:00:00Z' }], now).name, 'now');
+  assert.equal(nextLaunch([launches[1], launches[2]], now), null);
+  assert.equal(nextLaunch([], now), null);
+  assert.equal(nextLaunch(undefined, now), null);
+});
+
+test('launch labels use minutes, hours and days', () => {
+  const now = Date.parse('2026-11-09T12:00:00Z');
+  const launch = (ms, precision = 'Second') => ({ name: 'x', net: new Date(now + ms).toISOString(), status: 'Go', precision });
+  const label = (ms, precision) => launchLabel(launch(ms, precision), now);
+  const minute = 60000;
+  const hour = 3600000;
+  // Minutes: rounded, and never below one.
+  assert.equal(label(25 * minute), 'in 25 min');
+  assert.equal(label(10000), 'in 1 min');
+  // Hours: the first hour-based form starts at 60 minutes and stops before 36 hours.
+  assert.equal(label(hour), 'in 1 h');
+  assert.equal(label(75 * minute), 'in 1 h');
+  assert.equal(label(5.4 * hour), 'in 5 h');
+  assert.equal(label(35 * hour), 'in 35 h');
+  // Days: rounded from 36 hours onwards.
+  assert.equal(label(70 * hour), 'in 3 days');
+  assert.equal(label(48 * hour), 'in 2 days');
+});
+
+test('approximate precision adds "about" and never shows zero hours', () => {
+  const now = Date.parse('2026-11-09T12:00:00Z');
+  const launch = (ms, precision) => ({ name: 'x', net: new Date(now + ms).toISOString(), status: 'Go', precision });
+  const label = (ms, precision) => launchLabel(launch(ms, precision), now);
+  const minute = 60000;
+  const hour = 3600000;
+  // Minutes form: approximate launches read as hours, with at least one.
+  assert.equal(label(10 * minute, 'Day'), 'in about 1 h');
+  assert.equal(label(50 * minute, 'Day'), 'in about 1 h');
+  // Hours and days forms.
+  assert.equal(label(5 * hour, 'Day'), 'in about 5 h');
+  assert.equal(label(3 * 24 * hour, 'Day'), 'in about 3 days');
+});
+
+test('exact precision is case-insensitive and missing precision counts as exact', () => {
+  const now = Date.parse('2026-11-09T12:00:00Z');
+  const label = (precision) => launchLabel({ name: 'x', net: new Date(now + 5 * 3600000).toISOString(), status: 'Go', precision }, now);
+  assert.equal(label('HOUR'), 'in 5 h');
+  assert.equal(label('minute'), 'in 5 h');
+  assert.equal(label('Second'), 'in 5 h');
+  assert.equal(label(undefined), 'in 5 h');
+  assert.equal(label(''), 'in 5 h');
+  assert.equal(label('day'), 'in about 5 h');
 });

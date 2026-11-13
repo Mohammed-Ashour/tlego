@@ -329,3 +329,34 @@ func TestCachedReadsNeverContactTheProvider(t *testing.T) {
 		t.Fatal("accepted a corrupt saved file")
 	}
 }
+
+func TestGroupsHaveDistinctNamesAndQueries(t *testing.T) {
+	groups, err := NewStore(t.TempDir(), time.Hour).FetchGroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+	names, urls := map[string]bool{}, map[string]string{}
+	for _, group := range groups {
+		if names[group.Name] {
+			t.Errorf("group %q is listed twice", group.Name)
+		}
+		names[group.Name] = true
+		if other, seen := urls[group.URL]; seen {
+			t.Errorf("groups %q and %q use the same query %s", other, group.Name, group.URL)
+		}
+		urls[group.URL] = group.Name
+	}
+}
+
+func TestCelestrakRefusalIsReadable(t *testing.T) {
+	err := celestrakRefusal([]byte("Invalid query: \"GROUP=noaa&FORMAT=json\" (GROUP=noaa not found)\n"))
+	if err == nil || !strings.Contains(err.Error(), "CelesTrak has no data for this request") || !strings.Contains(err.Error(), "GROUP=noaa not found") {
+		t.Fatalf("err = %v", err)
+	}
+	if err := celestrakRefusal([]byte("No GP data found")); err == nil {
+		t.Fatal("expected an error for an empty answer")
+	}
+	if err := celestrakRefusal([]byte(`[{"OBJECT_NAME":"ISS (ZARYA)"}]`)); err != nil {
+		t.Fatalf("JSON was refused: %v", err)
+	}
+}

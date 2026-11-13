@@ -1,11 +1,13 @@
 import { createApi, isAbort } from './api.js';
 import { createGlobe } from './globe.js';
 import {
-  annotatePasses, buildUrlState, canonicalId, clamp, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
-  dataAge, describeKp, formatFrequency, summarizeClouds, summarizeHistory, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
+  annotatePasses, buildUrlState, canonicalId, clamp, cloudAtTime, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
+  dataAge, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
 } from './logic.js';
 import { sampleAt } from '../../../pkg/templates/viewer-state.js';
 import { renderSky } from './sky.js';
+import { createDossier } from './dossier.js';
+import { createSkyBar } from './skybar.js';
 
 const LIST_LIMIT = 200;
 const PASS_REFRESH_MS = 10 * 60000;
@@ -40,12 +42,27 @@ const state = {
   planFor: null,
   planAt: 0,
   activePass: null,
+  // The cloud check for the current observer: { observer, loading } while it runs, then { observer, feed } or { observer, error }.
+  clouds: null,
 };
 
 let globe = null;
 let lastDomUpdate = 0;
 let lastCountdown = 0;
 let frameFailed = false;
+// Set from the sources list at startup. Features that need live data are hidden while it is off.
+let liveDataOn = true;
+// The one api.sources() request, shared by the Data dialog, the dossier and the sky bar.
+let sourcesRequest = null;
+let catalog = null;
+let dossier = null;
+let skyBar = null;
+// Bumped on every selection change, so only the newest decides the Sees tab.
+let selectionToken = 0;
+
+// Tab order matches the markup. Sees is hidden unless the selected satellite has scenes.
+const TABS = ['now', 'passes', 'orbit', 'identity', 'radio', 'sees'];
+const DOSSIER_TABS = ['identity', 'radio', 'sees'];
 
 // Rerendering a list replaces its rows, so keyboard focus moves to the row with the
 // same data-focus key, or to the fallback if that row is gone.
@@ -170,6 +187,21 @@ function select(id) {
   renderStatus();
   refreshPlan();
   refreshReport();
+  if (changed) applySelection();
+}
+
+// Decides whether Sees is offered before the dossier opens a tab. If Sees is active and
+// the satellite has no scenes, the view moves to Now first, so no scene request is made.
+function applySelection() {
+  const token = ++selectionToken;
+  dossier.hasSees().then((hasScenes) => {
+    if (token !== selectionToken) return;
+    const seesTab = byId('tab-sees');
+    const focused = document.activeElement === seesTab;
+    seesTab.hidden = !hasScenes;
+    if (!hasScenes && state.tab === 'sees') showTab('now', focused);
+    dossier.selectionChanged(state.tab);
+  });
 }
 
 function reloadAllTracks() {
@@ -468,6 +500,7 @@ function renderPassesContent(container) {
     return;
   }
   const rows = annotatePasses(passes, visible);
+  const forecast = state.clouds?.feed?.data ?? null;
   for (const pass of rows.slice(0, 40)) {
     const isActive = Boolean(state.activePass && passesOverlap(state.activePass.pass, pass));
     const button = element('button', 'pass-row');
@@ -476,17 +509,54 @@ function renderPassesContent(container) {
     button.setAttribute('aria-pressed', String(isActive));
     const start = Date.parse(pass.start);
     const end = Date.parse(pass.end);
+    const cloud = forecast ? cloudAtTime(forecast, Date.parse(pass.maximum_at)) : null;
+    const cloudText = cloud === null ? '' : ` · ${Math.round(cloud)}% cloud`;
     button.append(
       element('span', 'pass-time', `${formatDay(start, state.utc)} ${formatClock(start, state.utc).slice(0, 5)}`),
       element('span', 'pass-elevation', `${Math.round(pass.maximum_elevation_deg)}°`),
-      element('span', 'pass-detail', `${compassPoint(pass.start_azimuth_deg)} to ${compassPoint(pass.end_azimuth_deg)} · ${formatDuration(end - start)}`),
+      element('span', 'pass-detail', `${compassPoint(pass.start_azimuth_deg)} to ${compassPoint(pass.end_azimuth_deg)} · ${formatDuration(end - start)}${cloudText}`),
     );
     if (pass.visible) button.append(element('span', 'badge', 'Visible'));
     button.addEventListener('click', () => choosePass(pass));
     container.append(button);
     if (isActive) container.append(renderActivePass());
   }
-  container.append(element('p', 'note', 'Visible means sunlit, in a dark sky and at least 10° high. Weather and brightness are not considered.'));
+  container.append(element('p', 'note', forecast
+    ? 'Visible means sunlit, in a dark sky and at least 10° high. Brightness is not considered.'
+    : 'Visible means sunlit, in a dark sky and at least 10° high. Weather and brightness are not considered.'));
+  if (liveDataOn) container.append(cloudCheck());
+}
+
+// Cloud cover is requested only on click, and the result is kept for this observer.
+function cloudCheck() {
+  const { clouds } = state;
+  const box = element('div', 'cloud-check');
+  const button = element('button', 'text-button', clouds?.loading ? 'Loading…' : clouds?.feed ? 'Check again' : 'Check clouds near me');
+  button.type = 'button';
+  button.dataset.focus = 'check-clouds';
+  button.addEventListener('click', checkClouds);
+  box.append(button, element('p', 'note', 'Sends your location, rounded to about 10 km, to Open-Meteo.'));
+  if (clouds?.error) box.append(dataFailure(clouds.error));
+  if (clouds?.feed) box.append(...feedCredit(clouds.feed));
+  return box;
+}
+
+async function checkClouds() {
+  const observer = state.observer;
+  if (!observer || state.clouds?.loading) return;
+  const request = { observer, loading: true };
+  state.clouds = request;
+  renderPasses();
+  try {
+    const feed = await api.cloudCover(observer);
+    // Saving or clearing the location replaces state.clouds, so an answer for an old location is dropped.
+    if (state.clouds !== request) return;
+    state.clouds = { observer, feed };
+  } catch (error) {
+    if (state.clouds !== request) return;
+    state.clouds = { observer, error };
+  }
+  renderPasses();
 }
 
 function renderActivePass() {
@@ -785,6 +855,7 @@ function renderLabel() {
 
 // Only text changes here, so focus and scroll position are left alone.
 function renderCountdowns() {
+  skyBar.tick();
   if (!state.plan) return;
   const headline = byId('headline');
   if (!headline.contains(document.activeElement)) renderHeadline();
@@ -840,6 +911,8 @@ function saveObserver(observer) {
   state.planFor = null;
   state.planError = null;
   state.activePass = null;
+  // Cloud cover belongs to the old location, and any request still running for it is dropped.
+  state.clouds = null;
   renderObserverLabel();
   reloadAllTracks();
   renderInspector();
@@ -879,110 +952,6 @@ function dataFailure(error) {
 function dataTime(isoTime) {
   const time = Date.parse(isoTime);
   return `${formatDay(time, state.utc)} ${formatClock(time, state.utc).slice(0, 5)} ${zoneLabel(state.utc)}`;
-}
-
-function values(...entries) {
-  const row = element('div', 'data-values');
-  for (const [label, value] of entries) {
-    const item = element('span', null, `${label} `);
-    item.append(element('strong', null, value));
-    row.append(item);
-  }
-  return row;
-}
-
-function renderSpaceWeather(feed) {
-  const { kp, flux, scales, alerts } = feed.data;
-  const latest = kp.at(-1);
-  const entries = [['Kp', `${latest.kp.toFixed(1)} ${describeKp(latest.kp)}`]];
-  if (flux.length) entries.push(['F10.7', String(Math.round(flux.at(-1).flux))]);
-  if (scales) entries.push(['Scales', `G${scales.geomagnetic.level} S${scales.solar.level} R${scales.radio.level}`]);
-  const nodes = [values(...entries)];
-  if (alerts.length) {
-    const list = element('ul');
-    list.append(...alerts.slice(0, 3).map((alert) => element('li', null, `${dataTime(alert.issued_at)}: ${alert.headline}`)));
-    nodes.push(list);
-  }
-  return [...nodes, ...feedCredit(feed)];
-}
-
-function renderLaunches(feed) {
-  if (!feed.data.length) return [element('p', 'note', 'No upcoming launches are listed.'), ...feedCredit(feed)];
-  const list = element('ul');
-  list.append(...feed.data.slice(0, 3).map((launch) => element('li', null, `${dataTime(launch.net)}: ${launch.name} (${launch.status})`)));
-  return [list, ...feedCredit(feed)];
-}
-
-function detailList(rows) {
-  const list = element('ul');
-  list.append(...rows.filter(([, value]) => value).map(([label, value]) => element('li', null, `${label}: ${value}`)));
-  return list;
-}
-
-function renderSatelliteDetails(feed) {
-  const [entry] = feed.data;
-  if (!entry) return [element('p', 'note', 'Wikidata has no entry for this satellite.'), ...feedCredit(feed)];
-  return [detailList([['Name', entry.name], ['Type', entry.types.join(', ')], ['Operator', entry.operators.join(', ')], ['Country', entry.countries.join(', ')], ['Launched', entry.launch_date]]), ...feedCredit(feed)];
-}
-
-function renderCatalogRecord(feed) {
-  const record = feed.data;
-  if (!record) return [element('p', 'note', 'GCAT has no entry for this satellite.'), ...feedCredit(feed)];
-  return [detailList([['Name', record.name], ['Kind', record.kind], ['Bus', record.bus], ['Mass', record.mass_kg ? `${record.mass_kg.toLocaleString('en-GB')} kg` : null], ['Launched', record.launch_date], ['Owner code', record.owner], ['Manufacturer code', record.manufacturer], ['Orbit class', record.orbit_class]]), ...feedCredit(feed)];
-}
-
-function renderSpaceTrack(feed) {
-  const [record] = feed.data;
-  if (!record) return [element('p', 'note', 'Space-Track has no record for this satellite.'), ...feedCredit(feed)];
-  return [detailList([['Name', record.name], ['Object type', record.object_type], ['Radar size', record.rcs_size], ['Country code', record.country], ['Launched', record.launch_date], ['Decayed', record.decay_date], ['Element epoch', record.epoch]]), ...feedCredit(feed)];
-}
-
-function renderScenes(feed) {
-  if (!feed.data.length) return [element('p', 'note', 'Earth Search lists scenes from Sentinel-2 and Landsat satellites. This satellite is not one of them.')];
-  const list = element('ul');
-  list.append(...feed.data.map((scene) => {
-    const cloud = scene.cloud_cover === null ? '' : `, ${Math.round(scene.cloud_cover)}% cloud`;
-    return element('li', null, `${dataTime(scene.time)}: near ${scene.center_lat.toFixed(1)}°, ${scene.center_lon.toFixed(1)}°${cloud}`);
-  }));
-  return [list, ...feedCredit(feed)];
-}
-
-function renderHistory(feed) {
-  const summary = summarizeHistory(feed.data);
-  if (!summary) return [element('p', 'note', 'No observed days are available.')];
-  return [values(['Past year, strongest Kp', `${summary.strongest.kp_max.toFixed(1)} on ${summary.strongest.date}`], ['Average F10.7', String(Math.round(summary.meanFlux))]), ...feedCredit(feed)];
-}
-
-function renderEvents(feed) {
-  if (!feed.data.length) return [element('p', 'note', 'No events in the past two weeks.'), ...feedCredit(feed)];
-  const list = element('ul');
-  list.append(...feed.data.slice(0, 4).map((event) => element('li', null, `${dataTime(event.time)}: ${event.kind}${event.detail ? ` (${event.detail})` : ''}`)));
-  return [list, ...feedCredit(feed)];
-}
-
-function renderClouds(feed) {
-  const summary = summarizeClouds(feed.data);
-  if (!summary) return [element('p', 'note', 'No forecast is available.'), ...feedCredit(feed)];
-  return [values(['Cloud cover now', `${Math.round(summary.now)}%`], ['Clearest in the next day', `${Math.round(summary.clearest.percent)}% at ${dataTime(summary.clearest.time)}`]), ...feedCredit(feed)];
-}
-
-function cloudControl(token) {
-  const node = byId('data-feed-open-meteo');
-  if (!node) return;
-  if (!state.observer) {
-    node.replaceChildren(element('p', 'note', 'Set your location to check cloud cover.'));
-    return;
-  }
-  // The result goes in its own child so the button keeps focus and stays for a retry.
-  const button = element('button', 'text-button', 'Check clouds near me');
-  button.type = 'button';
-  const result = element('div');
-  result.id = 'data-feed-open-meteo-result';
-  button.addEventListener('click', () => {
-    button.textContent = 'Check again';
-    showFeed(token, 'open-meteo-result', () => api.cloudCover(state.observer), renderClouds);
-  });
-  node.replaceChildren(button, result);
 }
 
 async function applyImagery(layerId) {
@@ -1038,30 +1007,6 @@ function imageryControl() {
   return label;
 }
 
-function renderTransmitters(feed) {
-  const active = feed.data.filter((item) => item.alive && item.status === 'active');
-  if (!active.length) return [element('p', 'note', 'SatNOGS lists no active transmitters for this satellite.'), ...feedCredit(feed)];
-  const list = element('ul');
-  list.append(...active.slice(0, 4).map((item) => {
-    const details = [formatFrequency(item.downlink_hz), item.mode].filter(Boolean).join(' · ');
-    return element('li', null, details ? `${item.description}: ${details}` : item.description);
-  }));
-  const summary = element('p', 'note', `${active.length} active transmitter${active.length === 1 ? '' : 's'}`);
-  return [summary, list, ...feedCredit(feed)];
-}
-
-async function showFeed(token, sourceId, load, render) {
-  const node = byId(`data-feed-${sourceId}`);
-  if (!node) return;
-  node.replaceChildren(element('p', 'note', 'Loading…'));
-  try {
-    const feed = await load();
-    if (token === dataRequest) node.replaceChildren(...render(feed));
-  } catch (error) {
-    if (token === dataRequest && error.name !== 'AbortError') node.replaceChildren(dataFailure(error));
-  }
-}
-
 function renderDataCategories(categories, liveData) {
   byId('data-categories').replaceChildren(...categories.map((category) => {
     const section = element('section', 'data-category');
@@ -1075,12 +1020,20 @@ function renderDataCategories(categories, liveData) {
       link.rel = 'noreferrer';
       const live = source.status === 'live';
       row.append(link, element('span', `data-status${live ? ' is-live' : ''}`, live ? 'Live' : 'Needs account'), element('p', 'note', `${source.summary} ${source.refresh}.`));
-      const feed = element('div', 'data-feed');
-      feed.id = `data-feed-${source.id}`;
-      section.append(row, feed);
+      section.append(row);
     }
     return section;
   }));
+}
+
+// Reuses the startup request while it is pending or after it succeeds. A failed startup is retried once per open.
+async function loadSources() {
+  try {
+    return await sourcesRequest;
+  } catch {
+    sourcesRequest = api.sources();
+    return sourcesRequest;
+  }
 }
 
 async function openDataDialog() {
@@ -1089,9 +1042,9 @@ async function openDataDialog() {
   statusNote.textContent = '';
   statusNote.classList.remove('is-warning');
   byId('data-dialog').showModal();
-  let catalog;
+  let sources;
   try {
-    catalog = await api.sources();
+    sources = await loadSources();
   } catch (error) {
     if (token === dataRequest && error.name !== 'AbortError') {
       statusNote.textContent = error.message;
@@ -1100,28 +1053,9 @@ async function openDataDialog() {
     return;
   }
   if (token !== dataRequest) return;
-  imageryLayers = catalog.imagery_layers;
-  renderDataCategories(catalog.categories, catalog.live_data);
-  if (!catalog.live_data) {
-    statusNote.textContent = 'Live data is off while serving a local file, so no provider requests are made.';
-    return;
-  }
-  showFeed(token, 'noaa-swpc', () => api.spaceWeather(), renderSpaceWeather);
-  showFeed(token, 'celestrak-space-weather', () => api.spaceWeatherHistory(), renderHistory);
-  showFeed(token, 'nasa-donki', () => api.spaceEvents(), renderEvents);
-  showFeed(token, 'launch-library', () => api.launches(), renderLaunches);
-  cloudControl(token);
-  const spaceTrackReady = catalog.categories.flatMap((category) => category.sources).some((source) => source.id === 'space-track' && source.status === 'live');
-  if (!spaceTrackReady) byId('data-feed-space-track').replaceChildren(element('p', 'note', 'Run khonsu setup to connect your own free account, then restart Khonsu.'));
-  if (!selectedEntry()) {
-    statusNote.textContent = 'Add a satellite to see its details here.';
-    return;
-  }
-  showFeed(token, 'wikidata', () => api.satelliteDetails(state.selected), renderSatelliteDetails);
-  showFeed(token, 'gcat', () => api.catalogRecord(state.selected), renderCatalogRecord);
-  showFeed(token, 'satnogs', () => api.transmitters(state.selected), renderTransmitters);
-  showFeed(token, 'earth-search', () => api.recentScenes(state.selected), renderScenes);
-  if (spaceTrackReady) showFeed(token, 'space-track', () => api.spaceTrack(state.selected), renderSpaceTrack);
+  imageryLayers = sources.imagery_layers;
+  renderDataCategories(sources.categories, sources.live_data);
+  if (!sources.live_data) statusNote.textContent = 'Live data is off while serving a local file, so no provider requests are made.';
 }
 
 function wireDataDialog() {
@@ -1190,29 +1124,33 @@ function wireObserver() {
   });
 }
 
+function showTab(name, focus = false) {
+  state.tab = name;
+  for (const tab of TABS) {
+    const button = byId(`tab-${tab}`);
+    const active = tab === name;
+    button.setAttribute('aria-selected', String(active));
+    button.tabIndex = active ? 0 : -1;
+    byId(`panel-${tab}`).hidden = !active;
+    if (active && focus) button.focus();
+  }
+  if (name === 'passes') refreshPlan();
+  if (name === 'orbit') refreshReport();
+  if (DOSSIER_TABS.includes(name)) dossier.open(name);
+}
+
 function wireTabs() {
-  const tabs = ['now', 'passes', 'orbit'];
-  const show = (name, focus = false) => {
-    state.tab = name;
-    for (const tab of tabs) {
-      const button = byId(`tab-${tab}`);
-      const active = tab === name;
-      button.setAttribute('aria-selected', String(active));
-      button.tabIndex = active ? 0 : -1;
-      byId(`panel-${tab}`).hidden = !active;
-      if (active && focus) button.focus();
-    }
-    if (name === 'passes') refreshPlan();
-    if (name === 'orbit') refreshReport();
-  };
-  tabs.forEach((name, index) => {
+  for (const name of TABS) {
     const button = byId(`tab-${name}`);
-    button.addEventListener('click', () => show(name));
+    button.addEventListener('click', () => showTab(name));
     button.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowRight') show(tabs[(index + 1) % tabs.length], true);
-      if (event.key === 'ArrowLeft') show(tabs[(index + tabs.length - 1) % tabs.length], true);
+      // Hidden tabs are skipped, so the arrow keys never reach Sees for a satellite without scenes.
+      const shown = TABS.filter((tab) => !byId(`tab-${tab}`).hidden);
+      const position = shown.indexOf(name);
+      if (event.key === 'ArrowRight') showTab(shown[(position + 1) % shown.length], true);
+      if (event.key === 'ArrowLeft') showTab(shown[(position + shown.length - 1) % shown.length], true);
     });
-  });
+  }
 }
 
 function wireControls() {
@@ -1247,6 +1185,8 @@ function wireControls() {
     renderTimeline();
     renderInspector();
     renderStatus();
+    // Scene times are the only dossier text that depends on the zone. This reuses the saved response.
+    if (state.tab === 'sees') dossier.open('sees');
   });
   byId('group-select').addEventListener('change', (event) => {
     byId('filter-input').value = '';
@@ -1263,11 +1203,23 @@ function wireControls() {
   byId('zoom-in').addEventListener('click', () => globe?.zoom(0.8));
   byId('zoom-out').addEventListener('click', () => globe?.zoom(1.25));
   const follow = byId('camera-follow');
-  follow.addEventListener('click', () => {
-    const next = follow.getAttribute('aria-pressed') !== 'true';
-    follow.setAttribute('aria-pressed', String(next));
-    globe?.setFollowing(next);
-  });
+  follow.addEventListener('click', () => setFollow(follow.getAttribute('aria-pressed') !== 'true'));
+}
+
+function setFollow(value) {
+  byId('camera-follow').setAttribute('aria-pressed', String(value));
+  globe?.setFollowing(value);
+}
+
+// Sees rows call these. Both are safe without WebGL, when there is no globe.
+function focusScene(point) {
+  if (!globe) return;
+  globe.showPoint(point.lat, point.lon);
+  setFollow(false);
+}
+
+function clearScene() {
+  globe?.clearPoint();
 }
 
 function sceneFailure(message) {
@@ -1276,7 +1228,37 @@ function sceneFailure(message) {
   box.textContent = message;
 }
 
+function sourceInfo(sources) {
+  const sourceList = sources.categories.flatMap((category) => category.sources);
+  return {
+    liveData: sources.live_data,
+    spaceTrackReady: sourceList.some((source) => source.id === 'space-track' && source.status === 'live'),
+    imagingIds: new Set(sources.imaging_satellites ?? []),
+  };
+}
+
 async function start() {
+  // One request serves every consumer. A failure leaves catalog null, and the dossier and sky bar use their defaults.
+  sourcesRequest = api.sources();
+  catalog = sourcesRequest.then(sourceInfo).catch(() => null);
+  catalog.then((info) => {
+    liveDataOn = info?.liveData !== false;
+    renderPasses();
+  });
+  dossier = createDossier({
+    api,
+    element,
+    feedCredit,
+    dataFailure,
+    dataTime,
+    selectedEntry,
+    catalog,
+    panels: { identity: byId('panel-identity'), radio: byId('panel-radio'), sees: byId('panel-sees') },
+    focusScene,
+    clearScene,
+  });
+  skyBar = createSkyBar({ api, element, feedCredit, dataFailure, dataTime, catalog, chips: byId('sky-chips'), popover: byId('sky-popover') });
+  skyBar.start();
   try {
     globe = createGlobe(byId('scene'), {
       onPick(point) {
