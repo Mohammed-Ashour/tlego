@@ -19,7 +19,30 @@
       "period_minutes": 92.9613927094714,
       "apogee_km": 424.24149457785285,
       "perigee_km": 414.88242265163166,
-      "orbit_class_estimate": "LEO"
+      "orbit_class_estimate": "LEO",
+      "explanation": {
+        "regime": "LEO",
+        "regime_name": "Low Earth orbit",
+        "patterns": [],
+        "statements": [
+          {
+            "id": "regime",
+            "text": "It flies in low Earth orbit, below 2,000 km. That's close enough for sharp pictures and quick radio contact, but it sees any one place for only a few minutes at a time.",
+            "basis": "derived"
+          },
+          {
+            "id": "pace",
+            "text": "It circles Earth about 15.5 times a day, once every 93 minutes.",
+            "basis": "derived"
+          },
+          {
+            "id": "reach",
+            "text": "Its orbit is tilted 51.6° to the equator, so it flies over latitudes up to 52° north and south.",
+            "basis": "derived"
+          }
+        ],
+        "nodal_precession_deg_day": -4.9485
+      }
     },
     "tle": "",
     "map_url": "https://www.google.com/maps/?q=-0.007381,-86.297369",

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   annotatePasses, activeTransmitters, buildUrlState, canonicalId, cloudAtTime, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCountdown, formatDay, formatDuration,
-  dataAge, describeKp, formatFrequency, groupScenes, latestKp, launchLabel, nextLaunch, sameObjectName, summarizeHistory, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, trailRange, validId, windowFrom,
+  dataAge, describeKp, explanationView, formatFrequency, groupScenes, latestKp, launchLabel, nextLaunch, sameObjectName, summarizeHistory, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, trailRange, validId, windowFrom,
 } from './logic.js';
 
 test('compass points cover the circle and wrap', () => {
@@ -381,4 +381,20 @@ test('exact precision is case-insensitive and missing precision counts as exact'
   assert.equal(label(undefined), 'in 5 h');
   assert.equal(label(''), 'in 5 h');
   assert.equal(label('day'), 'in about 5 h');
+});
+
+test('orbit explanation becomes chips and marked sentences', () => {
+  assert.equal(explanationView(undefined), null);
+  assert.equal(explanationView({ statements: [] }), null);
+  const view = explanationView({
+    regime: 'LEO', regime_name: 'Low Earth orbit', patterns: ['retrograde', 'sun_synchronous', 'something_new'],
+    statements: [
+      { id: 'regime', text: 'It flies low.', basis: 'heuristic' },
+      { id: 'pace', text: 'It circles 14 times a day.', basis: 'derived' },
+      { id: 'blank', text: ' ', basis: 'derived' },
+    ],
+  });
+  assert.deepEqual(view.chips, ['Low Earth orbit', 'Retrograde', 'Sun-synchronous']);
+  assert.deepEqual(view.items, [{ text: 'It flies low.', estimate: true }, { text: 'It circles 14 times a day.', estimate: false }]);
+  assert.deepEqual(explanationView({ regime: 'GEO', statements: [{ text: 'Hangs still.', basis: 'mystery' }] }).chips, ['GEO']);
 });

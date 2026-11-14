@@ -3,7 +3,7 @@ import { createGlobe } from './globe.js';
 import { createLayers } from './layers.js';
 import {
   annotatePasses, buildUrlState, canonicalId, clamp, cloudAtTime, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
-  dataAge, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
+  dataAge, explanationView, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
 } from './logic.js';
 import { sampleAt } from '../../../pkg/templates/viewer-state.js';
 import { renderSky } from './sky.js';
@@ -665,6 +665,23 @@ async function refreshReport() {
   renderOrbit();
 }
 
+function renderWhy(explanation) {
+  const card = byId('orbit-why');
+  const view = explanationView(explanation);
+  card.hidden = !view;
+  if (!view) return;
+  byId('orbit-why-chips').replaceChildren(...view.chips.map((label) => element('li', 'why-chip', label)));
+  byId('orbit-why-list').replaceChildren(...view.items.map((item) => {
+    const row = element('li', '', item.text);
+    if (item.estimate) {
+      const mark = element('span', 'why-estimate', 'estimate');
+      mark.title = 'A best guess: this matches a known pattern within Khonsu\'s tolerances';
+      row.append(' ', mark);
+    }
+    return row;
+  }));
+}
+
 function renderOrbit() {
   const readouts = byId('orbit-readouts');
   const note = byId('orbit-note');
@@ -672,6 +689,7 @@ function renderOrbit() {
   links.replaceChildren();
   note.textContent = '';
   note.className = 'note';
+  renderWhy(state.report?.data?.orbit?.explanation);
   if (!state.selected) {
     setReadouts(readouts, []);
     note.textContent = 'Add a satellite to see its orbit.';
@@ -700,7 +718,7 @@ function renderOrbit() {
     ['Element epoch', dayAndClock(Date.parse(provenance.element_epoch))],
     ['Data source', `${provenance.source} (${provenance.cache_status})`],
   ]);
-  note.textContent = 'Apogee and perigee are two-body estimates.';
+  note.textContent = 'Apogee and perigee are two-body estimates. Sentences marked estimate match a known orbit pattern within set tolerances.';
   const download = element('a', '', 'Download JSON report');
   download.href = `/api/v1/report?norad_id=${encodeURIComponent(state.selected)}`;
   download.download = `khonsu-${state.selected}.json`;

@@ -35,6 +35,37 @@ A sidereal day is taken as 1,436.068 minutes. [ESA's orbit guide](https://www.es
 
 Earlier versions classified by average altitude alone. A circular orbit at 38,621.863 km, for example, was labeled GEO despite having a period of about 1,583.36 minutes. It is now HEO. Inclined synchronous orbits now receive GSO; cross-band transfer and Molniya-like ellipses receive Other. Output field names and types are unchanged. Consumers should accept class strings beyond the original four values.
 
+## Why it's up there
+
+Reports, the v1 `report` output and the web app's Orbit tab add an `explanation` object under `orbit`. It's additive in schema 1.0: `orbit_class_estimate` keeps the rules above. Each sentence in `statements` has a `basis`. `derived` sentences are arithmetic on the mean elements. `heuristic` sentences match a named pattern within the tolerances below, and the web app marks them as estimates.
+
+`regime` repeats the class above, except that an `Other` orbit with eccentricity of at least 0.25 is reported as `Elliptical`. Its sentence is `heuristic` for GEO and GSO, which depend on tolerances, and `derived` for the altitude bands.
+
+Two-body motion doesn't explain sun-synchronous, Molniya or repeat-track orbits, because they depend on Earth's equatorial bulge. Khonsu estimates the secular drift of the orbital plane and of perigee from the J2 term, with `J2 = 1.08262998905e-3`, the WGS-84 value SGP4 uses:
+
+```text
+p = a * (1 - e^2)
+k = 1.5 * J2 * (R / p)^2 * n                # n in degrees per day
+node_rate    = -k * cos(i)                   # nodal_precession_deg_day
+perigee_rate =  k * (2 - 2.5 * sin(i)^2)
+```
+
+| Pattern | Rule |
+|---|---|
+| `sun_synchronous` | Eccentricity below 0.1 and a nodal rate within 0.03°/day of the mean Sun's 360/365.2422°/day. Local time then drifts by less than about 45 minutes a year. |
+| `dawn_dusk` | Sun-synchronous, with an equator crossing within one hour of 06:00 or 18:00 local mean solar time |
+| `molniya` | Eccentricity at least 0.5, period within 3% of half a sidereal day, inclination within 3° of 63.43° or 116.57° |
+| `tundra` | Period within 1% of a sidereal day, eccentricity from 0.15 to 0.5, inclination within 3° of 63.43° or 116.57° |
+| `polar` | Inclination from 80° to 100°, when not sun-synchronous |
+| `near_equatorial` | Within 5° of the equator, when not GEO |
+| `retrograde` | Inclination above 90° |
+
+For a sun-synchronous orbit, `descending_node_local_time_hours` is the local mean solar time of the descending node, `(RAAN - α_mean_sun) / 15` hours modulo 24, using the mean Sun's right ascension at the element epoch. The web app and text report round it to five minutes. With the elements in `internal/orbit/testdata`, Sentinel-2A gives 10:30 and Sentinel-1C gives 06:00, matching the published values.
+
+`repeat_ground_track` looks for the smallest whole number of nodal days, from 1 to 30, after which the ground track nearly repeats. A nodal day is one turn of Earth relative to the drifting orbital plane, `360 / (360.98564736629 - node_rate)` solar days. Orbits are counted node to node, using `n + perigee_rate`. A match needs the leftover to be under 0.0001 orbits per day of the cycle. Against CelesTrak's active catalog on 2026-11-13, this finds the published repeats of Sentinel-1 (12 days, 175 orbits), Sentinel-2 (10, 143), Sentinel-3 (27, 385), Sentinel-6 (about 10, 127), Landsat 8 and 9 (16, 233) and SWOT (about 21, 292), and none for the ISS. About 8% of other low orbits also match by coincidence, and real repeats are kept by station-keeping burns. That's why the statement is a `heuristic` and says it's a best guess. GEO orbits never report one.
+
+`internal/orbit/explain_test.go` checks these rules at their boundaries with synthetic elements, and checks real CelesTrak elements for the ISS, a GPS satellite, GOES-18, Sentinel-1C, Sentinel-2A, Sentinel-6A, Landsat 9, SWOT, Jason-3 and two Molniya objects.
+
 ## Checks and limits
 
 `internal/orbit/derive_test.go` checks both input paths against synthetic ellipses chosen by semi-major axis and eccentricity. The expected mean motions and periods were calculated independently using Python's standard-library `decimal` module at 50-digit precision, using `T = 2*pi*sqrt(a^3/mu)` and `m = 86400/T`. Expected apsides come directly from the chosen ellipse geometry. These check the two-body estimates, not SGP4 trajectory extrema. Tolerances are `1e-6 km` for apsides and `1e-6 minutes` for period.

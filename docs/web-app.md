@@ -22,6 +22,7 @@ khonsu web --file satellites.tle            # Local elements, no provider reques
 - **Passes:** see the next 48 hours, with a countdown to the next visible pass and a badge on each visible one. Select a pass for its sky plot, where the white stretch is the visible part, then use *Show on globe* to jump to its peak. *Check clouds near me* adds the forecast cloud cover to each pass.
 - **Layers:** the *Layers* button above the camera controls opens the choices for the globe's pictures. Pick one base picture, either the plain globe or yesterday's true-colour Earth from NASA GIBS. Then tick any of the near-live cloud layers to stack them over it: GOES East, GOES West and Himawari infrared. The base is drawn first and the cloud layers over it, in the order the app lists them. The bottom left of the globe shows a credit and last update for each picture on screen, one line each. *Clouds now* picks true colour with all three cloud layers, *Yesterday's Earth* keeps only the base, and *Plain* clears everything. Your choices are saved in this browser.
 - **Aurora:** an optional overlay on the Layers panel. It is an estimate: a rough oval drawn from NOAA's latest Kp index, which is also the Kp chip in the top bar. It is not a forecast. The slider tries another Kp value without saving it, and *Back to now* returns to the live reading.
+- **Orbit:** *Why is it up there?* explains the selected satellite's orbit in plain words. It covers how high it flies, how often it circles, how far north and south it reaches, and named patterns such as sun-synchronous or Molniya, with the local time it crosses the equator and how often its ground track repeats. All of this comes from the elements already loaded, so the card makes no extra requests. Sentences tagged *estimate* match a pattern within the tolerances in [orbit estimates](orbit-estimates.md#why-its-up-there). The same text appears in `khonsu report`.
 - **Identity:** the selected satellite's name, operator, country and launch details from Wikidata, its catalog record from GCAT, and its Space-Track record if you have an account.
 - **Radio:** the active transmitters that SatNOGS DB lists, with frequency and mode.
 - **Sees:** recent images of the satellite from Earth Search. The tab appears only for Sentinel-2 and Landsat satellites. Choose an image to mark where it was taken on the globe. The mark is blue, and the view turns to face it.
@@ -52,7 +53,7 @@ The server also exposes these JSON routes. The `/api/v1` routes other than searc
 | Route | Parameters | Returns |
 |---|---|---|
 | `/api/v1/position` | `time` | Position |
-| `/api/v1/report` | `time` | Position and orbit estimates |
+| `/api/v1/report` | `time` | Position, orbit estimates and the orbit explanation |
 | `/api/v1/passes` | observer (required), `start`, `duration` (default 24h, 1m to 168h), `step` (default 1m, 1s to 1h, up to 250,000 samples per request) | Passes |
 | `/api/v1/tonight` | observer (required), `time`, `min_elevation` (default 10), `max_sun_elevation` (default -6) | Visible passes in the next dark period |
 | `/api/v1/track` | `start`, `duration` (default 24h, 1m to 168h), `step` (default 1m, 1s to 1h), optional observer | Sampled path, up to 20,000 samples |

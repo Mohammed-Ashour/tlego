@@ -258,6 +258,8 @@ type OrbitRecord struct {
 	ApogeeKm           float64 `json:"apogee_km"`
 	PerigeeKm          float64 `json:"perigee_km"`
 	OrbitClassEstimate string  `json:"orbit_class_estimate"`
+	// Explanation is additive to schema 1.0; consumers may ignore it.
+	Explanation *orbit.Explanation `json:"explanation,omitempty"`
 }
 
 type ReportRecord struct {
@@ -273,7 +275,7 @@ type ReportRecord struct {
 
 func ReportV1(report ReportData) ReportRecord {
 	p, o := report.Position, report.Orbit
-	return ReportRecord{report.Name, report.NoradID, PositionRecord{report.NoradID, p.Time.UTC(), p.LatDeg, p.LonDeg, p.AltKm, p.VelocityKm}, OrbitRecord{o.InclinationDeg, o.Eccentricity, o.MeanMotion, o.PeriodMinutes, o.ApogeeKm, o.PerigeeKm, o.OrbitClass}, report.TLE, report.MapURL, report.SourceFormat, report.ElementData}
+	return ReportRecord{report.Name, report.NoradID, PositionRecord{report.NoradID, p.Time.UTC(), p.LatDeg, p.LonDeg, p.AltKm, p.VelocityKm}, OrbitRecord{o.InclinationDeg, o.Eccentricity, o.MeanMotion, o.PeriodMinutes, o.ApogeeKm, o.PerigeeKm, o.OrbitClass, report.Explanation}, report.TLE, report.MapURL, report.SourceFormat, report.ElementData}
 }
 
 func ValidateVersion(version string) error {

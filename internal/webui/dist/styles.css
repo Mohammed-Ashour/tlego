@@ -241,3 +241,12 @@ ul { list-style: none; }
   /* Leaves room on the right for the camera tools column. */
   .viewport .layers-panel { left: 8px; right: 86px; width: auto; }
 }
+
+.why { margin-bottom: 12px; padding: 10px 12px 8px; border: 1px solid rgba(235, 209, 147, .22); border-radius: 6px; background: rgba(235, 209, 147, .05); }
+.why-title { margin: 0 0 6px; color: var(--accent); font: 600 10px/1.3 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.tab-panel .why-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
+.tab-panel .why-chips li { padding: 1px 8px; border-radius: 9px; background: rgba(170, 184, 222, .13); color: var(--soft); font-size: 11px; }
+.tab-panel .why-chips li:first-child { background: rgba(235, 209, 147, .16); color: var(--accent); }
+.tab-panel .why-list { display: grid; gap: 6px; margin: 0; }
+.tab-panel .why-list li { padding: 0; color: var(--ink); line-height: 1.5; }
+.why-estimate { padding: 0 5px; border: 1px solid rgba(186, 197, 230, .25); border-radius: 4px; color: var(--muted); font: 10px var(--mono); white-space: nowrap; cursor: help; }

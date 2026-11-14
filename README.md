@@ -39,7 +39,7 @@ Everything works without setup. To connect an optional free [Space-Track](https:
 | Want to… | Do this |
 |---|---|
 | Follow satellites | Add them from a group, a filter or a NORAD ID |
-| Learn about one | Open **Identity**, **Radio** or **Sees** (for Sentinel-2 and Landsat) in the inspector |
+| Learn about one | Open **Orbit** to see why it flies where it does, or **Identity**, **Radio** and **Sees** (for Sentinel-2 and Landsat) |
 | Find a pass | Set your location, then open **Passes** for sky plots, a Visible badge and **Check clouds near me** |
 | Change the globe | Press **Layers** for true color, near-live clouds and the aurora estimate |
 | Check the sky | Open the **Kp** and **Launch** chips in the top bar |
