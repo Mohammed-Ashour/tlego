@@ -249,4 +249,8 @@ ul { list-style: none; }
 .tab-panel .why-chips li:first-child { background: rgba(235, 209, 147, .16); color: var(--accent); }
 .tab-panel .why-list { display: grid; gap: 6px; margin: 0; }
 .tab-panel .why-list li { padding: 0; color: var(--ink); line-height: 1.5; }
-.why-estimate { padding: 0 5px; border: 1px solid rgba(186, 197, 230, .25); border-radius: 4px; color: var(--muted); font: 10px var(--mono); white-space: nowrap; cursor: help; }
+.why-estimate { padding: 0 5px; border: 1px solid rgba(186, 197, 230, .3); border-radius: 4px; color: var(--soft); font: 10.5px var(--mono); white-space: nowrap; }
+.why-source { color: var(--accent); font-size: 11px; text-decoration: none; white-space: nowrap; }
+.why-source::before { content: "↗ "; opacity: .7; }
+.why-source:hover, .why-source:focus-visible { text-decoration: underline; }
+.tab-panel .why-legend { margin-top: 8px; font-size: 11px; }

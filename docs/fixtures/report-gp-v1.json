@@ -27,21 +27,42 @@
         "statements": [
           {
             "id": "regime",
-            "text": "It flies in low Earth orbit, below 2,000 km. That's close enough for sharp pictures and quick radio contact, but it sees any one place for only a few minutes at a time.",
-            "basis": "derived"
+            "text": "It flies in low Earth orbit, below 2,000 km. Being close to Earth suits sharp imaging, but each satellite sees only a small patch at a time, so services that need constant coverage use many satellites working together.",
+            "basis": "derived",
+            "sources": [
+              {
+                "label": "ESA",
+                "title": "Types of orbits",
+                "url": "https://www.esa.int/Enabling_Support/Space_Transportation/Types_of_orbits"
+              }
+            ]
           },
           {
             "id": "pace",
             "text": "It circles Earth about 15.5 times a day, once every 93 minutes.",
-            "basis": "derived"
+            "basis": "derived",
+            "sources": [
+              {
+                "label": "CelesTrak",
+                "title": "FAQs: Two-Line Element Set Format",
+                "url": "https://celestrak.org/columns/v04n03/"
+              }
+            ]
           },
           {
             "id": "reach",
             "text": "Its orbit is tilted 51.6° to the equator, so it flies over latitudes up to 52° north and south.",
-            "basis": "derived"
+            "basis": "derived",
+            "sources": [
+              {
+                "label": "NASA",
+                "title": "Catalog of Earth Satellite Orbits",
+                "url": "https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/"
+              }
+            ]
           }
         ],
-        "nodal_precession_deg_day": -4.9485
+        "nodal_precession_deg_day": -4.9499
       }
     },
     "tle": "",

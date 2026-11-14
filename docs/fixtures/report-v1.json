@@ -19,7 +19,51 @@
       "period_minutes": 92.9613927094714,
       "apogee_km": 424.24149457785285,
       "perigee_km": 414.88242265163166,
-      "orbit_class_estimate": "LEO"
+      "orbit_class_estimate": "LEO",
+      "explanation": {
+        "regime": "LEO",
+        "regime_name": "Low Earth orbit",
+        "patterns": [],
+        "statements": [
+          {
+            "id": "regime",
+            "text": "It flies in low Earth orbit, below 2,000 km. Being close to Earth suits sharp imaging, but each satellite sees only a small patch at a time, so services that need constant coverage use many satellites working together.",
+            "basis": "derived",
+            "sources": [
+              {
+                "label": "ESA",
+                "title": "Types of orbits",
+                "url": "https://www.esa.int/Enabling_Support/Space_Transportation/Types_of_orbits"
+              }
+            ]
+          },
+          {
+            "id": "pace",
+            "text": "It circles Earth about 15.5 times a day, once every 93 minutes.",
+            "basis": "derived",
+            "sources": [
+              {
+                "label": "CelesTrak",
+                "title": "FAQs: Two-Line Element Set Format",
+                "url": "https://celestrak.org/columns/v04n03/"
+              }
+            ]
+          },
+          {
+            "id": "reach",
+            "text": "Its orbit is tilted 51.6° to the equator, so it flies over latitudes up to 52° north and south.",
+            "basis": "derived",
+            "sources": [
+              {
+                "label": "NASA",
+                "title": "Catalog of Earth Satellite Orbits",
+                "url": "https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/"
+              }
+            ]
+          }
+        ],
+        "nodal_precession_deg_day": -4.9499
+      }
     },
     "tle": "ISS (ZARYA)\n1 25544U 98067A   26297.20915682  .00007800  00000+0  14938-3 0  9991\n2 25544  51.6335  21.6229 0006884 302.9098  57.1228 15.49030149591752",
     "map_url": "https://www.google.com/maps/?q=0.000230,-86.291386"

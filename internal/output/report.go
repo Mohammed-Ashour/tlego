@@ -80,6 +80,13 @@ func formatExplanation(e *orbit.Explanation) string {
 			mark = " (estimate)"
 		}
 		fmt.Fprintf(b, "- %s%s\n", s.Text, mark)
+		refs := make([]string, 0, len(s.Sources))
+		for _, src := range s.Sources {
+			refs = append(refs, fmt.Sprintf("%s, %s <%s>", src.Label, src.Title, src.URL))
+		}
+		if len(refs) > 0 {
+			fmt.Fprintf(b, "  Sources: %s\n", strings.Join(refs, "; "))
+		}
 	}
 	return b.String()
 }

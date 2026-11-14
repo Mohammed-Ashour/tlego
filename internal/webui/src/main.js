@@ -675,8 +675,17 @@ function renderWhy(explanation) {
     const row = element('li', '', item.text);
     if (item.estimate) {
       const mark = element('span', 'why-estimate', 'estimate');
-      mark.title = 'A best guess: this matches a known pattern within Khonsu\'s tolerances';
+      mark.setAttribute('aria-describedby', 'orbit-why-legend');
       row.append(' ', mark);
+    }
+    for (const source of item.sources) {
+      const link = element('a', 'why-source', source.label);
+      link.href = source.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.title = source.title;
+      link.setAttribute('aria-label', `Source: ${source.title} (${source.label}, opens in a new tab)`);
+      row.append(' ', link);
     }
     return row;
   }));
@@ -718,7 +727,7 @@ function renderOrbit() {
     ['Element epoch', dayAndClock(Date.parse(provenance.element_epoch))],
     ['Data source', `${provenance.source} (${provenance.cache_status})`],
   ]);
-  note.textContent = 'Apogee and perigee are two-body estimates. Sentences marked estimate match a known orbit pattern within set tolerances.';
+  note.textContent = 'Apogee and perigee are two-body estimates.';
   const download = element('a', '', 'Download JSON report');
   download.href = `/api/v1/report?norad_id=${encodeURIComponent(state.selected)}`;
   download.download = `khonsu-${state.selected}.json`;

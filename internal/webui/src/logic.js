@@ -382,6 +382,13 @@ export function explanationView(explanation) {
   const chips = [explanation.regime_name || explanation.regime, ...(explanation.patterns ?? []).map((id) => PATTERN_LABELS[id])].filter(Boolean);
   const items = explanation.statements
     .filter((s) => typeof s?.text === 'string' && s.text.trim())
-    .map((s) => ({ text: s.text, estimate: s.basis !== 'derived' }));
+    .map((s) => ({
+      text: s.text,
+      estimate: s.basis !== 'derived',
+      // Only https links are shown, so a bad server value can't become a script URL.
+      sources: (Array.isArray(s.sources) ? s.sources : [])
+        .filter((src) => typeof src?.url === 'string' && /^https:\/\//.test(src.url))
+        .map((src) => ({ label: String(src.label || 'Source'), title: String(src.title || src.label || 'Source'), url: src.url })),
+    }));
   return items.length ? { chips, items } : null;
 }

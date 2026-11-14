@@ -87,3 +87,18 @@ func gstime(jd float64) float64 {
 	}
 	return v
 }
+
+// SecularRates returns the secular rates SGP4 applies to the mean anomaly,
+// argument of perigee and right ascension of the ascending node, in radians
+// per minute. Deep-space orbits include the lunisolar secular terms. Resonant
+// orbits (periods near 12 or 24 hours) also have resonance terms that SGP4
+// integrates separately; resonant reports whether they apply.
+func (s Satellite) SecularRates() (meanAnomaly, argPerigee, node float64, resonant bool) {
+	meanAnomaly, argPerigee, node = s.mdot, s.argpdot, s.nodedot
+	if s.method == "d" {
+		meanAnomaly += s.dmdt
+		argPerigee += s.domdt
+		node += s.dnodt
+	}
+	return meanAnomaly, argPerigee, node, s.irez != 0
+}

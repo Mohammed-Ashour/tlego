@@ -871,17 +871,46 @@
                   "derived",
                   "heuristic"
                 ]
+              },
+              "sources": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri",
+                      "pattern": "^https://"
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "title",
+                    "url"
+                  ]
+                }
               }
             },
             "required": [
               "id",
               "text",
-              "basis"
+              "basis",
+              "sources"
             ]
           }
         },
         "nodal_precession_deg_day": {
-          "type": "number"
+          "type": "number",
+          "description": "Secular drift of the ascending node from SGP4, degrees per day"
         },
         "descending_node_local_time_hours": {
           "type": "number",

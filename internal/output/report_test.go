@@ -81,7 +81,8 @@ func TestReportCarriesOrbitExplanationInV1AndTextOnly(t *testing.T) {
 		t.Errorf("legacy JSON changed shape: %s", legacy)
 	}
 	text := FormatReportText(r)
-	if !strings.Contains(text, "Why It's Up There (Low Earth orbit):") || !strings.Contains(text, "about 15.5 times a day") {
+	if !strings.Contains(text, "Why It's Up There (Low Earth orbit):") || !strings.Contains(text, "about 15.5 times a day") ||
+		!strings.Contains(text, "  Sources: ESA, Types of orbits <https://www.esa.int/") {
 		t.Errorf("text report lacks explanation:\n%s", text)
 	}
 	r.Explanation = nil

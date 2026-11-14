@@ -389,12 +389,15 @@ test('orbit explanation becomes chips and marked sentences', () => {
   const view = explanationView({
     regime: 'LEO', regime_name: 'Low Earth orbit', patterns: ['retrograde', 'sun_synchronous', 'something_new'],
     statements: [
-      { id: 'regime', text: 'It flies low.', basis: 'heuristic' },
+      { id: 'regime', text: 'It flies low.', basis: 'heuristic', sources: [{ label: 'ESA', title: 'Types of orbits', url: 'https://www.esa.int/x' }, { label: 'Bad', title: 'Bad', url: 'javascript:alert(1)' }] },
       { id: 'pace', text: 'It circles 14 times a day.', basis: 'derived' },
       { id: 'blank', text: ' ', basis: 'derived' },
     ],
   });
   assert.deepEqual(view.chips, ['Low Earth orbit', 'Retrograde', 'Sun-synchronous']);
-  assert.deepEqual(view.items, [{ text: 'It flies low.', estimate: true }, { text: 'It circles 14 times a day.', estimate: false }]);
+  assert.deepEqual(view.items, [
+    { text: 'It flies low.', estimate: true, sources: [{ label: 'ESA', title: 'Types of orbits', url: 'https://www.esa.int/x' }] },
+    { text: 'It circles 14 times a day.', estimate: false, sources: [] },
+  ]);
   assert.deepEqual(explanationView({ regime: 'GEO', statements: [{ text: 'Hangs still.', basis: 'mystery' }] }).chips, ['GEO']);
 });

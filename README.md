@@ -52,8 +52,8 @@ Everything works without setup. To connect an optional free [Space-Track](https:
     <td width="50%"><img src="assets/web-molniya.jpg" alt="A Molniya satellite's long, tilted ellipse around a small globe, with the Orbit tab explaining the 12-hour orbit"></td>
   </tr>
   <tr>
-    <td><b>Why is it up there?</b> Sentinel-2A is sun-synchronous, crosses the equator at 10:30 and repeats its path every 10 days.</td>
-    <td><b>Orbits with a purpose.</b> A Molniya ellipse spends about 8 hours of each orbit high over the far north.</td>
+    <td><b>Why is it up there?</b> Sentinel-2A is sun-synchronous, crosses the equator at 10:30 and repeats its path every 10 days (<a href="https://sentiwiki.copernicus.eu/web/s2-mission">Copernicus</a>). Every sentence links to its source.</td>
+    <td><b>Orbits with a purpose.</b> A Molniya orbit's 12-hour ellipse lingers high over the far north (<a href="https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/">NASA</a>).</td>
   </tr>
   <tr>
     <td><img src="assets/web-identity.jpg" alt="The Identity tab for Sentinel-2A, with details from Wikidata, GCAT and Space-Track"></td>
