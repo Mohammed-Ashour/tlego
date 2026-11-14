@@ -46,6 +46,25 @@ Everything works without setup. To connect an optional free [Space-Track](https:
 | Look ahead | Scrub or play the timeline, then press **Live** to return |
 | Share a view | Send the URL, which holds the satellites but never your location |
 
+<table>
+  <tr>
+    <td width="50%"><img src="assets/web-orbit.jpg" alt="Sentinel-2A over a cloud-covered globe, with the Orbit tab explaining why it is sun-synchronous and crosses the equator at 10:30"></td>
+    <td width="50%"><img src="assets/web-molniya.jpg" alt="A Molniya satellite's long, tilted ellipse around a small globe, with the Orbit tab explaining the 12-hour orbit"></td>
+  </tr>
+  <tr>
+    <td><b>Why is it up there?</b> Sentinel-2A is sun-synchronous, crosses the equator at 10:30 and repeats its path every 10 days.</td>
+    <td><b>Orbits with a purpose.</b> A Molniya ellipse spends about 8 hours of each orbit high over the far north.</td>
+  </tr>
+  <tr>
+    <td><img src="assets/web-identity.jpg" alt="The Identity tab for Sentinel-2A, with details from Wikidata, GCAT and Space-Track"></td>
+    <td><img src="assets/web-sees.jpg" alt="The Sees tab marking where Sentinel-2A's latest image of Earth was taken, with the globe turned to face it"></td>
+  </tr>
+  <tr>
+    <td><b>Who runs it.</b> Identity combines Wikidata, GCAT and, with your own account, Space-Track.</td>
+    <td><b>What it sees.</b> Pick a recent Sentinel-2 or Landsat image and the globe turns to where it was taken.</td>
+  </tr>
+</table>
+
 Each tab asks its provider only when you open it, and the **Data** button lists every source with its credit. Run `khonsu web --file examples/tui-demo/iss.tle` from a checkout to try it with no provider requests. The [web app guide](docs/web-app.md) covers privacy, limits and the JSON API.
 
 ## Terminal UI
