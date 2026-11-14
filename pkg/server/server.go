@@ -213,14 +213,10 @@ func writeJSON(w http.ResponseWriter, value any) {
 	fmt.Fprintln(w, string(bytes))
 }
 
-// Serve owns its mux and stops when ctx is canceled. An empty staticDir disables
-// the experimental checkout-based UI without affecting the JSON API.
+// Serve owns its mux and stops when ctx is canceled. It serves the JSON API, and
+// files from staticDir only when one is given. It applies the same read-only,
+// same-site and loopback-host checks as the web app.
 func Serve(ctx context.Context, addr, staticDir string) error {
-	mux := http.NewServeMux()
-	mux.Handle("/api/", NewHandler())
-	if staticDir != "" {
-		mux.Handle("/", http.FileServer(http.Dir(staticDir)))
-	}
 	if addr == "" {
 		addr = ":http" // Matches http.Server's meaning of an empty address.
 	}
@@ -228,7 +224,16 @@ func Serve(ctx context.Context, addr, staticDir string) error {
 	if err != nil {
 		return err
 	}
-	return serveListener(ctx, listener, mux)
+	return serveListener(ctx, listener, guardLoopback(listener, apiHandler(staticDir)))
+}
+
+func apiHandler(staticDir string) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/api/", NewHandler())
+	if staticDir != "" {
+		mux.Handle("/", http.FileServer(http.Dir(staticDir)))
+	}
+	return readOnlySameSite(mux)
 }
 
 func serveListener(ctx context.Context, listener net.Listener, handler http.Handler) error {

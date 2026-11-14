@@ -1,6 +1,6 @@
 import { activeTransmitters, formatFrequency, groupScenes, sameObjectName } from './logic.js';
 
-// The Identity, Radio and Sees tabs. Each source is requested only when its tab is first
+// The Identity, Radio and Scenes tabs. Each source is requested only when its tab is first
 // opened for a satellite, so a provider hears about a satellite only when the user asks.
 const TABS = ['identity', 'radio', 'sees'];
 const MAX_TRANSMITTERS = 8;
@@ -165,7 +165,7 @@ export function createDossier({ api, element, feedCredit, dataFailure, dataTime,
     });
     const list = element('div', 'scene-list');
     list.append(...rows);
-    return [note('Choose a pass to see where it is.'), list, ...feedCredit(feed)];
+    return [note('Recent scenes and where their centres are. Choose one to mark it on the globe. These are acquisition locations, not the pictures themselves.'), list, ...feedCredit(feed)];
   }
 
   function openIdentity(entry, current, cat) {

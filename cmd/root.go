@@ -36,7 +36,7 @@ var RootCmd = &cli.Command{
 	Name:        "khonsu",
 	Version:     buildVersion(),
 	Usage:       "Follow what crosses the sky, in your browser or terminal",
-	Description: "Browse satellites, predict positions and passes, and export orbit views using current CelesTrak GP data.",
+	Description: "Start with khonsu web: follow a satellite on a 3D globe, read why its orbit is the way it is, and estimate when you might see it. The terminal UI (khonsu tui) and the commands below use the same calculations, with orbital elements from CelesTrak. Pass results are estimates.",
 	Authors: []any{
 		Author{
 			Name:    "Mohamed Ashour",

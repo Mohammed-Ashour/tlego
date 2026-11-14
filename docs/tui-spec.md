@@ -1,6 +1,6 @@
 # Khonsu terminal UI
 
-Status: initial implementation. This document describes the shipped baseline, not the future shared-core or extension API.
+Status: shipped. The TUI uses the same orbit, pass and report code as the CLI and web app; see ARCHITECTURE.md.
 
 ## Entry points
 
@@ -56,7 +56,7 @@ Errors, failed-group search coverage and stale-cache warnings remain visible in 
 
 ## Scientific and compatibility limits
 
-Positions are computed using UTC, displayed in degrees and km, and use the propagated velocity vector for km/s speed. Longitude is normalized to [-180,180). This corrects the TUI path only; older CLI calculations have separate tracked issues.
+Positions are computed using UTC, displayed in degrees and km, and use the propagated velocity vector for km/s speed. Longitude is normalized to [-180,180).
 
 Passes are found at one-minute steps, and their times and maxima are then refined to one second. A pass shorter than a minute can be missed. Start/end-clipped passes are marked. Configure your observer first; the default is 0 latitude, 0 longitude and 0 km altitude. These results do not establish optical visibility, precision antenna control or collision risk. Use `khonsu tonight` for a naked-eye estimate.
 

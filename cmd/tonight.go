@@ -33,9 +33,9 @@ func newTonightCommand() *cli.Command {
 	)
 	return &cli.Command{
 		Name:        "tonight",
-		Usage:       "List passes you can see with the naked eye in the next dark period",
+		Usage:       "List viewing windows in the next dark period: passes when the satellite is sunlit in your dark sky",
 		ArgsUsage:   "[NORAD-ID]",
-		Description: "Checks the next dark period for passes where the satellite is sunlit and above the minimum elevation. Without an ID, it uses the ISS. Weather and brightness are not considered.",
+		Description: "Checks the next dark period for passes where the satellite is sunlit and above the minimum elevation. Without an ID, it uses the ISS. Weather, brightness and obstructions are not considered, so a faint satellite may not be seen.",
 		Flags:       flags,
 		Action:      planTonight,
 	}

@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	UserAgent      = "Khonsu (+https://github.com/Mohammed-Ashour/Khonsu)"
+	UserAgent      = catalog.UserAgent
 	maxResponse    = 8 << 20
 	requestTimeout = 25 * time.Second
 	failurePause   = 15 * time.Minute

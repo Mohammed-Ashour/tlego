@@ -95,6 +95,7 @@ func (m Model) navLine() string {
 
 func (m Model) homeView() string {
 	var b strings.Builder
+	b.WriteString("Try the ISS: type :norad 25544 and press Enter.\n\n")
 	b.WriteString("Quick actions:\n")
 	b.WriteString("- / search\n")
 	b.WriteString("- :norad <id>\n")
@@ -103,7 +104,7 @@ func (m Model) homeView() string {
 	b.WriteString("- ? help\n")
 	b.WriteString("\nRecent satellites:\n")
 	if len(m.settings.Recent) == 0 {
-		b.WriteString("  (none yet)\n")
+		b.WriteString("  (none yet: satellites you open appear here)\n")
 	} else {
 		for i, id := range m.settings.Recent {
 			b.WriteString(fmt.Sprintf("  %d) %s\n", i+1, id))
