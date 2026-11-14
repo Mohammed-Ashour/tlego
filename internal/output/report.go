@@ -24,6 +24,19 @@ type ReportData struct {
 	MapURL       string          `json:"map_url"`
 	SourceFormat string          `json:"source_format,omitempty"`
 	ElementData  json.RawMessage `json:"element_data,omitempty"`
+	// Explanation is published through the v1 record only, so the legacy
+	// report JSON keeps its original shape.
+	Explanation *orbit.Explanation `json:"-"`
+}
+
+// explanationFor returns nil when the elements cannot be explained; the rest
+// of the report remains valid without it.
+func explanationFor(r elements.Record) *orbit.Explanation {
+	e, err := orbit.Explain(r)
+	if err != nil {
+		return nil
+	}
+	return &e
 }
 
 func BuildReportAt(element tle.TLE, position orbit.Position, orb orbit.OrbitInfo, mapURL string, generated time.Time) (ReportData, error) {
@@ -31,7 +44,11 @@ func BuildReportAt(element tle.TLE, position orbit.Position, orb orbit.OrbitInfo
 	if err != nil {
 		return ReportData{}, err
 	}
-	return ReportData{Name: element.Name, NoradID: element.NoradID, Epoch: epoch, Generated: generated.UTC(), TLE: element.String(), Position: position, Orbit: orb, MapURL: mapURL}, nil
+	report := ReportData{Name: element.Name, NoradID: element.NoradID, Epoch: epoch, Generated: generated.UTC(), TLE: element.String(), Position: position, Orbit: orb, MapURL: mapURL}
+	if record, err := elements.FromTLE(element); err == nil {
+		report.Explanation = explanationFor(record)
+	}
+	return report, nil
 }
 
 // BuildElementReportAt retains optional original TLE text; GP data remains JSON.
@@ -39,7 +56,7 @@ func BuildElementReportAt(element elements.Record, position orbit.Position, orb 
 	if err := element.Validate(); err != nil {
 		return ReportData{}, err
 	}
-	r := ReportData{Name: element.Name, NoradID: element.CatalogID, Epoch: element.Epoch.UTC(), Generated: generated.UTC(), Position: position, Orbit: orb, MapURL: mapURL}
+	r := ReportData{Name: element.Name, NoradID: element.CatalogID, Epoch: element.Epoch.UTC(), Generated: generated.UTC(), Position: position, Orbit: orb, MapURL: mapURL, Explanation: explanationFor(element)}
 	if element.LegacyTLE != nil {
 		r.TLE = element.LegacyTLE.String()
 	} else {
@@ -48,7 +65,37 @@ func BuildElementReportAt(element elements.Record, position orbit.Position, orb 
 	}
 	return r, nil
 }
+
+// formatExplanation renders the "Why it's up there" section of a text report.
+func formatExplanation(e *orbit.Explanation) string {
+	if e == nil || len(e.Statements) == 0 {
+		return ""
+	}
+	b := &strings.Builder{}
+	fmt.Fprintf(b, "\nWhy It's Up There (%s):\n", e.RegimeName)
+	b.WriteString("--------------------\n")
+	for _, s := range e.Statements {
+		mark := ""
+		if s.Basis == orbit.BasisHeuristic {
+			mark = " (estimate)"
+		}
+		fmt.Fprintf(b, "- %s%s\n", s.Text, mark)
+		refs := make([]string, 0, len(s.Sources))
+		for _, src := range s.Sources {
+			refs = append(refs, fmt.Sprintf("%s, %s <%s>", src.Label, src.Title, src.URL))
+		}
+		if len(refs) > 0 {
+			fmt.Fprintf(b, "  Sources: %s\n", strings.Join(refs, "; "))
+		}
+	}
+	return b.String()
+}
+
 func FormatReportText(r ReportData) string {
+	return formatReportText(r) + formatExplanation(r.Explanation)
+}
+
+func formatReportText(r ReportData) string {
 	label, payload := "TLE Data", r.TLE
 	if r.SourceFormat != "" {
 		label = "Element data (" + r.SourceFormat + ")"

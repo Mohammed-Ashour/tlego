@@ -364,3 +364,31 @@ export function launchLabel(launch, nowMs) {
   const days = Math.round(difference / 86400000);
   return `${prefix} ${days} ${days === 1 ? 'day' : 'days'}`;
 }
+
+const PATTERN_LABELS = {
+  sun_synchronous: 'Sun-synchronous',
+  dawn_dusk: 'Dawn-dusk',
+  molniya: 'Molniya',
+  tundra: 'Tundra',
+  polar: 'Polar',
+  near_equatorial: 'Near-equatorial',
+  retrograde: 'Retrograde',
+};
+
+// Turns the report's orbit explanation into what the Orbit tab shows. Unknown
+// pattern IDs are skipped, so a newer server can add patterns safely.
+export function explanationView(explanation) {
+  if (!explanation || !Array.isArray(explanation.statements) || explanation.statements.length === 0) return null;
+  const chips = [explanation.regime_name || explanation.regime, ...(explanation.patterns ?? []).map((id) => PATTERN_LABELS[id])].filter(Boolean);
+  const items = explanation.statements
+    .filter((s) => typeof s?.text === 'string' && s.text.trim())
+    .map((s) => ({
+      text: s.text,
+      estimate: s.basis !== 'derived',
+      // Only https links are shown, so a bad server value can't become a script URL.
+      sources: (Array.isArray(s.sources) ? s.sources : [])
+        .filter((src) => typeof src?.url === 'string' && /^https:\/\//.test(src.url))
+        .map((src) => ({ label: String(src.label || 'Source'), title: String(src.title || src.label || 'Source'), url: src.url })),
+    }));
+  return items.length ? { chips, items } : null;
+}

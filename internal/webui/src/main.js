@@ -3,7 +3,7 @@ import { createGlobe } from './globe.js';
 import { createLayers } from './layers.js';
 import {
   annotatePasses, buildUrlState, canonicalId, clamp, cloudAtTime, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
-  dataAge, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
+  dataAge, explanationView, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
 } from './logic.js';
 import { sampleAt } from '../../../pkg/templates/viewer-state.js';
 import { renderSky } from './sky.js';
@@ -665,6 +665,32 @@ async function refreshReport() {
   renderOrbit();
 }
 
+function renderWhy(explanation) {
+  const card = byId('orbit-why');
+  const view = explanationView(explanation);
+  card.hidden = !view;
+  if (!view) return;
+  byId('orbit-why-chips').replaceChildren(...view.chips.map((label) => element('li', 'why-chip', label)));
+  byId('orbit-why-list').replaceChildren(...view.items.map((item) => {
+    const row = element('li', '', item.text);
+    if (item.estimate) {
+      const mark = element('span', 'why-estimate', 'estimate');
+      mark.setAttribute('aria-describedby', 'orbit-why-legend');
+      row.append(' ', mark);
+    }
+    for (const source of item.sources) {
+      const link = element('a', 'why-source', source.label);
+      link.href = source.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.title = source.title;
+      link.setAttribute('aria-label', `Source: ${source.title} (${source.label}, opens in a new tab)`);
+      row.append(' ', link);
+    }
+    return row;
+  }));
+}
+
 function renderOrbit() {
   const readouts = byId('orbit-readouts');
   const note = byId('orbit-note');
@@ -672,6 +698,7 @@ function renderOrbit() {
   links.replaceChildren();
   note.textContent = '';
   note.className = 'note';
+  renderWhy(state.report?.data?.orbit?.explanation);
   if (!state.selected) {
     setReadouts(readouts, []);
     note.textContent = 'Add a satellite to see its orbit.';
