@@ -170,6 +170,20 @@ export function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
+// Codes every pass answer carries. Their limits are already stated next to the list.
+const ROUTINE_PLAN_WARNINGS = new Set(['sampled_passes', 'estimated_visibility']);
+
+// The warnings of a pass plan's answers, such as old or saved elements, once each.
+export function planWarnings(results) {
+  const seen = new Map();
+  for (const result of results) {
+    for (const warning of result?.warnings ?? []) {
+      if (!ROUTINE_PLAN_WARNINGS.has(warning.code) && !seen.has(warning.code)) seen.set(warning.code, warning);
+    }
+  }
+  return [...seen.values()];
+}
+
 // Marks each pass that overlaps a visible stretch, and carries that stretch along.
 export function annotatePasses(passes, visible) {
   return passes.map((pass) => ({

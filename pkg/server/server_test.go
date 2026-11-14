@@ -199,3 +199,25 @@ func TestGPJSONHTTPPreservesNineDigitID(t *testing.T) {
 		}
 	}
 }
+
+func TestAPIServerRefusesWritesAndCrossSiteCallsAndServesNoFilesByDefault(t *testing.T) {
+	handler := apiHandler("")
+	for _, tc := range []struct {
+		method, path, site string
+		want               int
+	}{
+		{http.MethodPost, "/api/v1/position", "", http.StatusMethodNotAllowed},
+		{http.MethodGet, "/api/v1/position?norad_id=x", "cross-site", http.StatusForbidden},
+		{http.MethodGet, "/", "", http.StatusNotFound},
+	} {
+		request := httptest.NewRequest(tc.method, tc.path, nil)
+		if tc.site != "" {
+			request.Header.Set("Sec-Fetch-Site", tc.site)
+		}
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		if recorder.Code != tc.want {
+			t.Errorf("%s %s (%s) = %d, want %d", tc.method, tc.path, tc.site, recorder.Code, tc.want)
+		}
+	}
+}

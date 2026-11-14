@@ -60,7 +60,7 @@
         <button id="tab-orbit" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-orbit" tabindex="-1">Orbit</button>
         <button id="tab-identity" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-identity" tabindex="-1">Identity</button>
         <button id="tab-radio" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-radio" tabindex="-1">Radio</button>
-        <button id="tab-sees" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-sees" tabindex="-1" hidden>Sees</button>
+        <button id="tab-sees" class="tab" role="tab" type="button" aria-selected="false" aria-controls="panel-sees" tabindex="-1" hidden>Scenes</button>
       </div>
       <section id="panel-now" class="tab-panel" role="tabpanel" aria-labelledby="tab-now">
         <dl id="now-readouts" class="readouts"></dl>
@@ -104,7 +104,7 @@
       <h2 id="data-title">Data sources</h2>
       <button id="data-close" class="text-button" type="button">Close</button>
     </div>
-    <p class="note">Your copy of Khonsu fetches this data, keeps a local copy to limit requests and credits each source. Khonsu doesn't redistribute it. Space weather and launch times are requested when the app opens and send nothing about you or your satellites. The Identity and Radio tabs send the selected satellite's NORAD ID to Wikidata and SatNOGS, and to Space-Track if you've connected an account. For Sentinel-2 and Landsat satellites, the Sees tab sends the platform name to Earth Search. Your location is only sent if you ask for cloud cover, and is rounded to about 10 km first.</p>
+    <p class="note">Your copy of Khonsu fetches this data, keeps a local copy to limit requests and credits each source. Khonsu doesn't redistribute it. Space weather and launch times are requested when the app opens and send nothing about you or your satellites. The Identity and Radio tabs send the selected satellite's NORAD ID to Wikidata and SatNOGS, and to Space-Track if you've connected an account. GCAT is downloaded as one whole table, so it never learns which satellite you chose. For Sentinel-2 and Landsat satellites, the Scenes tab sends the platform name to Earth Search. Your location is only sent if you ask for cloud cover, and is rounded to about 10 km first.</p>
     <p id="data-status-note" class="note"></p>
     <div id="data-categories"></div>
   </dialog>
@@ -112,7 +112,7 @@
   <dialog id="observer-dialog" class="dialog" aria-labelledby="observer-title">
     <form id="observer-form" method="dialog" novalidate>
       <h2 id="observer-title">Your location</h2>
-      <p class="note">Used to predict passes. It stays in this browser and is sent only to this Khonsu server, never in shared links.</p>
+      <p class="note">Used to predict passes. It stays in this browser and is sent only to this Khonsu server, never in shared links. The one exception is <i>Check clouds near me</i>, which sends it to Open-Meteo, rounded to about 10 km, when you press it. <code>khonsu setup</code> saves a separate location for the terminal.</p>
       <div class="dialog-grid">
         <label class="field"><span>Latitude °</span><input id="observer-lat" inputmode="decimal" autocomplete="off" required></label>
         <label class="field"><span>Longitude °</span><input id="observer-lon" inputmode="decimal" autocomplete="off" required></label>

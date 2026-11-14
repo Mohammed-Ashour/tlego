@@ -315,12 +315,12 @@ test('radio truncates to eight transmitters and reports the rest', async () => {
   assert.match(text, /\+ 2 more/);
 });
 
-test('sees lists scene groups and focuses the scene when clicked', async () => {
+test('scenes lists scene groups and focuses the scene when clicked', async () => {
   const { dossier, panels, env } = harness();
   await dossier.open('sees');
   await flush();
   const text = textOf(panels.sees);
-  assert.match(text, /Choose a pass to see where it is\./);
+  assert.match(text, /acquisition locations, not the pictures themselves\./);
   assert.match(text, /near 5\.0°, 6\.0°/);
   assert.match(text, /near 1\.2°, 2\.3° · 2 tiles · 20–40% cloud/);
   assert.match(text, /time 2026-11-09T12:00:00\.000Z/);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  annotatePasses, activeTransmitters, buildUrlState, canonicalId, cloudAtTime, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCountdown, formatDay, formatDuration,
+  annotatePasses, planWarnings, activeTransmitters, buildUrlState, canonicalId, cloudAtTime, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCountdown, formatDay, formatDuration,
   dataAge, describeKp, explanationView, formatFrequency, groupScenes, latestKp, launchLabel, nextLaunch, sameObjectName, summarizeHistory, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, PALETTE, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, trailRange, validId, windowFrom,
 } from './logic.js';
 
@@ -400,4 +400,17 @@ test('orbit explanation becomes chips and marked sentences', () => {
     { text: 'It circles 14 times a day.', estimate: false, sources: [] },
   ]);
   assert.deepEqual(explanationView({ regime: 'GEO', statements: [{ text: 'Hangs still.', basis: 'mystery' }] }).chips, ['GEO']);
+});
+
+test('planWarnings keeps element warnings once and drops the routine ones', () => {
+  const stale = { code: 'stale_elements', message: 'Showing saved elements.' };
+  const distant = { code: 'distant_epoch', message: 'The elements are 9 days from this time.' };
+  const warnings = planWarnings([
+    { warnings: [stale, { code: 'sampled_passes', message: 'x' }, distant] },
+    { warnings: [stale, { code: 'estimated_visibility', message: 'y' }] },
+    { warnings: null },
+    undefined,
+  ]);
+  assert.deepEqual(warnings, [stale, distant]);
+  assert.deepEqual(planWarnings([]), []);
 });

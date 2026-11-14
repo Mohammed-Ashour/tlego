@@ -16,7 +16,7 @@ Set a repository secret named `TAP_GITHUB_TOKEN` to a fine-grained token with Co
 
 Without the secret the release still succeeds. The manifests stay in the workflow's `package-manifests` artifact and can be committed by hand: `Casks/khonsu.rb` in the tap and `khonsu.json` in the bucket.
 
-The cask's install step needs a recent Homebrew. Anyone who sees an unknown `postflight_steps` error should run `brew update`.
+The macOS binaries are not signed or notarized, so the cask's install step removes the `com.apple.quarantine` attribute from the installed `khonsu` binary. Without that, macOS would refuse to open it. Signing and notarizing the binaries would remove the need for this step. The cask's install step needs a recent Homebrew. Anyone who sees an unknown `postflight_steps` error should run `brew update`.
 
 ## If the release job fails
 

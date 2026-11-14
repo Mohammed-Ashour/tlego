@@ -119,6 +119,7 @@ ul { list-style: none; }
 
 .pass-summary { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--raised); line-height: 1.5; }
 .pass-summary strong { display: block; margin-bottom: 2px; font-weight: 600; }
+.pass-summary .pass-caveat { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
 .pass-summary.is-visible { border-color: rgba(235, 209, 147, .5); }
 .section-title { margin: 16px 0 6px; }
 .pass-row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px; border: 0; border-radius: 4px; background: transparent; text-align: left; cursor: pointer; }

@@ -21,6 +21,9 @@ func TestFetchURLFetchesAndThenUsesCache(t *testing.T) {
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requests.Add(1)
+		if agent := r.Header.Get("User-Agent"); agent != UserAgent {
+			t.Errorf("User-Agent = %q", agent)
+		}
 		_, _ = w.Write([]byte(validTLE))
 	}))
 	defer server.Close()

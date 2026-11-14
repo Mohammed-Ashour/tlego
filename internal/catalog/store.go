@@ -469,11 +469,15 @@ func readBounded(path string) ([]byte, error) {
 	return b, e
 }
 
+// UserAgent identifies Khonsu to every provider it downloads from.
+const UserAgent = "Khonsu (+https://github.com/Mohammed-Ashour/Khonsu)"
+
 func (s *Store) downloadBytes(ctx context.Context, source string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("User-Agent", UserAgent)
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err

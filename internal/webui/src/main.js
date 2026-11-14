@@ -2,7 +2,7 @@ import { createApi, isAbort } from './api.js';
 import { createGlobe } from './globe.js';
 import { createLayers } from './layers.js';
 import {
-  annotatePasses, buildUrlState, canonicalId, clamp, cloudAtTime, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
+  annotatePasses, planWarnings, buildUrlState, canonicalId, clamp, cloudAtTime, compassPoint, elementAgeDays, filterSatellites, formatClock, formatCoordinate, formatCountdown, formatDay, formatDuration,
   dataAge, explanationView, lookAt, MAX_TRACKED, migrateStorage, needsNewWindow, nextColor, parseObserver, parseUrlState, passesOverlap, providerMessage, readStoredObserver, safeStorage, shortCoordinate, sunlitAt, validId, windowFrom, zoneLabel,
 } from './logic.js';
 import { sampleAt } from '../../../pkg/templates/viewer-state.js';
@@ -61,7 +61,7 @@ let skyBar = null;
 // Bumped on every selection change, so only the newest decides the Sees tab.
 let selectionToken = 0;
 
-// Tab order matches the markup. Sees is hidden unless the selected satellite has scenes.
+// Tab order matches the markup. Scenes is hidden unless the selected satellite has scenes.
 const TABS = ['now', 'passes', 'orbit', 'identity', 'radio', 'sees'];
 const DOSSIER_TABS = ['identity', 'radio', 'sees'];
 
@@ -441,6 +441,9 @@ function locationPrompt(container) {
   container.append(button);
 }
 
+// Shown beside every viewing window: the estimate is geometric only.
+const SIGHTING_CAVEAT = 'Brightness, weather and obstructions may prevent a sighting.';
+
 function nextVisible() {
   const passes = state.plan?.visible ?? [];
   return passes.find((pass) => Date.parse(pass.end.at) > Date.now()) ?? null;
@@ -454,13 +457,14 @@ function passSummary() {
   if (visible) {
     const start = Date.parse(visible.start.at);
     summary.append(
-      element('strong', '', Date.now() >= start ? 'Visible now' : `Visible ${formatCountdown(start, Date.now())}`),
+      element('strong', '', Date.now() >= start ? 'Viewing window now' : `Viewing window ${formatCountdown(start, Date.now())}`),
       element('span', '', `${dayAndClock(start)}, up to ${Math.round(visible.peak.elevation_deg)}° in the ${compassPoint(visible.peak.azimuth_deg)}.`),
+      element('span', 'pass-caveat', SIGHTING_CAVEAT),
     );
   } else if (!tonight.dark_start) {
     summary.append(element('strong', '', 'No dark sky soon'), element('span', '', 'The Sun stays too high for the next 24 hours.'));
   } else {
-    summary.append(element('strong', '', `No visible passes in the next ${PLAN_HOURS} hours`), element('span', '', `The next dark sky starts ${dayAndClock(Date.parse(tonight.dark_start))}.`));
+    summary.append(element('strong', '', `No viewing windows in the next ${PLAN_HOURS} hours`), element('span', '', `The next dark sky starts ${dayAndClock(Date.parse(tonight.dark_start))}.`));
   }
   return summary;
 }
@@ -495,6 +499,7 @@ function renderPassesContent(container) {
   }
   const { visible, passes } = state.plan;
   if (state.planError) container.append(element('p', 'note is-warning', `Could not update this list: ${state.planError}`));
+  for (const warning of state.plan.warnings ?? []) container.append(element('p', 'note is-warning plan-warning', warning.message));
   container.append(passSummary(), element('h2', 'eyebrow section-title', `Next ${PLAN_HOURS} hours · ${zoneLabel(state.utc)} time`));
   if (!passes.length) {
     container.append(element('p', 'note', 'No passes above your horizon in this period.'));
@@ -517,14 +522,14 @@ function renderPassesContent(container) {
       element('span', 'pass-elevation', `${Math.round(pass.maximum_elevation_deg)}°`),
       element('span', 'pass-detail', `${compassPoint(pass.start_azimuth_deg)} to ${compassPoint(pass.end_azimuth_deg)} · ${formatDuration(end - start)}${cloudText}`),
     );
-    if (pass.visible) button.append(element('span', 'badge', 'Visible'));
+    if (pass.visible) button.append(element('span', 'badge', 'Window'));
     button.addEventListener('click', () => choosePass(pass));
     container.append(button);
     if (isActive) container.append(renderActivePass());
   }
   container.append(element('p', 'note', forecast
-    ? 'Visible means sunlit, in a dark sky and at least 10° high. Brightness is not considered.'
-    : 'Visible means sunlit, in a dark sky and at least 10° high. Weather and brightness are not considered.'));
+    ? 'A viewing window means the satellite is sunlit, your sky is dark and it is at least 10° high. Brightness is not considered, so a faint satellite may not be seen.'
+    : 'A viewing window means the satellite is sunlit, your sky is dark and it is at least 10° high. Weather and brightness are not considered, so a faint satellite may not be seen.'));
   if (liveDataOn) container.append(cloudCheck());
 }
 
@@ -627,17 +632,20 @@ async function refreshPlan(force = false) {
     const tonight = await api.tonight(id, state.observer, Date.now());
     // Each answer covers one dark period, so keep asking until the list's end.
     const visible = [...tonight.data.passes];
+    const answers = [tonight];
     let night = tonight.data;
     const horizon = Date.now() + PLAN_HOURS * 3600000;
     while (night.dark_end && !night.dark_end_clipped && Date.parse(night.dark_end) < horizon) {
       const next = await api.tonight(id, state.observer, night.dark_end);
       if (state.planFor !== key) return;
       visible.push(...next.data.passes);
+      answers.push(next);
       night = next.data;
     }
     const passes = await passesRequest;
     if (state.planFor !== key) return;
-    state.plan = { tonight: tonight.data, visible, passes: passes.data.passes };
+    // Old or saved elements make every pass less certain, so their warnings stay with the plan.
+    state.plan = { tonight: tonight.data, visible, passes: passes.data.passes, warnings: planWarnings([passes, ...answers]) };
     if (state.activePass && !state.plan.passes.some((pass) => passesOverlap(state.activePass.pass, pass))) state.activePass = null;
   } catch (error) {
     if (isAbort(error) || state.planFor !== key) return;
@@ -777,13 +785,14 @@ function renderHeadline() {
     const start = Date.parse(visible.start.at);
     const started = Date.now() >= start;
     headline.append(
-      element('p', 'headline-title', `${started ? 'Visible now' : 'Next visible pass'} · ${entry.name}`),
+      element('p', 'headline-title', `${started ? 'Viewing window now' : 'Next viewing window'} · ${entry.name}`),
       element('p', 'headline-main', `${dayAndClock(start).slice(0, -3)}${started ? '' : ` · ${formatCountdown(start, Date.now())}`}`),
       element('p', 'headline-sub', `Up to ${Math.round(visible.peak.elevation_deg)}° in the ${compassPoint(visible.peak.azimuth_deg)}, starting in the ${compassPoint(visible.start.azimuth_deg)}.`),
+      element('p', 'headline-sub', state.plan.warnings?.length ? `${SIGHTING_CAVEAT} ${state.plan.warnings[0].message}` : SIGHTING_CAVEAT),
     );
     return;
   }
-  headline.append(element('p', 'headline-title', entry.name), element('p', 'headline-main', state.plan.tonight.dark_start ? `No visible passes in the next ${PLAN_HOURS} hours` : 'No dark sky soon'));
+  headline.append(element('p', 'headline-title', entry.name), element('p', 'headline-main', state.plan.tonight.dark_start ? `No viewing windows in the next ${PLAN_HOURS} hours` : 'No dark sky soon'));
 }
 
 function renderStatus() {

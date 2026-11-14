@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install build setup web test test-web
+.PHONY: help install build setup web test test-web notices
 
 help: ## Show these commands
 	@awk 'BEGIN {FS = ":.*## "} /^[a-z-]+:.*## / {printf "  make %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -22,3 +22,6 @@ test: ## Run the Go tests
 
 test-web: ## Run the web app tests (needs Node)
 	cd internal/webui && npm test
+
+notices: ## Regenerate THIRD_PARTY_NOTICES.md (needs npm ci in internal/webui)
+	go run ./internal/tools/notices > THIRD_PARTY_NOTICES.md

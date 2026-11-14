@@ -547,6 +547,18 @@ func newAppHandler(source elementSource, feeds *sources.Hub, ui fs.FS) http.Hand
 // server is read-only, and pages on other sites have no reason to call its API:
 // without this check, any website could spend the user's provider allowance.
 func securityHeaders(next http.Handler) http.Handler {
+	return readOnlySameSite(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		headers := w.Header()
+		headers.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+		headers.Set("X-Content-Type-Options", "nosniff")
+		headers.Set("Referrer-Policy", "no-referrer")
+		next.ServeHTTP(w, r)
+	}))
+}
+
+// readOnlySameSite accepts only reads, and refuses API calls from pages on other
+// sites. Both servers use it; only the web app adds its content policy.
+func readOnlySameSite(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
@@ -557,12 +569,16 @@ func securityHeaders(next http.Handler) http.Handler {
 			http.Error(w, "Cross-site requests are not allowed", http.StatusForbidden)
 			return
 		}
-		headers := w.Header()
-		headers.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
-		headers.Set("X-Content-Type-Options", "nosniff")
-		headers.Set("Referrer-Policy", "no-referrer")
 		next.ServeHTTP(w, r)
 	})
+}
+
+// guardLoopback adds the DNS-rebinding check when the listener is on loopback.
+func guardLoopback(listener net.Listener, handler http.Handler) http.Handler {
+	if tcp, ok := listener.Addr().(*net.TCPAddr); ok && tcp.IP.IsLoopback() {
+		return loopbackHostsOnly(handler)
+	}
+	return handler
 }
 
 // loopbackHostsOnly blocks DNS rebinding: a loopback server is only ever reached by
@@ -607,9 +623,5 @@ func ServeApp(ctx context.Context, options AppOptions) error {
 	if options.OnReady != nil {
 		options.OnReady(appURL(listener.Addr()))
 	}
-	handler := newAppHandler(source, feeds, options.UI)
-	if tcp, ok := listener.Addr().(*net.TCPAddr); ok && tcp.IP.IsLoopback() {
-		handler = loopbackHostsOnly(handler)
-	}
-	return serveListener(ctx, listener, handler)
+	return serveListener(ctx, listener, guardLoopback(listener, newAppHandler(source, feeds, options.UI)))
 }

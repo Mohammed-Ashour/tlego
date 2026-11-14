@@ -44,7 +44,7 @@ func newWebCommand() *cli.Command {
 		&cli.StringFlag{Name: "file", Usage: "Serve satellites from a local TLE or GP JSON file instead of live data"},
 		&cli.BoolFlag{Name: "no-open", Usage: "Do not open a browser"},
 	)
-	return &cli.Command{Name: "web", Usage: "Open the web app: a 3D globe, live tracking and pass predictions", Flags: flags, Action: startWeb}
+	return &cli.Command{Name: "web", Usage: "Open the web app: a 3D globe, orbit explanations and viewing windows", Category: "UI", Flags: flags, Action: startWeb}
 }
 
 func startWeb(ctx context.Context, c *cli.Command) error {

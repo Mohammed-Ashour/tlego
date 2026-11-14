@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="assets/web-demo.mp4"><img src="assets/web-demo.gif" width="100%" alt="A 25-second tour of the Khonsu web app: the ISS over a globe with live clouds, its next visible pass from London with a sky plot, the timeline playing ahead, then why Sentinel-2A is sun-synchronous, who runs it, and today's space weather"></a>
+  <a href="assets/web-demo.mp4"><img src="assets/web-demo.gif" width="100%" alt="A 25-second tour of the Khonsu web app: the ISS over a globe with live clouds, its next viewing window from London with a sky plot, the timeline playing ahead, then why Sentinel-2A is sun-synchronous, who runs it, and today's space weather"></a>
 </p>
 
 <img align="right" src="assets/khonsu-god.png" width="120" alt="Khonsu, the ancient Egyptian moon god, standing with a full moon resting in a crescent on his head, holding a crook, flail and staff, painted in blue and gold">
@@ -24,7 +24,7 @@ Satellites cross your sky every night, but most trackers only give you numbers. 
 
 - **A moment to look up.** It tells you when a satellite will pass over you, whether you'll be able to see it, and whether clouds will be in the way.
 - **An understanding of what you see.** It explains in plain words why each orbit is the way it is, and links every sentence to a source.
-- **A view of the planet they watch.** See today's clouds, yesterday's Earth, the aurora estimate, and the latest pictures satellites took.
+- **A view of the planet they watch.** See today's clouds, yesterday's Earth and the aurora estimate, and find where Sentinel-2 and Landsat recently captured scenes.
 - **Tools you own.** Khonsu is one program that runs on your computer, with a web app, a terminal app and a command line. It needs no account.
 
 Khonsu was the ancient Egyptian god of the Moon. His name means "traveller", which may refer to the Moon's nightly journey across the sky ([Wikipedia](https://en.wikipedia.org/wiki/Khonsu)). This project follows newer travellers along the same path. It was previously called TLEGO.
@@ -42,13 +42,13 @@ go install github.com/Mohammed-Ashour/khonsu@latest
 khonsu web          # opens the app in your browser
 ```
 
-Everything works without setup. To save your location, or to connect an optional free [Space-Track](https://www.space-track.org/auth/createAccount) account, run `khonsu setup`, and press Enter to skip any question. From a checkout, `make install` and `make web` do the same, and `make help` lists the rest.
+No account is required. To save a location for terminal pass estimates, or to connect an optional free [Space-Track](https://www.space-track.org/auth/createAccount) account, run `khonsu setup`, and press Enter to skip any question. The web app keeps its own location in your browser. From a checkout, `make install` and `make web` do the same, and `make help` lists the rest.
 
 ## What you can do
 
 ### See the ISS tonight
 
-Ask when the International Space Station will be visible from where you are. This example uses Greenwich, London:
+Ask when the International Space Station will next be sunlit in your dark sky, a *viewing window* when you might see it. This example uses Greenwich, London:
 
 ```console
 $ khonsu tonight --lat 51.48 --lon 0
@@ -61,7 +61,7 @@ Sat 14 Nov  visible for 2m 25s
   fades    18:23:46  32° above S
 ```
 
-In the web app, set your location and open **Passes**. You get a countdown to the next visible pass, a sky plot of where to look, and a *Visible* badge on each pass you can see. **Check clouds near me** adds the forecast cloud cover for each one. `khonsu passes` does the same for any satellite.
+In the web app, set your location and open **Passes**. You get a countdown to the next viewing window, a sky plot of where to look, and a *Window* badge on each pass that is sunlit in a dark sky. Brightness, weather and obstructions may still prevent a sighting. **Check clouds near me** adds the forecast cloud cover for each one. `khonsu passes` does the same for any satellite.
 
 ### Understand why a satellite flies where it does
 
@@ -92,18 +92,18 @@ Why It's Up There (Low Earth orbit):
 ...
 ```
 
-### Meet the satellite, and see what it sees
+### Meet the satellite, and find its scenes
 
-**Identity** shows who runs a satellite, when it launched and what it's for. **Radio** lists what it transmits and on which frequencies. For Sentinel-2 and Landsat, **Sees** finds their latest pictures of Earth and turns the globe to where each one was taken.
+**Identity** shows who runs a satellite, when it launched and what it's for. **Radio** lists what it transmits and on which frequencies. For Sentinel-2 and Landsat, **Scenes** lists the latest scenes they captured and turns the globe to the centre of each one. It shows where a scene was taken, not the picture itself.
 
 <table>
   <tr>
     <td width="50%"><img src="assets/web-identity.jpg" alt="The Identity tab for Sentinel-2A, with details from Wikidata, GCAT and Space-Track"></td>
-    <td width="50%"><img src="assets/web-sees.jpg" alt="The Sees tab marking where Sentinel-2A's latest image of Earth was taken, with the globe turned to face it"></td>
+    <td width="50%"><img src="assets/web-sees.jpg" alt="The Scenes tab marking where Sentinel-2A's latest image of Earth was taken, with the globe turned to face it"></td>
   </tr>
   <tr>
     <td>Identity combines Wikidata, GCAT and, with your own account, Space-Track.</td>
-    <td>Pick a recent image, and the globe turns to where it was taken.</td>
+    <td>Pick a recent scene, and the globe turns to where it was captured.</td>
   </tr>
 </table>
 
@@ -184,7 +184,7 @@ CI runs on Linux, macOS and Windows. The web app's source is in `internal/webui/
 
 ## License
 
-Khonsu is available under the [MIT license](LICENSE.md).
+Khonsu is available under the [MIT license](LICENSE.md). The software it builds on keeps its own licenses, listed in full in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), which ships in every release archive.
 
 - **Libraries:** propagation uses [go-satellite-v2](https://github.com/Mohammed-Ashour/go-satellite-v2), the TUI uses [Bubble Tea](https://github.com/charmbracelet/bubbletea), and commands use [urfave/cli](https://github.com/urfave/cli). The web app and orbit viewer use [Three.js](https://threejs.org/) and [Natural Earth](https://www.naturalearthdata.com/).
 - **Drawing of Khonsu:** dedicated to the public domain ([CC0](https://creativecommons.org/publicdomain/zero/1.0/)) by its author on [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Khonsu_(azure_skin_color).svg).

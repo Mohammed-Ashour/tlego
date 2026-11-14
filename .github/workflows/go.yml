@@ -90,6 +90,17 @@ jobs:
       - run: npm run build
       - name: Verify committed web app bundle
         run: test -z "$(git status --porcelain -- dist)"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Verify third-party notices
+        working-directory: .
+        run: |
+          go run ./internal/tools/notices > THIRD_PARTY_NOTICES.md
+          git diff --exit-code -- THIRD_PARTY_NOTICES.md
+      - name: Vet
+        working-directory: .
+        run: go vet ./...
 
   extensions:
     runs-on: ubuntu-latest

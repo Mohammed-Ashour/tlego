@@ -54,7 +54,7 @@ internal/sources holds one package per provider (swpc, wikidata, gcat and so on)
 - cmd/root.go owns the CLI; individual cmd files register native commands through init. cmd/run.go chooses native commands before external dispatch.
 - cmd/plugin.go exposes plugin list and plugin init. Initialization writes a new standalone Go or Python project from embedded templates without invoking external tools or overwriting existing directories.
 - cmd/tui.go calls pkg/tui.RunContext.
-- cmd/server.go calls pkg/server.Serve with context cancellation. The CLI defaults to 127.0.0.1:8080; --addr and --static-dir configure serving.
+- cmd/server.go calls pkg/server.Serve with context cancellation. It serves the JSON API only, at 127.0.0.1:8080 by default, with the web app's read-only, same-site and loopback-host checks. --static-dir opts in to serving files, such as the legacy public/ prototype. The web app is `khonsu web`.
 - cmd/web.go calls pkg/server.ServeApp with the embedded internal/webui files, or with a local element file instead of the live catalog. It binds first, prints the URL, then opens a browser.
 - pkg/server.NewHandler exposes the legacy API plus the versioned position, report, passes, tonight, track, look and search endpoints without registering on the global mux.
 - examples/ contains standalone Go examples and the independently packaged Python calendar extension.
@@ -104,7 +104,7 @@ The web app requests a 25-hour sampled track for each satellite and interpolates
 
 The viz command accepts a live catalog ID or a validated local TLE or GP JSON file. pkg/visual samples core states from one UTC start and atomically writes embedded data, renderer and CSS. Points are physical TEME kilometres with UTC times and metadata. The frontend maps axes into Three.js, rotates the globe using UTC-derived GMST, and interpolates only within the common sample interval. The viewer bundle has a separate Node build/check job; Go consumers do not need Node.
 
-The experimental public browser client owns one active selection request. New selections abort previous requests and reject their late responses. HTTP failures show a status message and preserve the last complete scene. Group changes clear old satellite choices, and empty choices remain disabled after failure.
+The legacy public/ browser prototype (served only with `khonsu server --static-dir public`) owns one active selection request. New selections abort previous requests and reject their late responses. HTTP failures show a status message and preserve the last complete scene. Group changes clear old satellite choices, and empty choices remain disabled after failure.
 
 Unknown valid top-level commands resolve to khonsu-command on PATH. Built-in names and aliases always win; invalid native flags do not trigger dispatch. Extensions inherit arguments, streams, environment and working directory. Discovery lists paths without executing code. plugin init creates standalone projects from internal/extensions/templates with a sample command, tests and installation instructions. docs/writing-extensions.md explains extension development. The Python calendar example consumes pass-plan JSON and emits an iCalendar file as an independent process.
 
